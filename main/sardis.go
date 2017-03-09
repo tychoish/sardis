@@ -28,6 +28,7 @@ func buildApp() *cli.App {
 	app.Commands = []cli.Command{
 		operations.HelloWorld(),
 		operations.Notify(),
+		operations.Version(),
 	}
 
 	// These are global options. Use this to configure logging or

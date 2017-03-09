@@ -49,6 +49,7 @@ lintArgs += --exclude="unused global variable \w+Key"
 # end linting configuration
 
 
+
 # start dependency installation tools
 #   implementation details for being able to lazily install dependencies
 gopath := $(shell go env GOPATH)
@@ -70,14 +71,14 @@ makefile:$(deps)
 # implementation details for building the binary and creating a
 # convienent link in the working directory
 define crossCompile
-	@./$(buildDir)/build-cross-compile -buildName=$* -ldflags="-X=github.com/tychoish/sink.BuildRevision=`git rev-parse HEAD`" -goBinary="`which go`" -output=$@
+	@./$(buildDir)/build-cross-compile -buildName=$* -ldflags="-X=github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -goBinary="`which go`" -output=$@
 endef
 $(name):$(buildDir)/$(name)
 	@[ -e $@ ] || ln -s $<
 $(buildDir)/$(name):$(srcFiles)
-	go build -ldflags "-X github.com/tychoish/sink.BuildRevision=`git rev-parse HEAD`" -o $@ main/$(name).go
+	go build -ldflags "-X github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -o $@ main/$(name).go
 $(buildDir)/$(name).race:$(srcFiles)
-	go build -race -ldflags "-X github.com/tychoish/sink.BuildRevision=`git rev-parse HEAD`" -o $@ main/$(name).go
+	go build -race -ldflags "-X github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -o $@ main/$(name).go
 # end dependency installation tools
 
 

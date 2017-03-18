@@ -192,7 +192,12 @@ vendor-sync:$(vendorDeps)
 vendor-clean:
 	rm -rf vendor/github.com/stretchr/testify/vendor/
 	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/mongodb/grip/
+	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/golang.org/x/net/
 	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/tychoish/gimlet/
+	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/pkg/errors
+	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/pmezard/
+	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/stretchr/
+	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/davecgh/
 	rm -rf vendor/github.com/mongodb/amboy/vendor/gopkg.in/mgo.v2
 	rm -rf vendor/github.com/mongodb/amboy/vendor/golang.org/x/net/
 	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/stretchr/
@@ -206,7 +211,6 @@ change-go-version:
 vendor:$(buildDir)/vendor/src
 	@$(MAKE) $(makeArgs) -k -C vendor/github.com/mongodb/grip $@
 	@$(MAKE) $(makeArgs) -k -C vendor/github.com/mongodb/amboy $@
-	@$(MAKE) $(makeArgs) -k -C vendor/github.com/mongodb/curator $@
 $(buildDir)/vendor/src:$(buildDir)/make-vendor $(buildDir)/render-gopath
 	@./$(buildDir)/make-vendor
 #   targets to build the small programs used to support vendoring.

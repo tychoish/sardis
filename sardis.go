@@ -138,7 +138,7 @@ func (c *appServicesCache) setSeystemEventLog(s send.Sender) error {
 
 	c.sysSender = s
 	c.logger = logging.NewGrip("sink")
-	return errors.WithStack(c.logger.SetSender(s))
+	return errors.Wrap(c.logger.SetSender(s), "problem setting sender")
 }
 
 func (c *appServicesCache) getSystemEventLog() send.Sender {

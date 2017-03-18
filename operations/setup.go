@@ -46,6 +46,7 @@ func configureQueue() error {
 
 func configureSender() error {
 	sender, err := send.NewXMPP("sardis", os.Getenv(NotifyTargetEnvName), grip.GetSender().Level())
+	sender.SetFormatter(send.MakeXMPPFormatter("sardis"))
 	if err != nil {
 		return errors.Wrap(err, "problem creating sender")
 	}

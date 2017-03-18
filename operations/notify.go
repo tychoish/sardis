@@ -3,6 +3,7 @@ package operations
 import (
 	"bufio"
 	"os"
+	"strings"
 
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
@@ -28,7 +29,7 @@ func notifyPipe() cli.Command {
 		Usage: "send the contents of standard input over xmpp",
 		Action: func(c *cli.Context) error {
 			if err := configureSender(); err != nil {
-				return errors.WithStack(err)
+				return errors.Wrap(err, "problem configuring sender")
 			}
 
 			level := grip.DefaultLevel()
@@ -48,13 +49,13 @@ func notifySend() cli.Command {
 		Usage: "send the remaining arguments over xmpp",
 		Action: func(c *cli.Context) error {
 			if err := configureSender(); err != nil {
-				return errors.WithStack(err)
+				return errors.Wrap(err, "problem configuring sender")
 			}
 
 			level := grip.DefaultLevel()
 			logger := sardis.GetLogger()
 
-			logger.Log(level, []string(c.Args()))
+			logger.Log(level, strings.Join(c.Args(), " "))
 
 			return nil
 		},

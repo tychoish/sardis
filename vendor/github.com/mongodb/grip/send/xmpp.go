@@ -101,6 +101,7 @@ func constructXMPPLogger(target string, info XMPPConnectionInfo) (Sender, error)
 	client, err := xmpp.NewClient(info.Hostname, info.Username, info.Password, false)
 	if err != nil {
 		errs := []string{err.Error()}
+		xmpp.DefaultConfig.InsecureSkipVerify = true
 		client, err = xmpp.NewClientNoTLS(info.Hostname, info.Username, info.Password, false)
 		if err != nil {
 			errs = append(errs, err.Error())

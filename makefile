@@ -169,6 +169,61 @@ $(buildDir)/output.%.coverage.html:$(buildDir)/output.%.coverage
 	go tool cover -html=$< -o $@
 # end test and coverage artifacts
 
+
+# start vendoring configuration
+#    begin with configuration of dependencies
+vendorDeps := github.com/Masterminds/glide
+vendorDeps := $(addprefix $(gopath)/src/,$(vendorDeps))
+vendor-deps:$(vendorDeps)
+#   this allows us to store our vendored code in vendor and use
+#   symlinks to support vendored code both in the legacy style and with
+#   new-style vendor directories. When this codebase can drop support
+#   for go1.4, we can delete most of this.
+-include $(buildDir)/makefile.vendor
+nestedVendored := vendor/github.com/mongodb/grip
+nestedVendored += vendor/github.com/mongodb/amboy
+nestedVendored := $(foreach project,$(nestedVendored),$(project)/build/vendor)
+$(buildDir)/makefile.vendor:$(buildDir)/render-gopath makefile
+	@mkdir -p $(buildDir)
+	@echo "vendorGopath := \$$(shell \$$(buildDir)/render-gopath $(nestedVendored))" >| $@
+#   targets for the directory components and manipulating vendored files.
+vendor-sync:$(vendorDeps)
+	glide install -s
+vendor-clean:
+	rm -rf vendor/github.com/stretchr/testify/vendor/
+	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/mongodb/grip/
+	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/tychoish/gimlet/
+	rm -rf vendor/github.com/mongodb/amboy/vendor/gopkg.in/mgo.v2
+	rm -rf vendor/github.com/mongodb/amboy/vendor/golang.org/x/net/
+	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/stretchr/
+	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/davecgh/go-spew/
+	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/pmezard/go-difflib/
+	rm -rf vendor/gopkg.in/mgo.v2/harness/
+	find vendor/ -name "*.gif" -o -name "*.gz" -o -name "*.png" -o -name "*.ico" -o -name "*testdata*" | xargs rm -rf
+change-go-version:
+	rm -rf $(buildDir)/make-vendor $(buildDir)/render-gopath
+	@$(MAKE) $(makeArgs) vendor > /dev/null 2>&1
+vendor:$(buildDir)/vendor/src
+	@$(MAKE) $(makeArgs) -k -C vendor/github.com/mongodb/grip $@
+	@$(MAKE) $(makeArgs) -k -C vendor/github.com/mongodb/amboy $@
+	@$(MAKE) $(makeArgs) -k -C vendor/github.com/mongodb/curator $@
+$(buildDir)/vendor/src:$(buildDir)/make-vendor $(buildDir)/render-gopath
+	@./$(buildDir)/make-vendor
+#   targets to build the small programs used to support vendoring.
+$(buildDir)/make-vendor:buildscripts/make-vendor.go
+	@mkdir -p $(buildDir)
+	go build -o $@ $<
+$(buildDir)/render-gopath:buildscripts/render-gopath.go
+	@mkdir -p $(buildDir)
+	go build -o $@ $<
+#   define dependencies for buildscripts
+buildscripts/make-vendor.go:buildscripts/vendoring/vendoring.go
+buildscripts/render-gopath.go:buildscripts/vendoring/vendoring.go
+#   add phony targets
+phony += vendor vendor-deps vendor-clean vendor-sync change-go-version
+# end vendoring tooling configuration
+
+
 # clean and other utility targets
 clean:
 	rm -rf $(lintDeps) $(buildDir)/test.* $(buildDir)/coverage.* $(buildDir)/race.* $(name) $(buildDir)/$(name)

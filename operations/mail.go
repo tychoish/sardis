@@ -68,7 +68,7 @@ func updateDB() cli.Command {
 				return errors.Wrap(err, "problem starting queue")
 			}
 
-			j := units.NewMailUpdaterJob(c.String("mail"), c.String("mu"), c.String("daemon"j), c.Bool("rebuild"))
+			j := units.NewMailUpdaterJob(c.String("mail"), c.String("mu"), c.String("daemon"), c.Bool("rebuild"))
 			if err := queue.Put(j); err != nil {
 				return errors.Wrap(err, "problem registering job")
 			}

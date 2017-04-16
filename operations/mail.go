@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mongodb/amboy"
+	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
@@ -23,7 +24,9 @@ func Mail() cli.Command {
 }
 
 func updateDB() cli.Command {
-	user, _ := user.Current()
+	user, err := user.Current()
+	grip.CatchWarning(err)
+
 	return cli.Command{
 		Name:    "mu-update",
 		Aliases: []string{"mu", "mui", "muiw"},
@@ -65,7 +68,7 @@ func updateDB() cli.Command {
 				return errors.Wrap(err, "problem starting queue")
 			}
 
-			j := units.NewMailUpdaterJob(c.String("mail"), c.String("mu"), c.String("daemon"), c.Bool("rebuild"))
+			j := units.NewMailUpdaterJob(c.String("mail"), c.String("mu"), c.String("daemon"j), c.Bool("rebuild"))
 			if err := queue.Put(j); err != nil {
 				return errors.Wrap(err, "problem registering job")
 			}

@@ -15,7 +15,7 @@ func HelloWorld() cli.Command {
 		Usage:   "A simple hello world example.",
 		Flags:   []cli.Flag{},
 		Action: func(c *cli.Context) error {
-			grip.Log(grip.ThresholdLevel(), "hello world!")
+			grip.Notice("hello world!")
 			return nil
 		},
 	}

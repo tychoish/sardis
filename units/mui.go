@@ -1,6 +1,7 @@
 package units
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -57,7 +58,7 @@ func NewMailUpdaterJob(mailDir, muHome, daemonName string, rebuild bool) amboy.J
 	return j
 }
 
-func (j *mailUpdatederUnit) Run() {
+func (j *mailUpdatederUnit) Run(ctx context.Context) {
 	defer j.MarkComplete()
 
 	cmds := [][]string{

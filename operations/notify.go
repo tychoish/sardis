@@ -32,7 +32,7 @@ func notifyPipe() cli.Command {
 				return errors.Wrap(err, "problem configuring sender")
 			}
 
-			level := grip.DefaultLevel()
+			level := grip.GetSender().Level().Default
 			logger := sardis.GetLogger()
 			scanner := bufio.NewScanner(os.Stdin)
 			for scanner.Scan() {
@@ -52,7 +52,7 @@ func notifySend() cli.Command {
 				return errors.Wrap(err, "problem configuring sender")
 			}
 
-			level := grip.DefaultLevel()
+			level := grip.GetSender().Level().Default
 			logger := sardis.GetLogger()
 
 			logger.Log(level, strings.Join(c.Args(), " "))

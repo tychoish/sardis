@@ -25,7 +25,7 @@ func Mail() cli.Command {
 
 func updateDB() cli.Command {
 	user, err := user.Current()
-	grip.CatchWarning(err)
+	grip.Warning(err)
 
 	return cli.Command{
 		Name:    "mu-update",

@@ -1,19 +1,21 @@
 package pool
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/job"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/net/context"
 )
 
 type LocalWorkersSuite struct {
 	size  int
-	pool  *LocalWorkers
+	pool  *localWorkers
 	queue *QueueTester
 	suite.Suite
 }
@@ -40,8 +42,16 @@ func TestLocalWorkersSuiteSizeOneHundred(t *testing.T) {
 }
 
 func (s *LocalWorkersSuite) SetupTest() {
-	s.pool = NewLocalWorkers(s.size, nil)
+	s.pool = NewLocalWorkers(s.size, nil).(*localWorkers)
 	s.queue = NewQueueTester(s.pool)
+}
+
+func (s *LocalWorkersSuite) TestPanicJobsDoNotPanicHarness() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	wg := &sync.WaitGroup{}
+
+	s.NotPanics(func() { worker(ctx, jobsChanWithPanicingJobs(ctx, s.size), s.queue, wg) })
 }
 
 func (s *LocalWorkersSuite) TestConstructedInstanceImplementsInterface() {
@@ -87,10 +97,10 @@ func (s *LocalWorkersSuite) TestPoolStartsAndProcessesJobs() {
 	s.True(s.pool.Started())
 	s.True(s.queue.Started())
 
-	amboy.Wait(s.queue)
+	amboy.WaitInterval(s.queue, 100*time.Millisecond)
 
 	counter := 0
-	for j := range s.queue.Results() {
+	for j := range s.queue.Results(ctx) {
 		s.True(j.Status().Completed)
 		counter++
 	}
@@ -133,10 +143,24 @@ func (s *LocalWorkersSuite) TestQueueIsNotMutableAfterStartingPool() {
 
 func TestLocalWorkerPoolConstructorDoesNotAllowSizeValuesLessThanOne(t *testing.T) {
 	assert := assert.New(t)
-	var pool *LocalWorkers
+	var pool *localWorkers
+	var runner amboy.Runner
 
 	for _, size := range []int{-10, -1, 0} {
-		pool = NewLocalWorkers(size, nil)
+		runner = NewLocalWorkers(size, nil)
+		pool = runner.(*localWorkers)
+
 		assert.Equal(1, pool.size)
 	}
+}
+
+func TestPanicJobPanics(t *testing.T) {
+	assert := assert.New(t) // nolint
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	for wu := range jobsChanWithPanicingJobs(ctx, 8) {
+		assert.Panics(func() { wu.job.Run(ctx) })
+	}
+
 }

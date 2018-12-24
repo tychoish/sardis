@@ -1,29 +1,38 @@
 package queue
 
 import (
+	"context"
 	"time"
 
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/pool"
 	"github.com/mongodb/grip"
-	"golang.org/x/net/context"
+	"github.com/mongodb/grip/message"
 )
+
+// Remote queues extend the queue interface to allow a
+// pluggable-storage backend, or "driver"
+type Remote interface {
+	amboy.Queue
+	SetDriver(Driver) error
+	Driver() Driver
+}
 
 // RemoteUnordered are queues that use a Driver as backend for job
 // storage and processing and do not impose any additional ordering
 // beyond what's provided by the driver.
-type RemoteUnordered struct {
+type remoteUnordered struct {
 	*remoteBase
 }
 
 // NewRemoteUnordered returns a queue that has been initialized with a
 // local worker pool Runner instance of the specified size.
-func NewRemoteUnordered(size int) *RemoteUnordered {
-	q := &RemoteUnordered{
+func NewRemoteUnordered(size int) Remote {
+	q := &remoteUnordered{
 		remoteBase: newRemoteBase(),
 	}
 
-	grip.CatchError(q.SetRunner(pool.NewLocalWorkers(size, q)))
+	grip.Error(q.SetRunner(pool.NewLocalWorkers(size, q)))
 
 	grip.Infof("creating new remote job queue with %d workers", size)
 
@@ -34,7 +43,9 @@ func NewRemoteUnordered(size int) *RemoteUnordered {
 // context is canceled. The operation is blocking until an
 // undispatched, unlocked job is available. This operation takes a job
 // lock.
-func (q *RemoteUnordered) Next(ctx context.Context) amboy.Job {
+func (q *remoteUnordered) Next(ctx context.Context) amboy.Job {
+	var err error
+
 	start := time.Now()
 	count := 0
 	for {
@@ -43,21 +54,52 @@ func (q *RemoteUnordered) Next(ctx context.Context) amboy.Job {
 		case <-ctx.Done():
 			return nil
 		case job := <-q.channel:
-			err := q.driver.Lock(job)
-			if err != nil {
-				grip.Warning(err)
+			if job == nil {
 				continue
 			}
 
-			job, err = q.driver.Get(job.ID())
-			if err != nil {
-				grip.CatchNotice(q.driver.Unlock(job))
-				grip.Warning(err)
+			job, err = q.driver.Get(ctx, job.ID())
+			if job == nil {
 				continue
 			}
 
-			grip.Debugf("returning job from remote source, count = %d; duration = %s",
-				count, time.Since(start))
+			if err != nil {
+				grip.Debug(message.WrapError(err, message.Fields{
+					"id":        job.ID(),
+					"operation": "problem refreshing job in dispatching from remote queue",
+				}))
+
+				grip.Debug(message.WrapError(q.driver.Unlock(ctx, job),
+					message.Fields{
+						"id":        job.ID(),
+						"operation": "unlocking job, may leave a stale job",
+					}))
+				continue
+			}
+
+			if !isDispatchable(job.Status()) {
+				continue
+			}
+
+			ti := amboy.JobTimeInfo{
+				Start: time.Now(),
+			}
+			job.UpdateTimeInfo(ti)
+
+			if err := q.driver.Lock(ctx, job); err != nil {
+				grip.Debug(message.WrapError(err, message.Fields{
+					"id":        job.ID(),
+					"operation": "locking job",
+					"attempt":   count,
+				}))
+				continue
+			}
+
+			grip.Debug(message.Fields{
+				"message":       "returning job from remote source",
+				"dispatch_secs": time.Since(start).Seconds(),
+				"attempts":      count,
+			})
 
 			return job
 		}

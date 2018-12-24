@@ -1,14 +1,13 @@
 package queue
 
 import (
+	"context"
 	"testing"
 
-	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/job"
 	"github.com/mongodb/amboy/pool"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/net/context"
 )
 
 // LocalLimitedSizeQueue suite tests the queue implementation that
@@ -17,7 +16,7 @@ import (
 // storage object *or* exercised by the general queue functionality
 // tests, which test all implementations.
 type LimitedSizeQueueSuite struct {
-	queue       *LocalLimitedSize
+	queue       *limitedSizeLocal
 	numWorkers  int
 	numCapacity int
 	require     *require.Assertions
@@ -35,7 +34,7 @@ func (s *LimitedSizeQueueSuite) SetupSuite() {
 }
 
 func (s *LimitedSizeQueueSuite) SetupTest() {
-	s.queue = NewLocalLimitedSize(s.numWorkers, s.numCapacity)
+	s.queue = NewLocalLimitedSize(s.numWorkers, s.numCapacity).(*limitedSizeLocal)
 }
 
 func (s *LimitedSizeQueueSuite) TestBufferForPendingWorkEqualToCapacityForResults() {
@@ -64,13 +63,16 @@ func (s *LimitedSizeQueueSuite) TestCallingStartMultipleTimesDoesNotImpactState(
 	ctx := context.Background()
 	s.NoError(s.queue.Start(ctx))
 
+	s.NotNil(s.queue.channel)
 	for i := 0; i < 100; i++ {
-		s.NoError(s.queue.Start(ctx))
+		s.Error(s.queue.Start(ctx))
 	}
+
+	s.NotNil(s.queue.channel)
 }
 
 func (s *LimitedSizeQueueSuite) TestCannotSetRunnerAfterQueueIsOpened() {
-	secondRunner := pool.NewSingleRunner()
+	secondRunner := pool.NewSingle()
 	runner := s.queue.runner
 
 	s.False(s.queue.Started())
@@ -89,36 +91,4 @@ func (s *LimitedSizeQueueSuite) TestCannotSetRunnerAfterQueueIsOpened() {
 		s.Error(s.queue.SetRunner(secondRunner))
 		s.Error(s.queue.SetRunner(runner))
 	}
-}
-
-func (s *LimitedSizeQueueSuite) TestGetMethodOnlyReturnsCompletedJobs() {
-	s.False(s.queue.Started())
-
-	ctx := context.Background()
-	s.NoError(s.queue.Start(ctx))
-
-	s.True(s.queue.Started())
-
-	jobs := make(map[string]amboy.Job)
-	for i := 0; i < s.numCapacity; i++ {
-		j := job.NewShellJob("true", "")
-		s.NoError(s.queue.Put(j))
-		jobs[j.ID()] = j
-	}
-
-	amboy.Wait(s.queue)
-	s.queue.Runner().Close()
-
-	for name, j := range jobs {
-		rj, ok := s.queue.Get(name)
-		s.True(ok)
-		s.NotNil(rj)
-		s.Equal(j, rj)
-	}
-
-	j := job.NewShellJob("true", "")
-	s.NoError(s.queue.Put(j))
-	rj, ok := s.queue.Get(j.ID())
-	s.Nil(rj)
-	s.False(ok)
 }

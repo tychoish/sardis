@@ -1,11 +1,12 @@
 package pool
 
 import (
+	"context"
 	"sync"
 
 	"github.com/mongodb/amboy"
+	"github.com/mongodb/amboy/job"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 type QueueTester struct {
@@ -32,7 +33,7 @@ func NewQueueTester(p amboy.Runner) *QueueTester {
 // sense.
 func NewQueueTesterInstance() *QueueTester {
 	return &QueueTester{
-		toProcess: make(chan amboy.Job, 10),
+		toProcess: make(chan amboy.Job, 101),
 		storage:   make(map[string]amboy.Job),
 	}
 }
@@ -60,8 +61,6 @@ func (q *QueueTester) Complete(ctx context.Context, j amboy.Job) {
 	defer q.mutex.Unlock()
 
 	q.numComplete++
-
-	return
 }
 
 func (q *QueueTester) Stats() amboy.QueueStats {
@@ -114,24 +113,72 @@ func (q *QueueTester) Start(ctx context.Context) error {
 	return nil
 }
 
-func (q *QueueTester) Results() <-chan amboy.Job {
+func (q *QueueTester) Results(ctx context.Context) <-chan amboy.Job {
 	output := make(chan amboy.Job)
 
-	go func(m map[string]amboy.Job) {
-		for _, job := range m {
+	go func() {
+		defer close(output)
+		for _, job := range q.storage {
+			if ctx.Err() != nil {
+				return
+			}
+
 			if job.Status().Completed {
 				output <- job
 			}
 		}
-		close(output)
-	}(q.storage)
+	}()
 
 	return output
 }
 
-func (q *QueueTester) isComplete() bool {
-	q.mutex.RLock()
-	defer q.mutex.RUnlock()
+func (q *QueueTester) JobStats(ctx context.Context) <-chan amboy.JobStatusInfo {
+	output := make(chan amboy.JobStatusInfo)
+	go func() {
+		defer close(output)
+		for _, job := range q.storage {
+			if ctx.Err() != nil {
+				return
 
-	return len(q.storage) == q.numComplete
+			}
+			status := job.Status()
+			status.ID = job.ID()
+			output <- status
+		}
+	}()
+
+	return output
+}
+
+type jobThatPanics struct {
+	job.Base
+}
+
+func (j *jobThatPanics) Run(_ context.Context) {
+	defer j.MarkComplete()
+
+	panic("panic err")
+}
+
+func jobsChanWithPanicingJobs(ctx context.Context, num int) <-chan workUnit {
+	out := make(chan workUnit)
+
+	go func() {
+		defer close(out) // nolint
+		count := 0
+		for {
+			if count >= num {
+				return
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case out <- workUnit{job: &jobThatPanics{}, cancel: func() {}}:
+				count++
+			}
+		}
+	}()
+
+	return out
 }

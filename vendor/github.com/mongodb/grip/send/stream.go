@@ -41,14 +41,14 @@ func MakeStreamLogger(ws WriteStringer) Sender {
 	_ = s.SetErrorHandler(ErrorHandlerFromLogger(fallback))
 
 	s.reset = func() {
-		fallback.SetPrefix(fmt.Sprintf("[%s]", s.Name()))
+		fallback.SetPrefix(fmt.Sprintf("[%s] ", s.Name()))
 	}
 
 	return s
 }
 
 func (s *streamLogger) Send(m message.Composer) {
-	if s.level.ShouldLog(m) {
+	if s.Level().ShouldLog(m) {
 		msg := m.String()
 
 		if !strings.HasSuffix(msg, "\n") {
@@ -56,7 +56,7 @@ func (s *streamLogger) Send(m message.Composer) {
 		}
 
 		if _, err := s.fobj.WriteString(msg); err != nil {
-			s.errHandler(err, m)
+			s.ErrorHandler(err, m)
 		}
 	}
 }

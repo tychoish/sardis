@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"time"
 
 	"github.com/mongodb/amboy"
@@ -8,7 +9,6 @@ import (
 	"github.com/mongodb/amboy/pool"
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
-	"golang.org/x/net/context"
 )
 
 // SimpleRemoteOrdered queue implements the amboy.Queue interface and
@@ -21,15 +21,15 @@ import (
 // more complex dependency graphs. Internally SimpleRemoteOrdered and
 // RemoteUnordred share an implementation *except* for the Next method,
 // which differs in task dispatching strategies.
-type SimpleRemoteOrdered struct {
+type remoteSimpleOrdered struct {
 	*remoteBase
 }
 
 // NewSimpleRemoteOrdered returns a queue with a configured local
 // runner with the specified number of workers.
-func NewSimpleRemoteOrdered(size int) *SimpleRemoteOrdered {
-	q := &SimpleRemoteOrdered{remoteBase: newRemoteBase()}
-	grip.CatchError(q.SetRunner(pool.NewLocalWorkers(size, q)))
+func NewSimpleRemoteOrdered(size int) Remote {
+	q := &remoteSimpleOrdered{remoteBase: newRemoteBase()}
+	grip.Error(q.SetRunner(pool.NewLocalWorkers(size, q)))
 	grip.Infof("creating new remote job queue with %d workers", size)
 
 	return q
@@ -45,7 +45,7 @@ func NewSimpleRemoteOrdered(size int) *SimpleRemoteOrdered {
 // that the next time this job is dispatched its dependencies will be
 // ready. if there is only one Edge reported, blocked will attempt to
 // dispatch the dependent job.
-func (q *SimpleRemoteOrdered) Next(ctx context.Context) amboy.Job {
+func (q *remoteSimpleOrdered) Next(ctx context.Context) amboy.Job {
 	start := time.Now()
 	count := 1
 	for {
@@ -53,21 +53,25 @@ func (q *SimpleRemoteOrdered) Next(ctx context.Context) amboy.Job {
 		case <-ctx.Done():
 			return nil
 		case job := <-q.channel:
-			err := q.driver.Lock(job)
+			ti := amboy.JobTimeInfo{
+				Start: time.Now(),
+			}
+			job.UpdateTimeInfo(ti)
+			err := q.driver.Lock(ctx, job)
 			if err != nil {
 				grip.Warning(err)
 				continue
 			}
 
-			job, err = q.driver.Get(job.ID())
+			job, err = q.driver.Get(ctx, job.ID())
 			if err != nil {
-				grip.CatchNotice(q.driver.Unlock(job))
+				grip.Notice(q.driver.Unlock(ctx, job))
 				grip.Warning(err)
 				continue
 			}
 
 			if job.Status().Completed {
-				grip.CatchWarning(q.driver.Unlock(job))
+				grip.Warning(q.driver.Unlock(ctx, job))
 				continue
 			}
 
@@ -79,25 +83,25 @@ func (q *SimpleRemoteOrdered) Next(ctx context.Context) amboy.Job {
 			//
 			// The local version of this queue reads all jobs in and builds a DAG, which
 			// it then sorts and executes in order. This takes a more rudimentary approach.
+			id := job.ID()
 			switch dep.State() {
 			case dependency.Ready:
-				grip.Debugf("returning job from remote source, count = %d; duration = %s",
-					count, time.Since(start))
-
+				grip.Debugf("returning job %s from remote source, count = %d; duration = %s",
+					id, count, time.Since(start))
 				count++
 				return job
 			case dependency.Passed:
-				grip.CatchWarning(q.driver.Unlock(job))
+				grip.Warning(q.driver.Unlock(ctx, job))
 				q.addBlocked(job.ID())
 				continue
 			case dependency.Unresolved:
 				grip.Warning(message.MakeFieldsMessage("detected a dependency error",
 					message.Fields{
-						"job":   job.ID(),
+						"job":   id,
 						"edges": dep.Edges(),
 						"dep":   dep.Type(),
 					}))
-				grip.CatchWarning(q.driver.Unlock(job))
+				grip.Warning(q.driver.Unlock(ctx, job))
 				q.addBlocked(job.ID())
 				continue
 			case dependency.Blocked:
@@ -105,10 +109,10 @@ func (q *SimpleRemoteOrdered) Next(ctx context.Context) amboy.Job {
 				// to move that job *up* in the queue by submitting it here. there's a
 				// chance, however, that it's already in progress and we'll end up
 				// running it twice.
-				grip.CatchWarning(q.driver.Unlock(job))
+				grip.Warning(q.driver.Unlock(ctx, job))
 
 				edges := dep.Edges()
-				grip.Debugf("job %s is blocked. eep! [%v]", job.ID(), edges)
+				grip.Debugf("job %s is blocked. eep! [%v]", id, edges)
 				if len(edges) == 1 {
 					dj, ok := q.Get(edges[0])
 					if ok {
@@ -117,20 +121,20 @@ func (q *SimpleRemoteOrdered) Next(ctx context.Context) amboy.Job {
 						continue
 					}
 				} else if len(edges) == 0 {
-					grip.Debugf("blocked task %s has no edges", job.ID())
+					grip.Debugf("blocked task %s has no edges", id)
 				} else {
 					grip.Debugf("job '%s' has %d dependencies, passing for now",
-						job.ID(), len(edges))
+						id, len(edges))
 				}
 
-				q.addBlocked(job.ID())
+				q.addBlocked(id)
 
 				continue
 			default:
-				grip.CatchWarning(q.driver.Unlock(job))
+				grip.Warning(q.driver.Unlock(ctx, job))
 				grip.Warning(message.MakeFieldsMessage("detected invalid dependency",
 					message.Fields{
-						"job":   job.ID(),
+						"job":   id,
 						"edges": dep.Edges(),
 						"dep":   dep.Type(),
 						"state": message.Fields{

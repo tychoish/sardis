@@ -1,19 +1,18 @@
 package pool
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/job"
 	"github.com/stretchr/testify/suite"
-	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/level"
-	"golang.org/x/net/context"
 )
 
 type SingleRunnerSuite struct {
-	pool  *SingleRunner
+	pool  *single
 	queue *QueueTester
 	suite.Suite
 }
@@ -22,12 +21,8 @@ func TestSingleWorkerSuite(t *testing.T) {
 	suite.Run(t, new(SingleRunnerSuite))
 }
 
-func (s *SingleRunnerSuite) SetupSuite() {
-	grip.SetThreshold(level.Info)
-}
-
 func (s *SingleRunnerSuite) SetupTest() {
-	s.pool = NewSingleRunner()
+	s.pool = NewSingle().(*single)
 	s.queue = NewQueueTester(s.pool)
 }
 
@@ -73,7 +68,7 @@ func (s *SingleRunnerSuite) TestPoolStartsAndProcessesJobs() {
 	s.True(s.pool.Started())
 	s.True(s.queue.Started())
 
-	amboy.Wait(s.queue)
+	amboy.WaitInterval(s.queue, 100*time.Millisecond)
 
 	for _, job := range jobs {
 		s.True(job.Status().Completed)

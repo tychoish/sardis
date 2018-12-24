@@ -1,8 +1,9 @@
-// +build cgo,!gccgo
-
 package queue
 
 import (
+	"context"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -10,11 +11,9 @@ import (
 	"github.com/mongodb/amboy/dependency"
 	"github.com/mongodb/amboy/job"
 	"github.com/mongodb/amboy/pool"
-	"github.com/mongodb/amboy/queue/driver"
+	"github.com/mongodb/grip"
 	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/suite"
-	"github.com/mongodb/grip"
-	"golang.org/x/net/context"
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -43,25 +42,25 @@ func TestLocalOrderedQueueSuiteThreeWorker(t *testing.T) {
 	suite.Run(t, s)
 }
 
-func TestRemoteMongoDBOrderedQueueSuiteTwoWorkers(t *testing.T) {
+func TestRemoteMgoOrderedQueueSuiteFourWorkers(t *testing.T) {
 	s := &OrderedQueueSuite{}
 	name := "test-" + uuid.NewV4().String()
 	uri := "mongodb://localhost"
+	opts := DefaultMongoDBOptions()
+	opts.DB = "amboy_test"
 	ctx, cancel := context.WithCancel(context.Background())
 
 	session, err := mgo.Dial(uri)
-	if err != nil {
-		if !s.NoError(err) {
-			return
-		}
+	if err != nil || session == nil {
+		t.Fatal("problem configuring connection to:", uri)
 	}
 	defer session.Close()
 
 	s.size = 4
 
 	s.setup = func() {
-		remote := NewSimpleRemoteOrdered(s.size)
-		d := driver.NewMongoDB(name, driver.DefaultMongoDBOptions())
+		remote := NewSimpleRemoteOrdered(s.size).(*remoteSimpleOrdered)
+		d := NewMgoDriver(name, opts)
 		s.Require().NoError(d.Open(ctx))
 		s.Require().NoError(remote.SetDriver(d))
 		s.queue = remote
@@ -71,29 +70,55 @@ func TestRemoteMongoDBOrderedQueueSuiteTwoWorkers(t *testing.T) {
 	s.tearDown = func() {
 		cancel()
 
-		grip.CatchError(session.DB("amboy").C(name + ".jobs").DropCollection())
-		grip.CatchError(session.DB("amboy").C(name + ".locks").DropCollection())
+		grip.Error(session.DB("amboy_test").C(name + ".jobs").DropCollection())
+		grip.Error(session.DB("amboy_test").C(name + ".locks").DropCollection())
 	}
 
 	s.reset = func() {
-		_, err = session.DB("amboy").C(name + ".jobs").RemoveAll(bson.M{})
-		grip.CatchError(err)
-		_, err = session.DB("amboy").C(name + ".locks").RemoveAll(bson.M{})
-		grip.CatchError(err)
+		_, err = session.DB("amboy_test").C(name + ".jobs").RemoveAll(bson.M{})
+		grip.Error(err)
+		_, err = session.DB("amboy_test").C(name + ".locks").RemoveAll(bson.M{})
+		grip.Error(err)
 	}
 
 	suite.Run(t, s)
 }
 
-func TestRemoteLocalOrderedQueueSuite(t *testing.T) {
+func TestRemoteInternalOrderedQueueSuite(t *testing.T) {
 	s := &OrderedQueueSuite{}
 	ctx, cancel := context.WithCancel(context.Background())
 
 	s.size = 4
 
 	s.reset = func() {
-		d := driver.NewInternal()
-		remote := NewSimpleRemoteOrdered(s.size)
+		d := NewPriorityDriver()
+		remote := NewSimpleRemoteOrdered(s.size).(*remoteSimpleOrdered)
+		s.Require().NotNil(remote.remoteBase)
+		s.Require().NoError(d.Open(ctx))
+		s.Require().NoError(remote.SetDriver(d))
+		s.queue = remote
+	}
+
+	s.setup = func() {
+		s.reset()
+	}
+
+	s.tearDown = func() {
+		cancel()
+	}
+
+	suite.Run(t, s)
+}
+
+func TestRemotePriorityOrderedQueueSuite(t *testing.T) {
+	s := &OrderedQueueSuite{}
+	ctx, cancel := context.WithCancel(context.Background())
+
+	s.size = 4
+
+	s.reset = func() {
+		d := NewInternalDriver()
+		remote := NewSimpleRemoteOrdered(s.size).(*remoteSimpleOrdered)
 		s.Require().NotNil(remote.remoteBase)
 		s.Require().NoError(d.Open(ctx))
 		s.Require().NoError(remote.SetDriver(d))
@@ -135,7 +160,7 @@ func (s *OrderedQueueSuite) TestPutReturnsErrorForDuplicateNameTasks() {
 	s.Equal(0, s.queue.Stats().Total)
 	s.NoError(s.queue.Put(j))
 	s.Equal(1, s.queue.Stats().Total)
-	s.NoError(s.queue.Put(j))
+	s.Error(s.queue.Put(j))
 	s.Equal(1, s.queue.Stats().Total)
 
 }
@@ -153,12 +178,9 @@ func (s *OrderedQueueSuite) TestPuttingAJobIntoAQueueImpactsStats() {
 	jReturn, ok := s.queue.Get(j.ID())
 	s.True(ok)
 
-	base := &job.Base{}
 	jActual := jReturn.(*job.ShellJob)
-	jActual.Base = base
-	j.Base = base
 
-	s.Equal(jActual, j)
+	j.Base.SetDependency(jActual.Dependency())
 
 	stats = s.queue.Stats()
 	s.Equal(1, stats.Total)
@@ -191,20 +213,19 @@ func (s *OrderedQueueSuite) TestInternalRunnerCannotBeChangedAfterStartingAQueue
 }
 
 func (s *OrderedQueueSuite) TestResultsChannelProducesPointersToConsistentJobObjects() {
-	ctx, cancel := context.WithCancel(context.Background())
+	j := job.NewShellJob("echo true", "")
+	s.False(j.Status().Completed)
+
+	s.NoError(s.queue.Put(j))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	job := job.NewShellJob("true", "")
-	s.False(job.Status().Completed)
-
-	s.NoError(s.queue.Put(job))
 	s.NoError(s.queue.Start(ctx))
 
-	amboy.Wait(s.queue)
+	amboy.WaitCtxInterval(ctx, s.queue, 250*time.Millisecond)
 
-	result, ok := <-s.queue.Results()
-	if s.True(ok) {
-		s.Equal(job.ID(), result.ID())
+	for result := range s.queue.Results(ctx) {
+		s.Equal(j.ID(), result.ID())
 		s.True(result.Status().Completed)
 	}
 }
@@ -227,9 +248,11 @@ func (s *OrderedQueueSuite) TestQueueCanOnlyBeStartedOnce() {
 }
 
 func (s *OrderedQueueSuite) TestPassedIsCompletedButDoesNotRun() {
+	cwd := GetDirectoryOfFile()
+
 	j1 := job.NewShellJob("echo foo", "")
-	j2 := job.NewShellJob("true", "")
-	j1.SetDependency(dependency.NewCreatesFile("ordered_test.go"))
+	j2 := job.NewShellJob("echo true", "")
+	j1.SetDependency(dependency.NewCreatesFile(filepath.Join(cwd, "ordered_test.go")))
 	s.NoError(j1.Dependency().AddEdge(j2.ID()))
 
 	s.Equal(j1.Dependency().State(), dependency.Passed)
@@ -238,20 +261,25 @@ func (s *OrderedQueueSuite) TestPassedIsCompletedButDoesNotRun() {
 	s.False(j1.Status().Completed)
 	s.False(j2.Status().Completed)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	s.NoError(s.queue.Put(j1))
 	s.NoError(s.queue.Put(j2))
+	s.NoError(s.queue.Put(j1))
 
 	s.NoError(s.queue.Start(ctx))
 
 	amboy.WaitCtxInterval(ctx, s.queue, 250*time.Millisecond)
+
 	j1Refreshed, ok1 := s.queue.Get(j1.ID())
 	j2Refreshed, ok2 := s.queue.Get(j2.ID())
-	s.True(ok1)
-	s.True(ok2)
-	s.False(j1Refreshed.Status().Completed)
-	s.True(j2Refreshed.Status().Completed)
+	if s.True(ok1) {
+		stat := j1Refreshed.Status()
+		s.False(stat.Completed || stat.InProgress)
+	}
+	if s.True(ok2) {
+		stat := j2Refreshed.Status()
+		s.True(stat.Completed || stat.InProgress, "%+v", j2Refreshed.Status())
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -261,7 +289,7 @@ func (s *OrderedQueueSuite) TestPassedIsCompletedButDoesNotRun() {
 ////////////////////////////////////////////////////////////////////////
 
 type LocalOrderedSuite struct {
-	queue *LocalOrdered
+	queue *depGraphOrderedLocal
 	suite.Suite
 }
 
@@ -270,7 +298,7 @@ func TestLocalOrderedSuite(t *testing.T) {
 }
 
 func (s *LocalOrderedSuite) SetupTest() {
-	s.queue = NewLocalOrdered(2)
+	s.queue = NewLocalOrdered(2).(*depGraphOrderedLocal)
 }
 
 func (s *LocalOrderedSuite) TestLocalQueueFailsToStartIfGraphIsOutOfSync() {
@@ -341,4 +369,10 @@ func (s *LocalOrderedSuite) TestPuttingJobIntoQueueAfterStartingReturnsError() {
 
 	s.NoError(s.queue.Start(ctx))
 	s.Error(s.queue.Put(j))
+}
+
+func GetDirectoryOfFile() string {
+	_, file, _, _ := runtime.Caller(1)
+
+	return filepath.Dir(file)
 }

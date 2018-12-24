@@ -1,21 +1,19 @@
 package queue
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	mgo "gopkg.in/mgo.v2"
-
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/dependency"
 	"github.com/mongodb/amboy/job"
-	"github.com/mongodb/amboy/queue/driver"
 	"github.com/mongodb/amboy/registry"
+	"github.com/mongodb/grip"
 	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/suite"
-	"github.com/mongodb/grip"
-	"golang.org/x/net/context"
+	mgo "gopkg.in/mgo.v2"
 )
 
 func init() {
@@ -23,10 +21,10 @@ func init() {
 }
 
 type SimpleRemoteOrderedSuite struct {
-	queue             amboy.Queue
+	queue             Remote
 	tearDown          func() error
-	driver            driver.Driver
-	driverConstructor func() driver.Driver
+	driver            Driver
+	driverConstructor func() Driver
 	canceler          context.CancelFunc
 	suite.Suite
 }
@@ -38,8 +36,10 @@ func TestSimpleRemoteOrderedSuiteMongoDB(t *testing.T) {
 func (s *SimpleRemoteOrderedSuite) SetupSuite() {
 	name := "test-" + uuid.NewV4().String()
 	uri := "mongodb://localhost"
-	s.driverConstructor = func() driver.Driver {
-		return driver.NewMongoDB(name, driver.DefaultMongoDBOptions())
+	opts := DefaultMongoDBOptions()
+	opts.DB = "amboy_test"
+	s.driverConstructor = func() Driver {
+		return NewMgoDriver(name, opts)
 	}
 
 	s.tearDown = func() error {
@@ -50,12 +50,7 @@ func (s *SimpleRemoteOrderedSuite) SetupSuite() {
 			return err
 		}
 
-		err = session.DB("amboy").C(name + ".jobs").DropCollection()
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return session.DB("amboy_test").C(name + ".jobs").DropCollection()
 	}
 }
 
@@ -74,7 +69,7 @@ func (s *SimpleRemoteOrderedSuite) TearDownTest() {
 	// the context to prevent closing the connection before
 	// running the teardown procedure, given that some connection
 	// resources may be shared in the driver.
-	grip.CatchError(s.tearDown())
+	grip.Error(s.tearDown())
 	s.canceler()
 }
 

@@ -26,6 +26,11 @@ type Composer interface {
 	// above the logging threshold.
 	Loggable() bool
 
+	// Annotate makes it possible for Senders and Journalers to
+	// add structured data to a log message. May return an error
+	// when the key alrady exists.
+	Annotate(string, interface{}) error
+
 	// Priority returns the priority of the message.
 	Priority() level.Priority
 	SetPriority(level.Priority) error
@@ -38,12 +43,18 @@ func ConvertToComposer(p level.Priority, message interface{}) Composer {
 	case Composer:
 		_ = message.SetPriority(p)
 		return message
+	case []Composer:
+		out := NewGroupComposer(message)
+		_ = out.SetPriority(p)
+		return out
 	case string:
 		return NewDefaultMessage(p, message)
 	case error:
 		return NewErrorMessage(p, message)
-	case []string, []interface{}:
-		return NewLineMessage(p, message)
+	case []string:
+		return newLinesFromStrings(p, message)
+	case []interface{}:
+		return NewLineMessage(p, message...)
 	case []byte:
 		return NewBytesMessage(p, message)
 	case map[string]interface{}:

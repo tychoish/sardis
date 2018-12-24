@@ -15,9 +15,8 @@ a specific job to complete.
 package amboy
 
 import (
+	"context"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 // Wait takes a queue and blocks until all tasks are completed. This
@@ -82,6 +81,24 @@ func WaitCtxInterval(ctx context.Context, q Queue, interval time.Duration) bool 
 			}
 
 			timer.Reset(interval)
+		}
+	}
+}
+
+// WaitCtxIntervalNum waits for a certain number of jobs to complete,
+// with the same semantics as WaitCtxInterval.
+func WaitCtxIntervalNum(ctx context.Context, q Queue, interval time.Duration, num int) bool {
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-timer.C:
+			if q.Stats().Completed >= num {
+				return true
+			}
 		}
 	}
 }

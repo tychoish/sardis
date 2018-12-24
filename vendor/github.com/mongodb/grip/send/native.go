@@ -33,6 +33,10 @@ func NewFileLogger(name, filePath string, l LevelInfo) (Sender, error) {
 func MakeFileLogger(filePath string) (Sender, error) {
 	s := &nativeLogger{Base: NewBase("")}
 
+	if err := s.SetFormatter(MakeDefaultFormatter()); err != nil {
+		return nil, err
+	}
+
 	f, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		return nil, fmt.Errorf("error opening logging file, %s", err.Error())
@@ -40,10 +44,13 @@ func MakeFileLogger(filePath string) (Sender, error) {
 
 	s.level = LevelInfo{level.Trace, level.Trace}
 
-	_ = s.SetFormatter(MakeDefaultFormatter())
-
 	s.reset = func() {
-		s.logger = log.New(f, fmt.Sprintf("[%s] ", s.Name()), log.LstdFlags)
+		prefix := fmt.Sprintf("[%s] ", s.Name())
+
+		s.logger = log.New(f, prefix, log.LstdFlags)
+
+		fallback := log.New(os.Stderr, prefix, log.LstdFlags)
+		_ = s.SetErrorHandler(ErrorHandlerFromLogger(fallback))
 	}
 
 	s.closer = func() error {
@@ -91,11 +98,14 @@ func MakeErrorLogger() Sender {
 	s := &nativeLogger{
 		Base: NewBase(""),
 	}
+	_ = s.SetFormatter(MakeDefaultFormatter())
+
 	s.level = LevelInfo{level.Trace, level.Trace}
 
 	s.reset = func() {
 		prefix := fmt.Sprintf("[%s] ", s.Name())
 		s.logger = log.New(os.Stderr, prefix, log.LstdFlags)
+		_ = s.SetErrorHandler(ErrorHandlerFromLogger(s.logger))
 	}
 
 	return s
@@ -108,14 +118,13 @@ func NewErrorLogger(name string, l LevelInfo) (Sender, error) {
 }
 
 func (s *nativeLogger) Send(m message.Composer) {
-	if s.level.ShouldLog(m) {
+	if s.Level().ShouldLog(m) {
 		out, err := s.formatter(m)
-
 		if err != nil {
-			s.errHandler(err, m)
+			s.ErrorHandler(err, m)
 			return
 		}
 
-		s.logger.Printf(out)
+		s.logger.Print(out)
 	}
 }

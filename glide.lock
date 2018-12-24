@@ -2,18 +2,14 @@ hash: e5f2ca41b87af92293a43c85a230e0bf666f45d51e65145690ea653b0d3cf83c
 updated: 2017-03-18T13:28:12.984617986-04:00
 imports:
 - name: github.com/mongodb/amboy
-  version: 5a5edd16623b727b322e9b465710e9d6c6df5e3a
+  version: 45ee6f1e790a2fdf28a7d6acaf61c2ffc1da9629
 - name: github.com/mongodb/grip
-  version: 5225ff0b40e7a9500e76f101e7a1bdef741619a0
+  version: af5d4f01dce67c1dafa9c9a9334f9cae31b2b437
 - name: github.com/pkg/errors
   version: 01fa4104b9c248c8945d14d9f128454d5b28d595
 
 - name: github.com/urfave/cli
   version: 01857ac33766ce0c93856370626f9799281c14f4
-- name: golang.org/x/net
-  version: 1358eff22f0dd0c54fc521042cc607f6ff4b531a
-  subpackages:
-  - context
 - name: gopkg.in/mgo.v2
   version: 3f83fa5005286a7fe593b055f0d7771a7dce4655
 testImports: []

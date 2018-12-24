@@ -1,6 +1,8 @@
 package job
 
 import (
+	"context"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -75,7 +77,7 @@ func (s *ShellJobSuite) TestRunTrivialCommandReturnsWithoutError() {
 	s.job = NewShellJob("true", "")
 
 	s.False(s.job.Status().Completed)
-	s.job.Run()
+	s.job.Run(context.Background())
 	s.NoError(s.job.Error())
 	s.True(s.job.Status().Completed)
 }
@@ -84,7 +86,7 @@ func (s *ShellJobSuite) TestRunWithErroneousCommandReturnsError() {
 	s.job = NewShellJob("foo", "")
 
 	s.False(s.job.Status().Completed)
-	s.job.Run()
+	s.job.Run(context.Background())
 	s.Error(s.job.Error())
 	s.True(s.job.Status().Completed)
 }
@@ -92,7 +94,13 @@ func (s *ShellJobSuite) TestRunWithErroneousCommandReturnsError() {
 func (s *ShellJobSuite) TestEnvironmentVariableIsPassedToCommand() {
 	s.job = NewShellJob("env", "")
 	s.job.Env["MSG"] = "foo"
-	s.job.Run()
+	s.job.Run(context.Background())
 	s.NoError(s.job.Error())
-	s.Equal("MSG=foo", s.job.Output)
+
+	if runtime.GOOS == "windows" {
+		s.True(len(s.job.Output) > 0)
+	} else {
+		s.Equal("MSG=foo", s.job.Output)
+	}
+
 }

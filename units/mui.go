@@ -70,15 +70,15 @@ func (j *mailUpdatederUnit) Run(ctx context.Context) {
 		cmds[0] = append(cmds[0], "--rebuild")
 	}
 
-	for _, cmd := range cmds {
+	for idx, cmd := range cmds {
 		out, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
 		if err != nil {
+			if idx == 0 {
+				continue
+			}
 			j.AddError(err)
-			grip.Error(out)
-			return
 		}
-		grip.Info(strings.Join(cmd, " "))
-		grip.Debug(out)
+		grip.Info(strings.Join(append(cmd, "->", string(out)), " "))
 	}
 	grip.Infof("completed updating mail database for %s and %s (%s)",
 		j.MailDirPath, j.EmacsDaemonName, j.ID())

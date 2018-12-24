@@ -3,3 +3,5 @@ build
 *~
 *.out
 sardis
+!cmd/sardis
+

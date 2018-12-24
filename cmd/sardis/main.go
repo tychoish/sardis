@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/level"
 	"github.com/tychoish/sardis/operations"
 	"github.com/urfave/cli"
 )
@@ -17,7 +18,7 @@ func main() {
 	// environment.
 	app := buildApp()
 	err := app.Run(os.Args)
-	grip.CatchEmergencyFatal(err)
+	grip.EmergencyFatal(err)
 }
 
 func buildApp() *cli.App {
@@ -53,7 +54,10 @@ func buildApp() *cli.App {
 }
 
 // logging setup is separate to make it unit testable
-func loggingSetup(name, level string) {
+func loggingSetup(name, priority string) {
 	grip.SetName(name)
-	grip.SetThreshold(level)
+	sender := grip.GetSender()
+	li := sender.Level()
+	li.Threshold = level.FromString(priority)
+	sender.SetLevel(li)
 }

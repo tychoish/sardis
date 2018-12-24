@@ -99,7 +99,7 @@ func (c *appServicesCache) setQueue(q amboy.Queue) error {
 	}
 
 	c.queue = q
-	grip.Noticef("caching a '%T' queue in the '%s' service cache for use in tasks", q, c.name)
+	grip.Debugf("caching a '%T' queue in the '%s' service cache for use in tasks", q, c.name)
 	return nil
 }
 

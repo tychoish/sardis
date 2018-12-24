@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"context"
 	"os/user"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
 	"github.com/urfave/cli"
-	"golang.org/x/net/context"
 )
 
 func Mail() cli.Command {

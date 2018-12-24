@@ -3,12 +3,9 @@ package operations
 import (
 	"context"
 	"os/user"
-	"time"
 
-	"github.com/mongodb/amboy"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
-	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
 	"github.com/urfave/cli"
 )
@@ -55,27 +52,10 @@ func updateDB() cli.Command {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			if err := configureQueue(); err != nil {
-				return errors.Wrap(err, "problem setting up services")
-			}
+			job := units.NewMailUpdaterJob(c.String("mail"), c.String("mu"), c.String("daemon"), c.Bool("rebuild"))
+			job.Run(ctx)
 
-			queue, err := sardis.GetQueue()
-			if err != nil {
-				return errors.Wrap(err, "problem fetching queue")
-			}
-
-			if err := queue.Start(ctx); err != nil {
-				return errors.Wrap(err, "problem starting queue")
-			}
-
-			j := units.NewMailUpdaterJob(c.String("mail"), c.String("mu"), c.String("daemon"), c.Bool("rebuild"))
-			if err := queue.Put(j); err != nil {
-				return errors.Wrap(err, "problem registering job")
-			}
-
-			amboy.WaitCtxInterval(ctx, queue, 100*time.Millisecond)
-
-			return errors.Wrap(amboy.ResolveErrors(ctx, queue), "job encountered problem")
+			return errors.Wrap(job.Error(), "job encountered problem")
 		},
 	}
 }

@@ -2,11 +2,11 @@ package amboy
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/level"
 	"github.com/mongodb/grip/message"
-	"github.com/mongodb/grip/sometimes"
 	"github.com/pkg/errors"
 )
 
@@ -34,7 +34,7 @@ func (s QueueStats) String() string {
 }
 
 func (s QueueStats) isComplete() bool {
-	grip.DebugWhen(sometimes.Fifth(), &s)
+	grip.DebugWhen(rand.Intn(50000) == 1, &s)
 
 	if s.Total == s.Completed {
 		return true

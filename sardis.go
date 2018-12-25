@@ -36,8 +36,6 @@ func init() {
 	}
 }
 
-type Configuration struct{}
-
 // SetQueue configures the global application cache's shared queue.
 func SetQueue(q amboy.Queue) error { return servicesCache.setQueue(q) }
 

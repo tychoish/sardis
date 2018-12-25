@@ -12,7 +12,7 @@ import (
 
 const (
 	NotifyTargetEnvName = "SARDIS_NOTIFY_TARGET"
-	numWorkers          = 2
+	numWorkers          = 4
 )
 
 type configureFunc func() error

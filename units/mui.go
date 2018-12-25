@@ -15,7 +15,7 @@ import (
 	"github.com/mongodb/grip/message"
 )
 
-type mailUpdatederUnit struct {
+type mailUpdatederJob struct {
 	MailDirPath     string `bson:"maildir_path" json:"maildir_path" yaml:"maildir_path"`
 	MuHome          string `bson:"mu_home_path" json:"mu_home_path" yaml:"mu_home_path"`
 	EmacsDaemonName string `bson:"emacs_daemon" json:"emacs_daemon" yaml:"emacs_daemon"`
@@ -25,12 +25,10 @@ type mailUpdatederUnit struct {
 
 const muUpdaterJobTypeName = "mu-updater"
 
-func init() {
-	registry.AddJobType(muUpdaterJobTypeName, muUpdaterFactory)
-}
+func init() { registry.AddJobType(muUpdaterJobTypeName, func() amboy.Job { return muUpdaterFactory() }) }
 
-func muUpdaterFactory() amboy.Job {
-	j := &mailUpdatederUnit{
+func muUpdaterFactory() *mailUpdatederJob {
+	j := &mailUpdatederJob{
 		Base: job.Base{
 			JobType: amboy.JobType{
 				Name:    muUpdaterJobTypeName,
@@ -43,9 +41,7 @@ func muUpdaterFactory() amboy.Job {
 }
 
 func NewMailUpdaterJob(mailDir, muHome, daemonName string, rebuild bool) amboy.Job {
-	j := muUpdaterFactory().(*mailUpdatederUnit)
-
-	// TODO add verification of these values
+	j := muUpdaterFactory()
 
 	j.MailDirPath = mailDir
 	j.MuHome = muHome
@@ -58,7 +54,7 @@ func NewMailUpdaterJob(mailDir, muHome, daemonName string, rebuild bool) amboy.J
 	return j
 }
 
-func (j *mailUpdatederUnit) Run(ctx context.Context) {
+func (j *mailUpdatederJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 
 	cmds := [][]string{
@@ -72,15 +68,24 @@ func (j *mailUpdatederUnit) Run(ctx context.Context) {
 
 	for idx, cmd := range cmds {
 		out, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
+		grip.Debug(message.Fields{
+			"id":   j.ID(),
+			"cmd":  strings.Join(cmd, " "),
+			"err":  err != nil,
+			"path": j.MailDirPath,
+			"idx":  idx,
+			"num":  len(cmds),
+			"out":  strings.Trim(strings.Replace(string(out), "\n", "\n\t out -> ", -1), "\n\t out->"),
+		})
+
 		if err == nil {
-			grip.Info(strings.Join(append(cmd, "->", string(out)), " "))
 			break
 		}
 
 		if idx == 0 {
 			continue
 		}
-		grip.Info(strings.Join(append(cmd, "->", string(out)), " "))
+
 		j.AddError(err)
 	}
 	grip.Info(message.Fields{

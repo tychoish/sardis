@@ -52,7 +52,7 @@ func notifySend() cli.Command {
 				return errors.Wrap(err, "problem configuring sender")
 			}
 
-			level := grip.GetSender().Level().Default
+			level := grip.GetSender().Level().Threshold
 			logger := sardis.GetLogger()
 
 			logger.Log(level, strings.Join(c.Args(), " "))

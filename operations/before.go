@@ -20,6 +20,16 @@ func mergeBeforeFuncs(ops ...func(c *cli.Context) error) cli.BeforeFunc {
 	}
 }
 
+func addRemanderToStringSliceFlag(name string) cli.BeforeFunc {
+	return func(c *cli.Context) error {
+		catcher := grip.NewBasicCatcher()
+		for _, v := range c.Args() {
+			catcher.Add(c.Set(name, v))
+		}
+		return catcher.Resolve()
+	}
+}
+
 func requireConfig() cli.BeforeFunc {
 	return func(c *cli.Context) error {
 		env := sardis.GetEnvironment()

@@ -7,6 +7,8 @@ import (
 	"github.com/urfave/cli"
 )
 
+const nameFlagName = "name"
+
 func ArchLinux() cli.Command {
 	return cli.Command{
 		Name:  "arch",
@@ -25,19 +27,24 @@ func fetchAur() cli.Command {
 		Name:  "fetch",
 		Usage: "donwload source to build directory",
 		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name:  "name, n",
+			cli.StringSliceFlag{
+				Name:  joinFlagNames(nameFlagName, "n"),
 				Usage: "specify the name of a package",
 			},
 		},
-		// TODO: before to possitional, plus require config
+		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig()),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
 			ctx := env.Context()
+			catcher := grip.NewBasicCatcher()
 
-			job := units.NewArchFetchAurJob(c.String("name"), true)
-			job.Run(ctx)
-			return job.Error()
+			for _, name := range c.StringSlice(nameFlagName) {
+				job := units.NewArchFetchAurJob(name, true)
+				job.Run(ctx)
+				catcher.Add(job.Error())
+			}
+
+			return catcher.Resolve()
 		},
 	}
 }
@@ -47,21 +54,24 @@ func buildPkg() cli.Command {
 		Name:  "build",
 		Usage: "donwload source to build directory",
 		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name:  "name, n",
+			cli.StringSliceFlag{
+				Name:  joinFlagNames(nameFlagName, "n"),
 				Usage: "specify the name of a package",
 			},
 		},
-		// TODO: before to possitional, plus require config
+		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig()),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
-			pkg := c.String("name")
 			ctx := env.Context()
+			catcher := grip.NewBasicCatcher()
 
-			job := units.NewArchAbsBuildJob(pkg)
-			job.Run(ctx)
+			for _, name := range c.StringSlice(nameFlagName) {
+				job := units.NewArchAbsBuildJob(name)
+				job.Run(ctx)
+				catcher.Add(job.Error())
+			}
 
-			return job.Error()
+			return catcher.Resolve()
 		},
 	}
 }
@@ -70,25 +80,43 @@ func installAur() cli.Command {
 	return cli.Command{
 		Name:  "install",
 		Usage: "combination download+build+install",
-		Flags: []cli.Flag{},
-		// TODO: before to possitional, plus require config
+		Flags: []cli.Flag{
+			cli.StringSliceFlag{
+				Name:  joinFlagNames(nameFlagName, "n"),
+				Usage: "specify the name of a package",
+			},
+		},
+		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig()),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
-			conf := env.Configuration()
-			grip.Info("would buil package")
+			ctx := env.Context()
+			catcher := grip.NewBasicCatcher()
 
-			grip.Infoln(conf != nil)
+			for _, name := range c.StringSlice(nameFlagName) {
+				job := units.NewArchFetchAurJob(name, true)
+				job.Run(ctx)
 
-			return nil
+				if err := job.Error(); err != nil {
+					catcher.Add(err)
+					continue
+				}
+
+				job = units.NewArchAbsBuildJob(name)
+				job.Run(ctx)
+				catcher.Add(job.Error())
+			}
+
+			return catcher.Resolve()
 		},
 	}
 }
 
 func setupArchLinux() cli.Command {
 	return cli.Command{
-		Name:  "setup",
-		Usage: "bootstrap/setup system according to packages described",
-		Flags: []cli.Flag{},
+		Name:   "setup",
+		Usage:  "bootstrap/setup system according to packages described",
+		Flags:  []cli.Flag{},
+		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig()),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
 			conf := env.Configuration()
@@ -107,9 +135,8 @@ func setupArchLinux() cli.Command {
 			for _, pkg := range conf.Arch.AurPackages {
 				job := units.NewArchFetchAurJob(pkg.Name, pkg.Update)
 				job.Run(ctx)
-				err := job.Error()
 
-				if err != nil {
+				if err := job.Error(); err != nil {
 					catcher.Add(err)
 					continue
 				}

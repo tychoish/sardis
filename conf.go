@@ -8,8 +8,10 @@ import (
 )
 
 type Configuration struct {
-	Mail []MailConf `bson:"mail" json:"mail" yaml:"mail"`
-	Repo []RepoConf `bson:"repo" json:"repo" yaml:"repo"`
+	Mail         []MailConf `bson:"mail" json:"mail" yaml:"mail"`
+	Repo         []RepoConf `bson:"repo" json:"repo" yaml:"repo"`
+	Notification NotifyConf `bson:"notify" json:"notify" yaml:"notify"`
+	Queue        AmboyConf  `bson:"amboy" json:"amboy" yaml:"amboy"`
 }
 
 type MailConf struct {
@@ -23,6 +25,18 @@ type RepoConf struct {
 	Path       string `bson:"path" json:"path" yaml:"path"`
 	Remote     string `bson:"remote" json:"remote" yaml:"remote"`
 	ShouldSync bool   `bson:"sync" json:"sync" yaml:"sync"`
+}
+
+type NotifyConf struct {
+	Target   string `bson:"target" json:"target" yaml:"target"`
+	Host     string `bson:"host" json:"host" yaml:"host"`
+	User     string `bson:"user" json:"user" yaml:"user"`
+	Password string `bson:"password" json:"password" yaml:"password"`
+}
+
+type AmboyConf struct {
+	Workers int `bson:"workers" json:"workers" yaml:"workers"`
+	Size    int `bson:"size" json:"size" yaml:"size"`
 }
 
 func LoadConfiguration(fn string) (*Configuration, error) {

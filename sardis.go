@@ -15,11 +15,16 @@ sink/operations/setup.go for details.
 package sardis
 
 import (
+	"context"
+	"fmt"
+	"os"
 	"sync"
 
 	"github.com/mongodb/amboy"
+	"github.com/mongodb/amboy/queue"
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/logging"
+	"github.com/mongodb/grip/message"
 	"github.com/mongodb/grip/send"
 	"github.com/pkg/errors"
 )
@@ -31,42 +36,20 @@ var BuildRevision = ""
 var servicesCache *appServicesCache
 
 func init() {
-	servicesCache = &appServicesCache{
-		name: "global",
-	}
+	servicesCache = &appServicesCache{}
 }
 
-// SetQueue configures the global application cache's shared queue.
-func SetQueue(q amboy.Queue) error { return servicesCache.setQueue(q) }
+func GetEnvironment() Environment {
+	return servicesCache
+}
 
-// GetQueue retrieves the application's shared queue, which is cache
-// for easy access from within units or inside of requests or command
-// line operations
-func GetQueue() (amboy.Queue, error) { return servicesCache.getQueue() }
+type Environment interface {
+	Configure(context.Context, *Configuration) error
 
-// SetConf register's the application configuration, replacing an
-// existing configuration as needed.
-func SetConf(conf *Configuration) { servicesCache.setConf(conf) }
-
-// GetConf returns a copy of the global configuration object. Even
-// though the method returns a pointer, the underlying data is copied.
-func GetConf() (*Configuration, error) { return servicesCache.getConf() }
-
-// GetSystemSender returns a grip/send.Sender interface for use when
-// logging system events. When extending sink, you should generally log
-// messages using the default grip interface; however, the system
-// event Sender and logger are available to log events to the database
-// or other services for more critical issues encoutered during offline
-// processing. In typical configurations these events are logged to
-// the database and exposed via a rest endpoint.
-func GetSystemSender() send.Sender { return servicesCache.sysSender }
-
-// SetSystemSender configures the system logger.
-func SetSystemSender(s send.Sender) error { return servicesCache.setSeystemEventLog(s) }
-
-// GetLogger returns a compatible grip.Jounaler interface for use in
-// logging offline issues to the database.
-func GetLogger() grip.Journaler { return servicesCache.getLogger() }
+	Configuration() *Configuration
+	Queue() amboy.Queue
+	Logger() grip.Journaler
+}
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -75,81 +58,78 @@ func GetLogger() grip.Journaler { return servicesCache.getLogger() }
 // see the documentation for the corresponding global methods for
 
 type appServicesCache struct {
-	name      string
-	queue     amboy.Queue
-	conf      *Configuration
-	sysSender send.Sender
-	logger    grip.Journaler
+	queue  amboy.Queue
+	conf   *Configuration
+	logger grip.Journaler
 
 	mutex sync.RWMutex
 }
 
-func (c *appServicesCache) setQueue(q amboy.Queue) error {
+func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if c.queue != nil {
-		return errors.New("queue exists, cannot overwrite")
+	c.conf = conf
+
+	catcher := grip.NewBasicCatcher()
+
+	catcher.Add(c.initSender())
+	catcher.Add(c.initQueue(ctx))
+
+	return catcher.Resolve()
+}
+
+func (c *appServicesCache) initSender() error {
+	sender, err := send.NewXMPP("sardis", c.conf.Notification.Target, grip.GetSender().Level())
+	if err != nil {
+		return errors.Wrap(err, "problem creating sender")
 	}
 
-	if q == nil {
-		return errors.New("cannot set queue to nil")
+	host, err := os.Hostname()
+	if err != nil {
+		return errors.Wrap(err, "problem finding hostname")
 	}
 
-	c.queue = q
-	grip.Debugf("caching a '%T' queue in the '%s' service cache for use in tasks", q, c.name)
+	sender.SetFormatter(func(m message.Composer) (string, error) {
+		return fmt.Sprintf("[sardis:%s] %s", host, m.String()), nil
+	})
+
+	c.logger = logging.MakeGrip(sender)
+
 	return nil
 }
 
-func (c *appServicesCache) getQueue() (amboy.Queue, error) {
+func (c *appServicesCache) initQueue(ctx context.Context) error {
+	c.queue = queue.NewLocalLimitedSize(c.conf.Queue.Workers, c.conf.Queue.Size)
+
+	grip.Debug(message.Fields{
+		"op":      "configured local queue",
+		"size":    c.conf.Queue.Size,
+		"workers": c.conf.Queue.Workers,
+	})
+
+	return errors.Wrap(c.queue.Start(ctx), "problem starting queue")
+}
+
+func (c *appServicesCache) Queue() amboy.Queue {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	if c.queue == nil {
-		return nil, errors.New("no queue defined in the services cache")
-	}
-
-	return c.queue, nil
+	return c.queue
 }
 
-func (c *appServicesCache) setConf(conf *Configuration) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	c.conf = conf
-}
-
-func (c *appServicesCache) getConf() (*Configuration, error) {
+func (c *appServicesCache) Configuration() *Configuration {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-
-	if c.conf == nil {
-		return nil, errors.New("configuration is not set")
-	}
 
 	// copy the struct
 	out := Configuration{}
 	out = *c.conf
 
-	return &out, nil
+	return &out
 }
 
-func (c *appServicesCache) setSeystemEventLog(s send.Sender) error {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	c.sysSender = s
-	c.logger = logging.NewGrip("sink")
-	return errors.Wrap(c.logger.SetSender(s), "problem setting sender")
-}
-
-func (c *appServicesCache) getSystemEventLog() send.Sender {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-
-	return c.sysSender
-}
-
-func (c *appServicesCache) getLogger() grip.Journaler {
+func (c *appServicesCache) Logger() grip.Journaler {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 

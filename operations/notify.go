@@ -7,7 +7,6 @@ import (
 
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
-	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli"
 )
@@ -25,15 +24,14 @@ func Notify() cli.Command {
 
 func notifyPipe() cli.Command {
 	return cli.Command{
-		Name:  "pipe",
-		Usage: "send the contents of standard input over xmpp",
+		Name:   "pipe",
+		Usage:  "send the contents of standard input over xmpp",
+		Before: requireConfig(),
 		Action: func(c *cli.Context) error {
-			if err := configureSender(); err != nil {
-				return errors.Wrap(err, "problem configuring sender")
-			}
-
+			env := sardis.GetEnvironment()
 			level := grip.GetSender().Level().Default
-			logger := sardis.GetLogger()
+			logger := env.Logger()
+
 			scanner := bufio.NewScanner(os.Stdin)
 			for scanner.Scan() {
 				logger.Log(level, message.NewString(scanner.Text()))
@@ -45,15 +43,14 @@ func notifyPipe() cli.Command {
 
 func notifySend() cli.Command {
 	return cli.Command{
-		Name:  "send",
-		Usage: "send the remaining arguments over xmpp",
+		Name:   "send",
+		Usage:  "send the remaining arguments over xmpp",
+		Before: requireConfig(),
 		Action: func(c *cli.Context) error {
-			if err := configureSender(); err != nil {
-				return errors.Wrap(err, "problem configuring sender")
-			}
+			env := sardis.GetEnvironment()
 
 			level := grip.GetSender().Level().Threshold
-			logger := sardis.GetLogger()
+			logger := env.Logger()
 
 			logger.Log(level, strings.Join(c.Args(), " "))
 

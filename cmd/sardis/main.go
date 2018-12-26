@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,16 +54,31 @@ func buildApp() *cli.App {
 		// TODO log to file/service
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	app.Before = func(c *cli.Context) error {
+		env := sardis.GetEnvironment()
+
 		loggingSetup(app.Name, c.String("level"))
 
 		path := c.String("conf")
 		conf, err := sardis.LoadConfiguration(path)
-		grip.Debug(errors.Wrapf(err, "problem loading config from '%s'", path))
-		sardis.SetConf(conf)
+		if err != nil {
+			grip.Debug(errors.Wrap(err, "problem loading config"))
+			return nil
+		}
+
+		if err := env.Configure(ctx, conf); err != nil {
+			return errors.Wrap(err, "problem configuring app")
+		}
 
 		return nil
 
+	}
+	app.After = func(c *cli.Context) error {
+		cancel()
+		return nil
 	}
 
 	return app

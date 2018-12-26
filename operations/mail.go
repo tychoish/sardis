@@ -96,19 +96,16 @@ func syncRepo() cli.Command {
 
 func updateMail() cli.Command {
 	return cli.Command{
-		Name:  "update",
-		Usage: "update a local and remote git repository",
+		Name:   "update",
+		Usage:  "update a local and remote git repository",
+		Before: requireConfig(),
 		Action: func(c *cli.Context) error {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			env := sardis.GetEnvironment()
 
-			grip.EmergencyFatal(configureQueue())
-			queue, err := sardis.GetQueue()
-			grip.EmergencyFatal(err)
-			grip.EmergencyFatal(queue.Start(ctx))
-
-			conf, err := sardis.GetConf()
-			grip.EmergencyFatal(err)
+			queue := env.Queue()
+			conf := env.Configuration()
 
 			catcher := grip.NewBasicCatcher()
 			for _, mdir := range conf.Mail {

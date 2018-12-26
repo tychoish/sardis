@@ -9,6 +9,7 @@ import (
 
 type Configuration struct {
 	Mail []MailConf `bson:"mail" json:"mail" yaml:"mail"`
+	Repo []RepoConf `bson:"repo" json:"repo" yaml:"repo"`
 }
 
 type MailConf struct {
@@ -16,6 +17,12 @@ type MailConf struct {
 	Remote string `bson:"remote" json:"remote" yaml:"remote"`
 	Emacs  string `bson:"emacs" json:"emacs" yaml:"emacs"`
 	MuPath string `bson:"mu_path" json:"mu_path" yaml:"mu_path"`
+}
+
+type RepoConf struct {
+	Path       string `bson:"path" json:"path" yaml:"path"`
+	Remote     string `bson:"remote" json:"remote" yaml:"remote"`
+	ShouldSync bool   `bson:"sync" json:"sync" yaml:"sync"`
 }
 
 func LoadConfiguration(fn string) (*Configuration, error) {
@@ -43,8 +50,6 @@ func LoadConfiguration(fn string) (*Configuration, error) {
 	if err = unmarshal(data, &out); err != nil {
 		return nil, errors.Wrap(err, "problem unmarshaling report data")
 	}
-
-	SetConf(&out)
 
 	return &out, nil
 }

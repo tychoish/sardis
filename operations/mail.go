@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
+	"github.com/tychoish/sardis/util"
 	"github.com/urfave/cli"
 )
 
@@ -72,7 +73,7 @@ func syncRepo() cli.Command {
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "path",
-				Value: filepath.Join(getHomeDir(), "mail"),
+				Value: filepath.Join(util.GetHomeDir(), "mail"),
 			},
 			cli.StringFlag{
 				Name:  "host",
@@ -97,13 +98,7 @@ func updateMail() cli.Command {
 	return cli.Command{
 		Name:  "update",
 		Usage: "update a local and remote git repository",
-		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name:  "conf, c",
-				Value: filepath.Join(getHomeDir(), ".sardis.yaml"),
-			}},
 		Action: func(c *cli.Context) error {
-			path := c.String("conf")
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -111,12 +106,17 @@ func updateMail() cli.Command {
 			queue, err := sardis.GetQueue()
 			grip.EmergencyFatal(err)
 			grip.EmergencyFatal(queue.Start(ctx))
-			conf, err := sardis.LoadConfiguration(path)
-			grip.EmergencyFatal(errors.Wrapf(err, "problem loading config from '%s'", path))
+
+			conf, err := sardis.GetConf()
+			grip.EmergencyFatal(err)
 
 			catcher := grip.NewBasicCatcher()
 			for _, mdir := range conf.Mail {
 				catcher.Add(queue.Put(units.NewMailSyncJob(mdir)))
+			}
+
+			for _, repo := range conf.Repo {
+				catcher.Add(queue.Put(units.NewLocalRepoSyncJob(repo.Path)))
 			}
 
 			grip.EmergencyFatal(catcher.Resolve())

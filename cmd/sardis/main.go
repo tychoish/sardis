@@ -3,10 +3,14 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/level"
+	"github.com/pkg/errors"
+	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/operations"
+	"github.com/tychoish/sardis/util"
 	"github.com/urfave/cli"
 )
 
@@ -42,12 +46,23 @@ func buildApp() *cli.App {
 			Usage: fmt.Sprintln("Specify lowest visible loglevel as string: ",
 				"'emergency|alert|critical|error|warning|notice|info|debug'"),
 		},
+		cli.StringFlag{
+			Name:  "conf, c",
+			Value: filepath.Join(util.GetHomeDir(), ".sardis.yaml"),
+		},
 		// TODO log to file/service
 	}
 
 	app.Before = func(c *cli.Context) error {
 		loggingSetup(app.Name, c.String("level"))
+
+		path := c.String("conf")
+		conf, err := sardis.LoadConfiguration(path)
+		grip.Debug(errors.Wrapf(err, "problem loading config from '%s'", path))
+		sardis.SetConf(conf)
+
 		return nil
+
 	}
 
 	return app

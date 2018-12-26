@@ -50,7 +50,7 @@ func SetConf(conf *Configuration) { servicesCache.setConf(conf) }
 
 // GetConf returns a copy of the global configuration object. Even
 // though the method returns a pointer, the underlying data is copied.
-func GetConf() *Configuration { return servicesCache.getConf() }
+func GetConf() (*Configuration, error) { return servicesCache.getConf() }
 
 // GetSystemSender returns a grip/send.Sender interface for use when
 // logging system events. When extending sink, you should generally log
@@ -115,19 +115,22 @@ func (c *appServicesCache) getQueue() (amboy.Queue, error) {
 func (c *appServicesCache) setConf(conf *Configuration) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-
 	c.conf = conf
 }
 
-func (c *appServicesCache) getConf() *Configuration {
+func (c *appServicesCache) getConf() (*Configuration, error) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
+
+	if c.conf == nil {
+		return nil, errors.New("configuration is not set")
+	}
 
 	// copy the struct
 	out := Configuration{}
 	out = *c.conf
 
-	return &out
+	return &out, nil
 }
 
 func (c *appServicesCache) setSeystemEventLog(s send.Sender) error {

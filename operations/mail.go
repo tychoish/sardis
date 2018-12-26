@@ -55,7 +55,8 @@ func updateDB() cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			ctx, cancel := context.WithCancel(context.Background())
+			env := sardis.GetEnvironment()
+			ctx, cancel := context.WithCancel(env.Context())
 			defer cancel()
 
 			job := units.NewMailUpdaterJob(c.String("mail"), c.String("mu"), c.String("daemon"), c.Bool("rebuild"))
@@ -81,7 +82,8 @@ func syncRepo() cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			ctx, cancel := context.WithCancel(context.Background())
+			env := sardis.GetEnvironment()
+			ctx, cancel := context.WithCancel(env.Context())
 			defer cancel()
 
 			job := units.NewRepoSyncJob(c.String("host"), c.String("path"))
@@ -100,9 +102,9 @@ func updateMail() cli.Command {
 		Usage:  "update a local and remote git repository",
 		Before: requireConfig(),
 		Action: func(c *cli.Context) error {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			env := sardis.GetEnvironment()
+			ctx, cancel := context.WithCancel(env.Context())
+			defer cancel()
 
 			queue := env.Queue()
 			conf := env.Configuration()

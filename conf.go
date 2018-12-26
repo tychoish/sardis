@@ -4,6 +4,8 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/send"
 	"github.com/pkg/errors"
 )
 
@@ -28,6 +30,7 @@ type RepoConf struct {
 }
 
 type NotifyConf struct {
+	Name     string `bson:"name" json:"name" yaml:"name"`
 	Target   string `bson:"target" json:"target" yaml:"target"`
 	Host     string `bson:"host" json:"host" yaml:"host"`
 	User     string `bson:"user" json:"user" yaml:"user"`
@@ -66,4 +69,67 @@ func LoadConfiguration(fn string) (*Configuration, error) {
 	}
 
 	return &out, nil
+}
+
+type validatable interface {
+	Validate() error
+}
+
+func (conf *Configuration) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	for _, c := range []validatable{
+		&conf.Notification,
+		&conf.Queue,
+	} {
+		catcher.Add(errors.Wrapf(c.Validate(), "%T is not valid", c))
+	}
+	return catcher.Resolve()
+}
+
+func (conf *NotifyConf) Validate() error {
+	if conf.Name == "" {
+		conf.Name = "sardis"
+	}
+
+	if conf.Target == "" {
+		conf.Target = os.Getenv("SARDIS_NOTIFY_TARGET")
+	}
+	defaults := send.GetXMPPConnectionInfo()
+	if conf.Host == "" {
+		conf.Host = defaults.Hostname
+	}
+	if conf.User == "" {
+		conf.User = defaults.Username
+	}
+	if conf.Password == "" {
+		conf.Password = defaults.Password
+	}
+
+	catcher := grip.NewBasicCatcher()
+	for k, v := range map[string]string{
+		"host": conf.Host,
+		"user": conf.User,
+		"pass": conf.Password,
+	} {
+		if v == "" {
+			catcher.Add(errors.Errorf("missing value for '%s'", k))
+		}
+	}
+
+	return catcher.Resolve()
+}
+
+func (conf *AmboyConf) Validate() error {
+	catcher := grip.NewBasicCatcher()
+
+	if conf.Workers < 1 {
+		catcher.Add(errors.New("must specify one or more workers"))
+	}
+
+	if conf.Size < conf.Workers {
+		grip.Warning("suspect config; must specify more storage than workers")
+		conf.Size = 2 * conf.Workers
+	}
+
+	return catcher.Resolve()
 }

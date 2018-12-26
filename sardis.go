@@ -46,6 +46,7 @@ func GetEnvironment() Environment {
 type Environment interface {
 	Configure(context.Context, *Configuration) error
 
+	Context() context.Context
 	Configuration() *Configuration
 	Queue() amboy.Queue
 	Logger() grip.Journaler
@@ -61,8 +62,8 @@ type appServicesCache struct {
 	queue  amboy.Queue
 	conf   *Configuration
 	logger grip.Journaler
-
-	mutex sync.RWMutex
+	ctx    context.Context
+	mutex  sync.RWMutex
 }
 
 func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) error {
@@ -70,17 +71,25 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 	defer c.mutex.Unlock()
 
 	c.conf = conf
-
+	c.ctx = ctx
 	catcher := grip.NewBasicCatcher()
 
 	catcher.Add(c.initSender())
-	catcher.Add(c.initQueue(ctx))
+	catcher.Add(c.initQueue())
 
 	return catcher.Resolve()
 }
 
 func (c *appServicesCache) initSender() error {
-	sender, err := send.NewXMPP("sardis", c.conf.Notification.Target, grip.GetSender().Level())
+	sender, err := send.NewXMPPLogger(
+		c.conf.Notification.Name,
+		c.conf.Notification.Target,
+		send.XMPPConnectionInfo{
+			Hostname: c.conf.Notification.Host,
+			Username: c.conf.Notification.User,
+			Password: c.conf.Notification.Password,
+		},
+		grip.GetSender().Level())
 	if err != nil {
 		return errors.Wrap(err, "problem creating sender")
 	}
@@ -91,7 +100,7 @@ func (c *appServicesCache) initSender() error {
 	}
 
 	sender.SetFormatter(func(m message.Composer) (string, error) {
-		return fmt.Sprintf("[sardis:%s] %s", host, m.String()), nil
+		return fmt.Sprintf("[%s:%s] %s", c.conf.Notification.Name, host, m.String()), nil
 	})
 
 	c.logger = logging.MakeGrip(sender)
@@ -99,7 +108,7 @@ func (c *appServicesCache) initSender() error {
 	return nil
 }
 
-func (c *appServicesCache) initQueue(ctx context.Context) error {
+func (c *appServicesCache) initQueue() error {
 	c.queue = queue.NewLocalLimitedSize(c.conf.Queue.Workers, c.conf.Queue.Size)
 
 	grip.Debug(message.Fields{
@@ -108,14 +117,25 @@ func (c *appServicesCache) initQueue(ctx context.Context) error {
 		"workers": c.conf.Queue.Workers,
 	})
 
-	return errors.Wrap(c.queue.Start(ctx), "problem starting queue")
+	return nil
 }
 
 func (c *appServicesCache) Queue() amboy.Queue {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
+	if !c.queue.Started() {
+		grip.Alert(errors.Wrap(c.queue.Start(c.ctx), "problem starting queue"))
+	}
+
 	return c.queue
+}
+
+func (c *appServicesCache) Context() context.Context {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	return c.ctx
 }
 
 func (c *appServicesCache) Configuration() *Configuration {

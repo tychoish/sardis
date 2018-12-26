@@ -3,17 +3,21 @@ package sardis
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/send"
 	"github.com/pkg/errors"
+	"github.com/tychoish/sardis/util"
 )
 
 type Configuration struct {
-	Mail         []MailConf `bson:"mail" json:"mail" yaml:"mail"`
-	Repo         []RepoConf `bson:"repo" json:"repo" yaml:"repo"`
-	Notification NotifyConf `bson:"notify" json:"notify" yaml:"notify"`
-	Queue        AmboyConf  `bson:"amboy" json:"amboy" yaml:"amboy"`
+	Mail         []MailConf    `bson:"mail" json:"mail" yaml:"mail"`
+	Repo         []RepoConf    `bson:"repo" json:"repo" yaml:"repo"`
+	Notification NotifyConf    `bson:"notify" json:"notify" yaml:"notify"`
+	Queue        AmboyConf     `bson:"amboy" json:"amboy" yaml:"amboy"`
+	Arch         ArchLinuxConf `bson:"arch" json:"arch" yaml:"arch"`
 }
 
 type MailConf struct {
@@ -40,6 +44,17 @@ type NotifyConf struct {
 type AmboyConf struct {
 	Workers int `bson:"workers" json:"workers" yaml:"workers"`
 	Size    int `bson:"size" json:"size" yaml:"size"`
+}
+
+type ArchLinuxConf struct {
+	BuildPath   string `bson:"build_path" json:"build_path" yaml:"build_path"`
+	AurPackages []struct {
+		Name   string `bson:"name" json:"name" yaml:"name"`
+		Update bool   `bson:"update" json:"update" yaml:"update"`
+	} `bson:"aur_packages" json:"aur_packages" yaml:"aur_packages"`
+	Packages []struct {
+		Name string `bson:"name" json:"name" yaml:"name"`
+	} `bson:"packages" json:"packages" yaml:"packages"`
 }
 
 func LoadConfiguration(fn string) (*Configuration, error) {
@@ -80,6 +95,7 @@ func (conf *Configuration) Validate() error {
 	for _, c := range []validatable{
 		&conf.Notification,
 		&conf.Queue,
+		&conf.Arch,
 	} {
 		catcher.Add(errors.Wrapf(c.Validate(), "%T is not valid", c))
 	}
@@ -131,5 +147,41 @@ func (conf *AmboyConf) Validate() error {
 		conf.Size = 2 * conf.Workers
 	}
 
+	return catcher.Resolve()
+}
+
+func (conf *ArchLinuxConf) Validate() error {
+	if _, err := os.Stat("/etc/arch-release"); os.IsNotExist(err) {
+		return nil
+	}
+
+	if conf.BuildPath == "" {
+		conf.BuildPath = filepath.Join(util.GetHomeDir(), "abs")
+	}
+
+	catcher := grip.NewBasicCatcher()
+	if stat, err := os.Stat(conf.BuildPath); os.IsNotExist(err) {
+		catcher.Add(errors.Wrap(os.MkdirAll(conf.BuildPath, 0755), "problem making build directory"))
+	} else if !stat.IsDir() {
+		catcher.Add(errors.Errorf("arch build path '%s' is a file not a directory", conf.BuildPath))
+	}
+
+	for idx, pkg := range conf.AurPackages {
+		if pkg.Name == "" {
+			catcher.Add(errors.Errorf("aur package at index=%d does not have name", idx))
+		}
+		if strings.Contains(pkg.Name, ".+=") {
+			catcher.Add(errors.Errorf("aur package '%s' at index=%d has invalid character", pkg.Name, idx))
+		}
+	}
+
+	for idx, pkg := range conf.Packages {
+		if pkg.Name == "" {
+			catcher.Add(errors.Errorf("package at index=%d does not have name", idx))
+		}
+		if strings.Contains(pkg.Name, ".+=") {
+			catcher.Add(errors.Errorf("package '%s' at index=%d has invalid character", pkg.Name, idx))
+		}
+	}
 	return catcher.Resolve()
 }

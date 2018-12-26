@@ -108,19 +108,20 @@ func updateMail() cli.Command {
 
 			queue := env.Queue()
 			conf := env.Configuration()
-
 			catcher := grip.NewBasicCatcher()
+
 			for _, mdir := range conf.Mail {
 				catcher.Add(queue.Put(units.NewMailSyncJob(mdir)))
 			}
 
 			for _, repo := range conf.Repo {
+				if !repo.ShouldSync {
+					continue
+				}
 				catcher.Add(queue.Put(units.NewLocalRepoSyncJob(repo.Path)))
 			}
-
 			grip.EmergencyFatal(catcher.Resolve())
-			amboy.WaitCtxInterval(ctx, queue, 100*time.Microsecond)
-
+			amboy.WaitCtxInterval(ctx, queue, time.Millisecond)
 			return nil
 		},
 	}

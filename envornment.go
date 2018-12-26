@@ -73,7 +73,7 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 	c.conf = conf
 	c.ctx = ctx
 	catcher := grip.NewBasicCatcher()
-
+	catcher.Add(conf.Validate())
 	catcher.Add(c.initSender())
 	catcher.Add(c.initQueue())
 

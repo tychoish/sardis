@@ -36,6 +36,7 @@ func buildApp() *cli.App {
 		operations.Notify(),
 		operations.Version(),
 		operations.Mail(),
+		operations.ArchLinux(),
 	}
 
 	// These are global options. Use this to configure logging or
@@ -55,7 +56,6 @@ func buildApp() *cli.App {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	app.Before = func(c *cli.Context) error {
 		env := sardis.GetEnvironment()

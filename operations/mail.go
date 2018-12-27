@@ -31,6 +31,10 @@ func updateDB() cli.Command {
 	user, err := user.Current()
 	grip.Warning(err)
 
+	if user == nil {
+		user = &user.User{}
+	}
+
 	return cli.Command{
 		Name: "mu",
 		Flags: []cli.Flag{

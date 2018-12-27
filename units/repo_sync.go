@@ -15,6 +15,7 @@ import (
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
 	"github.com/pkg/errors"
+	"github.com/tychoish/sardis"
 )
 
 type repoSyncJob struct {
@@ -128,11 +129,14 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 			break
 		}
 	}
-	grip.Info(message.Fields{
+	notify := sardis.GetEnvironment().Logger()
+	msg := message.Fields{
 		"op":     "completed repo sync",
 		"errors": j.HasErrors(),
 		"host":   j.Host,
 		"path":   j.Path,
 		"id":     j.ID(),
-	})
+	}
+	notify.Notice(msg)
+	grip.Info(msg)
 }

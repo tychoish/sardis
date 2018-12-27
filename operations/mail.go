@@ -28,11 +28,11 @@ func Mail() cli.Command {
 }
 
 func updateDB() cli.Command {
-	user, err := user.Current()
+	usr, err := user.Current()
 	grip.Warning(err)
 
-	if user == nil {
-		user = &user.User{}
+	if usr == nil {
+		usr = &user.User{}
 	}
 
 	return cli.Command{
@@ -51,7 +51,7 @@ func updateDB() cli.Command {
 			cli.StringFlag{
 				Name:  "daemon",
 				Usage: "name of emacs deamon",
-				Value: user.Username,
+				Value: usr.Username,
 			},
 			cli.BoolFlag{
 				Name:  "rebuild",

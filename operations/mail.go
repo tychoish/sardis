@@ -124,9 +124,14 @@ func updateMail() cli.Command {
 				}
 				catcher.Add(queue.Put(units.NewLocalRepoSyncJob(repo.Path)))
 			}
-			grip.EmergencyFatal(catcher.Resolve())
+
+			if catcher.HasErrors() {
+				return catcher.Resolve()
+			}
+
 			amboy.WaitCtxInterval(ctx, queue, time.Millisecond)
-			return nil
+
+			return amboy.ResolveErrors(ctx, queue)
 		},
 	}
 }

@@ -2,8 +2,10 @@ package operations
 
 import (
 	"context"
+	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mongodb/amboy"
@@ -101,6 +103,9 @@ func syncRepo() cli.Command {
 }
 
 func updateMail() cli.Command {
+	hostname, err := os.Hostname()
+	grip.Warning(err)
+
 	return cli.Command{
 		Name:   "update",
 		Usage:  "update a local and remote git repository",
@@ -119,11 +124,18 @@ func updateMail() cli.Command {
 			}
 
 			for _, repo := range conf.Repo {
-				if !repo.ShouldSync {
-					continue
+				if repo.LocalSync {
+					catcher.Add(queue.Put(units.NewLocalRepoSyncJob(repo.Path)))
 				}
 
-				catcher.Add(queue.Put(units.NewLocalRepoSyncJob(repo.Path)))
+				for _, mirror := range repo.Mirrors {
+					if strings.Contains(mirror, hostname) {
+						grip.Infof("skipping mirror %s->%s because it's probably local (%s)",
+							repo.Path, mirror, hostname)
+						continue
+					}
+					catcher.Add(queue.Put(units.NewRepoSyncRemoteJob(mirror, repo.Path, repo.Pre, repo.Post)))
+				}
 			}
 
 			if catcher.HasErrors() {

@@ -51,7 +51,7 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 
 	if _, err := os.Stat(j.Conf.Path); !os.IsNotExist(err) {
-		if j.Conf.ShouldSync {
+		if j.Conf.LocalSync {
 			job := NewLocalRepoSyncJob(j.Conf.Path)
 			job.Run(ctx)
 			j.AddError(job.Error())

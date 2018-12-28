@@ -75,7 +75,7 @@ func (j *archAurFetchJob) Run(ctx context.Context) {
 		return
 	}
 
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	grip.Debug(message.Fields{

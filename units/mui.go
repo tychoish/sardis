@@ -67,7 +67,7 @@ func (j *mailUpdatederJob) Run(ctx context.Context) {
 	}
 
 	for idx, cmd := range cmds {
-		out, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
+		out, err := exec.CommandContext(ctx, cmd[0], cmd[1:]...).CombinedOutput()
 		grip.Debug(message.Fields{
 			"id":   j.ID(),
 			"cmd":  strings.Join(cmd, " "),

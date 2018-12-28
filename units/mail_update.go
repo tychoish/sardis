@@ -46,7 +46,7 @@ func (j *mailSyncJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 
 	jobs := []amboy.Job{
-		NewRepoSyncJob(j.Conf.Remote, j.Conf.Path),
+		NewRepoSyncJob(j.Conf.Remote, j.Conf.Path, nil, nil),
 	}
 
 	if j.Conf.MuPath == "" || j.Conf.Emacs == "" {

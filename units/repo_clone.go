@@ -65,7 +65,7 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 		return
 	}
 	args := []string{"git", "clone", j.Conf.Remote, j.Conf.Path}
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Dir = filepath.Dir(j.Conf.Path)
 
 	out, err := cmd.CombinedOutput()

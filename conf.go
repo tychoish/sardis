@@ -28,9 +28,12 @@ type MailConf struct {
 }
 
 type RepoConf struct {
-	Path       string `bson:"path" json:"path" yaml:"path"`
-	Remote     string `bson:"remote" json:"remote" yaml:"remote"`
-	ShouldSync bool   `bson:"sync" json:"sync" yaml:"sync"`
+	Path       string   `bson:"path" json:"path" yaml:"path"`
+	Remote     string   `bson:"remote" json:"remote" yaml:"remote"`
+	ShouldSync bool     `bson:"sync" json:"sync" yaml:"sync"`
+	Pre        []string `bson:"pre" json:"pre" yaml:"pre"`
+	Post       []string `bson:"post" json:"post" yaml:"post"`
+	Mirrors    []string `bson:"mirrors" json:"mirrors" yaml:"mirrors"`
 }
 
 type NotifyConf struct {

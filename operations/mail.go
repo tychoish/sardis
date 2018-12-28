@@ -90,7 +90,7 @@ func syncRepo() cli.Command {
 			ctx, cancel := context.WithCancel(env.Context())
 			defer cancel()
 
-			job := units.NewRepoSyncJob(c.String("host"), c.String("path"))
+			job := units.NewRepoSyncJob(c.String("host"), c.String("path"), nil, nil)
 			grip.Infof("starting: %s", job.ID())
 			job.Run(ctx)
 
@@ -122,6 +122,7 @@ func updateMail() cli.Command {
 				if !repo.ShouldSync {
 					continue
 				}
+
 				catcher.Add(queue.Put(units.NewLocalRepoSyncJob(repo.Path)))
 			}
 

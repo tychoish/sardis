@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/shlex"
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/dependency"
 	"github.com/mongodb/amboy/job"
@@ -19,8 +20,10 @@ import (
 )
 
 type repoSyncJob struct {
-	Host     string `bson:"host" json:"host" yaml:"host"`
-	Path     string `bson:"path" json:"path" yaml:"path"`
+	Host     string   `bson:"host" json:"host" yaml:"host"`
+	Path     string   `bson:"path" json:"path" yaml:"path"`
+	PostHook []string `bson:"post" json:"post" yaml:"post"`
+	PreHook  []string `bson:"pre" json:"pre" yaml:"pre"`
 	job.Base `bson:"metadata" json:"metadata" yaml:"metadata"`
 }
 
@@ -49,11 +52,13 @@ func NewLocalRepoSyncJob(path string) amboy.Job {
 	return j
 }
 
-func NewRepoSyncJob(host, path string) amboy.Job {
+func NewRepoSyncJob(host, path string, pre, post []string) amboy.Job {
 	j := repoSyncFactory()
 
 	j.Host = host
 	j.Path = path
+	j.PreHook = pre
+	j.PostHook = post
 	j.SetID(j.buildID())
 	return j
 }
@@ -84,29 +89,51 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 	if !j.isLocal() {
 		cmds = append(cmds,
 			[]string{"ssh", j.Host,
-				fmt.Sprintf("cd %s && git add . && git pull && git commit -a -m 'mail update (%s)'; git push", j.Path, j.ID()),
+				fmt.Sprintf(syncCmdTemplate, j.Path, j.ID()),
 			})
+	}
+
+	for _, cmd := range j.PreHook {
+		args, err := shlex.Split(cmd)
+		if err != nil {
+			j.AddError(err)
+			continue
+		}
+
+		cmds = append(cmds, args)
 	}
 
 	cmds = append(cmds,
 		[]string{"git", "pull", "--keep", "--rebase", "--autostash", "origin", "master"},
 		[]string{"bash", "-c", "git ls-files -d | xargs -r git rm --ignore-unmatch --quiet -- "},
 		[]string{"git", "add", "-A"},
-		[]string{"git", "commit", "-a", "-m", fmt.Sprintf("mail update %s", j.ID())},
+		[]string{"git", "commit", "-a", "-m", fmt.Sprintf("update: (%s)", j.ID())},
 		[]string{"git", "push"},
 	)
 
 	if !j.isLocal() {
 		cmds = append(cmds,
-			[]string{"ssh", j.Host,
-				fmt.Sprintf("cd %s && git add . && git pull && git commit -a -m 'mail update (%s)'; git push", j.Path, j.ID()),
-			},
+			[]string{"ssh", j.Host, fmt.Sprintf(syncCmdTemplate, j.Path, j.ID())},
 			[]string{"git", "pull", "--keep", "--rebase", "--autostash", "origin", "master"},
 		)
 	}
 
+	for _, cmd := range j.PostHook {
+		args, err := shlex.Split(cmd)
+		if err != nil {
+			j.AddError(err)
+			continue
+		}
+
+		cmds = append(cmds, args)
+	}
+
+	if j.HasErrors() {
+		return
+	}
+
 	for idx, cmd := range cmds {
-		c := exec.Command(cmd[0], cmd[1:]...)
+		c := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
 		c.Dir = j.Path
 
 		out, err := c.CombinedOutput()

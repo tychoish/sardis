@@ -51,7 +51,7 @@ func (j *archInstallPackagesJob) Run(ctx context.Context) {
 
 	cmd := []string{"pacman", "--sync", "--refresh"}
 	cmd = append(cmd, j.Names...)
-	out, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
+	out, err := exec.CommandContext(ctx, cmd[0], cmd[1:]...).CombinedOutput()
 	grip.Debug(message.Fields{
 		"id":  j.ID(),
 		"cmd": strings.Join(cmd, " "),

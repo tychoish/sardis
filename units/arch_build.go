@@ -67,7 +67,7 @@ func (j *archAbsBuildJob) Run(ctx context.Context) {
 
 	args := []string{"makepkg", "--syncdeps", "--force", "--install"}
 
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	grip.Info(message.Fields{

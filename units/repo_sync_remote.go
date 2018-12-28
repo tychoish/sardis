@@ -12,7 +12,6 @@ import (
 	"github.com/mongodb/amboy/job"
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
-	"github.com/tychoish/sardis"
 )
 
 const (
@@ -86,15 +85,11 @@ func (j *repoSyncRemoteJob) Run(ctx context.Context) {
 		})
 	}
 
-	notify := sardis.GetEnvironment().Logger()
-	msg := message.Fields{
+	grip.Info(message.Fields{
 		"op":     "completed repo sync",
 		"errors": j.HasErrors(),
 		"host":   j.Host,
 		"path":   j.Path,
 		"id":     j.ID(),
-	}
-	notify.Notice(msg)
-	grip.Info(msg)
-
+	})
 }

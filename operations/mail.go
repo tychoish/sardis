@@ -2,10 +2,8 @@ package operations
 
 import (
 	"context"
-	"os"
 	"os/user"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/mongodb/amboy"
@@ -24,8 +22,7 @@ func Mail() cli.Command {
 		Subcommands: []cli.Command{
 			updateDB(),
 			syncRepo(),
-			syncAllRepos(),
-			updateRepos(),
+			syncAllMailRepos(),
 		},
 	}
 }
@@ -102,10 +99,10 @@ func syncRepo() cli.Command {
 	}
 }
 
-func syncAllRepos() cli.Command {
+func syncAllMailRepos() cli.Command {
 	return cli.Command{
 		Name:   "sync",
-		Usage:  "update a local and remote git repository",
+		Usage:  "sync all mail repos from the config",
 		Before: requireConfig(),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
@@ -129,48 +126,4 @@ func syncAllRepos() cli.Command {
 			return amboy.ResolveErrors(ctx, queue)
 		},
 	}
-}
-
-func updateRepos() cli.Command {
-	hostname, err := os.Hostname()
-	grip.Warning(err)
-
-	return cli.Command{
-		Name:   "update",
-		Usage:  "update a local and remote git repository",
-		Before: requireConfig(),
-		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
-			ctx, cancel := context.WithCancel(env.Context())
-			defer cancel()
-
-			queue := env.Queue()
-			conf := env.Configuration()
-			catcher := grip.NewBasicCatcher()
-
-			for _, repo := range conf.Repo {
-				if repo.LocalSync {
-					catcher.Add(queue.Put(units.NewLocalRepoSyncJob(repo.Path)))
-				}
-
-				for _, mirror := range repo.Mirrors {
-					if strings.Contains(mirror, hostname) {
-						grip.Infof("skipping mirror %s->%s because it's probably local (%s)",
-							repo.Path, mirror, hostname)
-						continue
-					}
-					catcher.Add(queue.Put(units.NewRepoSyncRemoteJob(mirror, repo.Path, repo.Pre, repo.Post)))
-				}
-			}
-
-			if catcher.HasErrors() {
-				return catcher.Resolve()
-			}
-
-			amboy.WaitCtxInterval(ctx, queue, time.Millisecond)
-
-			return amboy.ResolveErrors(ctx, queue)
-		},
-	}
-
 }

@@ -4,17 +4,17 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/dependency"
 	"github.com/mongodb/amboy/job"
 	"github.com/mongodb/amboy/registry"
 	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/level"
 	"github.com/mongodb/grip/message"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/util"
 )
 
 type repoCloneJob struct {
@@ -65,16 +65,6 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 		return
 	}
 	args := []string{"git", "clone", j.Conf.Remote, j.Conf.Path}
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-	cmd.Dir = filepath.Dir(j.Conf.Path)
 
-	out, err := cmd.CombinedOutput()
-	grip.Debug(message.Fields{
-		"id":   j.ID(),
-		"cmd":  strings.Join(args, " "),
-		"err":  err != nil,
-		"path": j.Conf.Path,
-		"out":  strings.Trim(strings.Replace(string(out), "\n", "\n\t out -> ", -1), "\n\t out->"),
-	})
-	j.AddError(err)
+	j.AddError(util.RunCommand(ctx, j.ID(), level.Debug, args, filepath.Dir(j.Conf.Path), nil))
 }

@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/google/shlex"
@@ -14,9 +12,10 @@ import (
 	"github.com/mongodb/amboy/job"
 	"github.com/mongodb/amboy/registry"
 	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/level"
 	"github.com/mongodb/grip/message"
 	"github.com/pkg/errors"
-	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/util"
 )
 
 type repoSyncJob struct {
@@ -107,7 +106,7 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 		[]string{"git", "pull", "--keep", "--rebase", "--autostash", "origin", "master"},
 		[]string{"bash", "-c", "git ls-files -d | xargs -r git rm --ignore-unmatch --quiet -- "},
 		[]string{"git", "add", "-A"},
-		[]string{"git", "commit", "-a", "-m", fmt.Sprintf("update: (%s)", j.ID())},
+		[]string{"bash", "-c", fmt.Sprintf("git commit -a -m 'update: (%s)' || true", j.ID())},
 		[]string{"git", "push"},
 	)
 
@@ -132,38 +131,13 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 		return
 	}
 
-	for idx, cmd := range cmds {
-		c := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
-		c.Dir = j.Path
+	j.AddError(util.RunCommandGroup(ctx, j.ID(), level.Debug, cmds, j.Path, nil))
 
-		out, err := c.CombinedOutput()
-		grip.Debug(message.Fields{
-			"id":   j.ID(),
-			"cmd":  strings.Join(cmd, " "),
-			"err":  err != nil,
-			"path": j.Path,
-			"idx":  idx,
-			"num":  len(cmds),
-			"out":  strings.Trim(strings.Replace(string(out), "\n", "\n\t out -> ", -1), "\n\t out->"),
-		})
-
-		if err != nil {
-			if cmd[0] == "git" {
-				grip.Debug("skipping git error")
-				continue
-			}
-			j.AddError(err)
-			break
-		}
-	}
-	notify := sardis.GetEnvironment().Logger()
-	msg := message.Fields{
+	grip.Info(message.Fields{
 		"op":     "completed repo sync",
 		"errors": j.HasErrors(),
 		"host":   j.Host,
 		"path":   j.Path,
 		"id":     j.ID(),
-	}
-	notify.Notice(msg)
-	grip.Info(msg)
+	})
 }

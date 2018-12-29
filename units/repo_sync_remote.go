@@ -3,15 +3,15 @@ package units
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/dependency"
 	"github.com/mongodb/amboy/job"
 	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/level"
 	"github.com/mongodb/grip/message"
+	"github.com/tychoish/sardis/util"
 )
 
 const (
@@ -72,20 +72,7 @@ func (j *repoSyncRemoteJob) Run(ctx context.Context) {
 		cmds = append(cmds, []string{"ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, cmd)})
 	}
 
-	for idx, args := range cmds {
-		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-		out, err := cmd.CombinedOutput()
-		j.AddError(err)
-		grip.Debug(message.Fields{
-			"id":   j.ID(),
-			"cmd":  strings.Join(args, " "),
-			"err":  err != nil,
-			"path": j.Path,
-			"idx":  idx,
-			"num":  len(cmds),
-			"out":  strings.Trim(strings.Replace(string(out), "\n", "\n\t out -> ", -1), "\n\t out->"),
-		})
-	}
+	j.AddError(util.RunCommandGroupContinueOnError(ctx, j.ID(), level.Debug, cmds, j.Path, nil))
 
 	grip.Info(message.Fields{
 		"op":     "completed repo sync",

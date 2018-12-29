@@ -142,6 +142,10 @@ func (c *appServicesCache) Configuration() *Configuration {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
+	if c.conf == nil {
+		return nil
+	}
+
 	// copy the struct
 	out := Configuration{}
 	out = *c.conf

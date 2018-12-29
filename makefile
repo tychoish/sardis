@@ -34,14 +34,13 @@ benchArgs += -bench=.
 benchArgs += -run='Benchmark.*'
 endif
 
-.DEFAULT:$(buildDir)/$(name)
 
 build:$(buildDir)/$(name)
 $(name):$(buildDir)/$(name)
 	ln -s $(buildDir)/$(name)
 $(buildDir)/$(name):$(srcFiles)
 	@mkdir -p $(buildDir)
-	go build -o $@ cmd/$(name)/main.go
+	go build -ldflags "-X github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -o $@ cmd/$(name)/main.go
 
 test:
 	@mkdir -p $(buildDir)
@@ -73,6 +72,8 @@ $(buildDir)/cover.%.out:$(buildDir) $(testFiles) .FORCE
 $(buildDir)/cover.%.html:$(buildDir)/cover.%.out
 	go tool cover -html=$< -o $@
 
+.DEFAULT:$(buildDir)/$(name)
+.PHONY:build test
 .FORCE:
 
 vendor-clean:
@@ -89,3 +90,7 @@ vendor-clean:
 	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/mongodb/grip/
 	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/stretchr/
 	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/stretchr/
+
+.DEFAULT:build
+.PHONY:build test
+.FORCE:

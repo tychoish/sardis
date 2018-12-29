@@ -4,17 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/job"
 	"github.com/mongodb/amboy/registry"
-	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/message"
+	"github.com/mongodb/grip/level"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/util"
 )
 
 type archAbsBuildJob struct {
@@ -67,15 +65,5 @@ func (j *archAbsBuildJob) Run(ctx context.Context) {
 
 	args := []string{"makepkg", "--syncdeps", "--force", "--install"}
 
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	grip.Info(message.Fields{
-		"id":   j.ID(),
-		"cmd":  strings.Join(args, " "),
-		"err":  err != nil,
-		"path": dir,
-		"out":  strings.Trim(strings.Replace(string(out), "\n", "\n\t out -> ", -1), "\n\t out->"),
-	})
-	j.AddError(err)
+	j.AddError(util.RunCommand(ctx, j.ID(), level.Info, args, dir, nil))
 }

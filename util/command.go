@@ -44,6 +44,25 @@ func getLogOutput(out []byte) string {
 	return strings.Trim(strings.Replace(string(out), "\n", "\n\t out -> ", -1), "\n\t out->")
 }
 
+func getRemoteCommand(ctx context.Context, host string, args []string, dir string) (*exec.Cmd, error) {
+	var remoteCmd string
+
+	if dir != "" {
+		remoteCmd = fmt.Sprintf("cd %s && ", dir)
+	}
+
+	switch len(args) {
+	case 0:
+		return nil, errors.New("args invalid")
+	case 1:
+		remoteCmd += args[0]
+	default:
+		remoteCmd += strings.Join(args, " ")
+	}
+
+	return exec.CommandContext(ctx, "ssh", []string{host, remoteCmd}...), nil
+}
+
 func RunCommand(ctx context.Context, id string, pri level.Priority, args []string, dir string, env map[string]string) error {
 	cmd, err := getCommand(ctx, args, dir, env)
 	if err != nil {
@@ -54,6 +73,25 @@ func RunCommand(ctx context.Context, id string, pri level.Priority, args []strin
 	grip.Log(pri, message.Fields{
 		"id":   id,
 		"cmd":  strings.Join(args, " "),
+		"err":  err != nil,
+		"path": dir,
+		"out":  getLogOutput(out),
+	})
+
+	return errors.Wrap(err, "problem with command")
+}
+
+func RunRemoteCommand(ctx context.Context, id string, pri level.Priority, host string, args []string, dir string) error {
+	cmd, err := getRemoteCommand(ctx, host, args, dir)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	out, err := cmd.CombinedOutput()
+	grip.Log(pri, message.Fields{
+		"id":   id,
+		"cmd":  strings.Join(args, " "),
+		"host": host,
 		"err":  err != nil,
 		"path": dir,
 		"out":  getLogOutput(out),
@@ -87,6 +125,32 @@ func RunCommandGroupContinueOnError(ctx context.Context, id string, pri level.Pr
 	return catcher.Resolve()
 }
 
+func RunRemoteCommandGroupContinueOnError(ctx context.Context, id string, pri level.Priority, host string, cmds [][]string, dir string) error {
+	catcher := grip.NewBasicCatcher()
+	for idx, args := range cmds {
+		cmd, err := getRemoteCommand(ctx, host, args, dir)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		out, err := cmd.CombinedOutput()
+		catcher.Add(err)
+
+		grip.Log(pri, message.Fields{
+			"id":   id,
+			"cmd":  strings.Join(args, " "),
+			"err":  err != nil,
+			"idx":  idx,
+			"host": host,
+			"len":  len(cmds),
+			"path": dir,
+			"out":  getLogOutput(out),
+		})
+	}
+
+	return catcher.Resolve()
+}
+
 func RunCommandGroup(ctx context.Context, id string, pri level.Priority, cmds [][]string, dir string, env map[string]string) error {
 	for idx, args := range cmds {
 		cmd, err := getCommand(ctx, args, dir, env)
@@ -100,6 +164,34 @@ func RunCommandGroup(ctx context.Context, id string, pri level.Priority, cmds []
 			"id":   id,
 			"cmd":  strings.Join(args, " "),
 			"err":  err != nil,
+			"idx":  idx,
+			"len":  len(cmds),
+			"path": dir,
+			"out":  getLogOutput(out),
+		})
+
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
+	return nil
+}
+
+func RunRemoteCommandGroup(ctx context.Context, id string, pri level.Priority, host string, cmds [][]string, dir string) error {
+	for idx, args := range cmds {
+		cmd, err := getRemoteCommand(ctx, host, args, dir)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		out, err := cmd.CombinedOutput()
+
+		grip.Log(pri, message.Fields{
+			"id":   id,
+			"cmd":  strings.Join(args, " "),
+			"err":  err != nil,
+			"host": host,
 			"idx":  idx,
 			"len":  len(cmds),
 			"path": dir,

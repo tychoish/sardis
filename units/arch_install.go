@@ -3,14 +3,13 @@ package units
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/job"
 	"github.com/mongodb/amboy/registry"
-	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/message"
+	"github.com/mongodb/grip/level"
+	"github.com/tychoish/sardis/util"
 )
 
 type archInstallPackagesJob struct {
@@ -51,12 +50,6 @@ func (j *archInstallPackagesJob) Run(ctx context.Context) {
 
 	cmd := []string{"pacman", "--sync", "--refresh"}
 	cmd = append(cmd, j.Names...)
-	out, err := exec.CommandContext(ctx, cmd[0], cmd[1:]...).CombinedOutput()
-	grip.Debug(message.Fields{
-		"id":  j.ID(),
-		"cmd": strings.Join(cmd, " "),
-		"err": err != nil,
-		"out": strings.Trim(strings.Replace(string(out), "\n", "\n\t out -> ", -1), "\n\t out->"),
-	})
-	j.AddError(err)
+
+	j.AddError(util.RunCommand(ctx, j.ID(), level.Debug, cmd, "", nil))
 }

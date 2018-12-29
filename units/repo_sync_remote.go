@@ -63,16 +63,16 @@ func (j *repoSyncRemoteJob) Run(ctx context.Context) {
 	cmds := [][]string{}
 
 	for _, cmd := range j.PreHook {
-		cmds = append(cmds, []string{"ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, cmd)})
+		cmds = append(cmds, []string{cmd})
 	}
 
-	cmds = append(cmds, []string{"ssh", j.Host, fmt.Sprintf(remoteUpdateCmdTemplate, j.Path)})
+	cmds = append(cmds, []string{fmt.Sprintf(remoteUpdateCmdTemplate, j.Path)})
 
 	for _, cmd := range j.PostHook {
-		cmds = append(cmds, []string{"ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, cmd)})
+		cmds = append(cmds, []string{cmd})
 	}
 
-	j.AddError(util.RunCommandGroupContinueOnError(ctx, j.ID(), level.Debug, cmds, j.Path, nil))
+	j.AddError(util.RunRemoteCommandGroupContinueOnError(ctx, j.ID(), level.Debug, j.Host, cmds, j.Path))
 
 	grip.Info(message.Fields{
 		"op":     "completed repo sync",

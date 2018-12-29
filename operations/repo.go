@@ -15,7 +15,7 @@ import (
 
 func Repo() cli.Command {
 	return cli.Command{
-		Name:  "mail",
+		Name:  "repo",
 		Usage: "a collections of commands to manage repositories",
 		Subcommands: []cli.Command{
 			updateRepos(),
@@ -64,5 +64,4 @@ func updateRepos() cli.Command {
 			return amboy.ResolveErrors(ctx, queue)
 		},
 	}
-
 }

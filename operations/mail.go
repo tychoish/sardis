@@ -24,7 +24,8 @@ func Mail() cli.Command {
 		Subcommands: []cli.Command{
 			updateDB(),
 			syncRepo(),
-			updateMail(),
+			syncAllRepos(),
+			updateRepos(),
 		},
 	}
 }
@@ -75,7 +76,7 @@ func updateDB() cli.Command {
 
 func syncRepo() cli.Command {
 	return cli.Command{
-		Name:  "sync",
+		Name:  "repo",
 		Usage: "sync a local and remote git repository",
 		Flags: []cli.Flag{
 			cli.StringFlag{
@@ -99,10 +100,38 @@ func syncRepo() cli.Command {
 			return errors.Wrap(job.Error(), "job encountered problem")
 		},
 	}
-
 }
 
-func updateMail() cli.Command {
+func syncAllRepos() cli.Command {
+	return cli.Command{
+		Name:   "sync",
+		Usage:  "update a local and remote git repository",
+		Before: requireConfig(),
+		Action: func(c *cli.Context) error {
+			env := sardis.GetEnvironment()
+			ctx, cancel := context.WithCancel(env.Context())
+			defer cancel()
+
+			queue := env.Queue()
+			conf := env.Configuration()
+			catcher := grip.NewBasicCatcher()
+
+			for _, mdir := range conf.Mail {
+				catcher.Add(queue.Put(units.NewMailSyncJob(mdir)))
+			}
+
+			if catcher.HasErrors() {
+				return catcher.Resolve()
+			}
+
+			amboy.WaitCtxInterval(ctx, queue, time.Millisecond)
+
+			return amboy.ResolveErrors(ctx, queue)
+		},
+	}
+}
+
+func updateRepos() cli.Command {
 	hostname, err := os.Hostname()
 	grip.Warning(err)
 
@@ -118,10 +147,6 @@ func updateMail() cli.Command {
 			queue := env.Queue()
 			conf := env.Configuration()
 			catcher := grip.NewBasicCatcher()
-
-			for _, mdir := range conf.Mail {
-				catcher.Add(queue.Put(units.NewMailSyncJob(mdir)))
-			}
 
 			for _, repo := range conf.Repo {
 				if repo.LocalSync {
@@ -147,4 +172,5 @@ func updateMail() cli.Command {
 			return amboy.ResolveErrors(ctx, queue)
 		},
 	}
+
 }

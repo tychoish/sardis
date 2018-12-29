@@ -63,13 +63,13 @@ func (j *repoSyncRemoteJob) Run(ctx context.Context) {
 	cmds := [][]string{}
 
 	for _, cmd := range j.PreHook {
-		cmds = append(cmds, []string{"ssh", j.Host, cmd})
+		cmds = append(cmds, []string{"ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, cmd)})
 	}
 
-	cmds = append(cmds, []string{"ssh", j.Host, fmt.Sprintf(remoteUpdateCmdTemplate, j.Path, j.ID())})
+	cmds = append(cmds, []string{"ssh", j.Host, fmt.Sprintf(remoteUpdateCmdTemplate, j.Path)})
 
 	for _, cmd := range j.PostHook {
-		cmds = append(cmds, []string{"ssh", j.Host, cmd})
+		cmds = append(cmds, []string{"ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, cmd)})
 	}
 
 	for idx, args := range cmds {

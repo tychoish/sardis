@@ -103,6 +103,7 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 	}
 
 	cmds = append(cmds,
+		[]string{"git", "add", "-A"},
 		[]string{"git", "pull", "--keep", "--rebase", "--autostash", "origin", "master"},
 		[]string{"bash", "-c", "git ls-files -d | xargs -r git rm --ignore-unmatch --quiet -- "},
 		[]string{"git", "add", "-A"},

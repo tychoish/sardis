@@ -38,6 +38,7 @@ func buildApp() *cli.App {
 		operations.Mail(),
 		operations.ArchLinux(),
 		operations.Repo(),
+		operations.Jira(),
 	}
 
 	// These are global options. Use this to configure logging or

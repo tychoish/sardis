@@ -1,7 +1,6 @@
 package sardis
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,11 +12,10 @@ import (
 )
 
 type Configuration struct {
-	Mail         []MailConf    `bson:"mail" json:"mail" yaml:"mail"`
-	Repo         []RepoConf    `bson:"repo" json:"repo" yaml:"repo"`
-	Notification NotifyConf    `bson:"notify" json:"notify" yaml:"notify"`
-	Queue        AmboyConf     `bson:"amboy" json:"amboy" yaml:"amboy"`
-	Arch         ArchLinuxConf `bson:"arch" json:"arch" yaml:"arch"`
+	Settings Settings      `bson:"settings" json:"settings" yaml:"settings"`
+	Mail     []MailConf    `bson:"mail" json:"mail" yaml:"mail"`
+	Repo     []RepoConf    `bson:"repo" json:"repo" yaml:"repo"`
+	Arch     ArchLinuxConf `bson:"arch" json:"arch" yaml:"arch"`
 }
 
 type MailConf struct {
@@ -36,19 +34,6 @@ type RepoConf struct {
 	Mirrors   []string `bson:"mirrors" json:"mirrors" yaml:"mirrors"`
 }
 
-type NotifyConf struct {
-	Name     string `bson:"name" json:"name" yaml:"name"`
-	Target   string `bson:"target" json:"target" yaml:"target"`
-	Host     string `bson:"host" json:"host" yaml:"host"`
-	User     string `bson:"user" json:"user" yaml:"user"`
-	Password string `bson:"password" json:"password" yaml:"password"`
-}
-
-type AmboyConf struct {
-	Workers int `bson:"workers" json:"workers" yaml:"workers"`
-	Size    int `bson:"size" json:"size" yaml:"size"`
-}
-
 type ArchLinuxConf struct {
 	BuildPath   string `bson:"build_path" json:"build_path" yaml:"build_path"`
 	AurPackages []struct {
@@ -60,33 +45,61 @@ type ArchLinuxConf struct {
 	} `bson:"packages" json:"packages" yaml:"packages"`
 }
 
+type NotifyConf struct {
+	Name     string `bson:"name" json:"name" yaml:"name"`
+	Target   string `bson:"target" json:"target" yaml:"target"`
+	Host     string `bson:"host" json:"host" yaml:"host"`
+	User     string `bson:"user" json:"user" yaml:"user"`
+	Password string `bson:"password" json:"password" yaml:"password"`
+}
+
+type Settings struct {
+	Notification NotifyConf      `bson:"notify" json:"notify" yaml:"notify"`
+	Queue        AmboyConf       `bson:"amboy" json:"amboy" yaml:"amboy"`
+	Credentials  CredentialsConf `bson:"credentials" json:"credentials" yaml:"credentials"`
+}
+
+type CredentialsConf struct {
+	Path string `bson:"path" json:"path" yaml:"path"`
+	Jira struct {
+		Username string `bson:"username" json:"username" yaml:"username"`
+		Password string `bson:"password" json:"password" yaml:"password"`
+		URL      string `bson:"url" json:"url" yaml:"url"`
+	} `bson:"jira" json:"jira" yaml:"jira"`
+	Corp struct {
+		Username string `bson:"username" json:"username" yaml:"username"`
+		Password string `bson:"password" json:"password" yaml:"password"`
+		Seed     string `bson:"seed" json:"seed" yaml:"seed"`
+	} `bson:"corp" json:"corp" yaml:"corp"`
+	GitHub struct {
+		Username string `bson:"username" json:"username" yaml:"username"`
+		Password string `bson:"password" json:"password" yaml:"password"`
+		Token    string `bson:"token" json:"token" yaml:"token"`
+	} `bson:"github" json:"github" yaml:"github"`
+	AWS struct {
+		Key    string `bson:"key" json:"key" yaml:"key"`
+		Secret string `bson:"secret" json:"secret" yaml:"secret"`
+		Token  string `bson:"token" json:"token" yaml:"token"`
+	} `bson:"aws" json:"aws" yaml:"aws"`
+	RHN struct {
+		Username string `bson:"username" json:"username" yaml:"username"`
+		Password string `bson:"password" json:"password" yaml:"password"`
+	} `bson:"rhn" json:"rhn" yaml:"rhn"`
+}
+
+type AmboyConf struct {
+	Workers int `bson:"workers" json:"workers" yaml:"workers"`
+	Size    int `bson:"size" json:"size" yaml:"size"`
+}
+
 func LoadConfiguration(fn string) (*Configuration, error) {
-	if stat, err := os.Stat(fn); os.IsNotExist(err) || stat.IsDir() {
-		return nil, errors.Errorf("'%s' does not exist", fn)
+	out := &Configuration{}
+
+	if err := util.UnmarshalFile(fn, out); err != nil {
+		return nil, errors.Wrap(err, "problem unmarshaling config data")
 	}
 
-	unmarshal := getUnmarshaler(fn)
-	if unmarshal == nil {
-		return nil, errors.Errorf("cannot find unmarshler for input %s", fn)
-	}
-
-	file, err := os.Open(fn)
-	if err != nil {
-		return nil, errors.Wrapf(err, "problem opening file '%s'", fn)
-	}
-	defer file.Close()
-
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		return nil, errors.Wrapf(err, "problem reading data from %s", fn)
-	}
-
-	out := Configuration{}
-	if err = unmarshal(data, &out); err != nil {
-		return nil, errors.Wrap(err, "problem unmarshaling report data")
-	}
-
-	return &out, nil
+	return out, nil
 }
 
 type validatable interface {
@@ -96,12 +109,14 @@ type validatable interface {
 func (conf *Configuration) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	for _, c := range []validatable{
-		&conf.Notification,
-		&conf.Queue,
+		&conf.Settings.Notification,
+		&conf.Settings.Queue,
+		&conf.Settings.Credentials,
 		&conf.Arch,
 	} {
 		catcher.Add(errors.Wrapf(c.Validate(), "%T is not valid", c))
 	}
+
 	return catcher.Resolve()
 }
 
@@ -187,4 +202,11 @@ func (conf *ArchLinuxConf) Validate() error {
 		}
 	}
 	return catcher.Resolve()
+}
+
+func (conf *CredentialsConf) Validate() error {
+	if conf.Path == "" {
+		return nil
+	}
+	return errors.WithStack(util.UnmarshalFile(conf.Path, &conf))
 }

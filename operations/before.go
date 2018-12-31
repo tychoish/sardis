@@ -1,9 +1,10 @@
 package operations
 
 import (
-	"errors"
+	"os"
 
 	"github.com/mongodb/grip"
+	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli"
 )
@@ -41,5 +42,23 @@ func requireConfig() cli.BeforeFunc {
 			return errors.New("conf is nil")
 		}
 		return nil
+	}
+}
+
+func requirePathExists(flagName string) cli.BeforeFunc {
+	return func(c *cli.Context) error {
+		path := c.String(flagName)
+		if path == "" {
+			if c.NArg() != 1 {
+				return errors.New("must specify the path to an evergreen configuration")
+			}
+			path = c.Args().Get(0)
+		}
+
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return errors.Errorf("configuration file %s does not exist", path)
+		}
+
+		return c.Set(flagName, path)
 	}
 }

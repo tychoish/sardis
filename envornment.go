@@ -50,6 +50,7 @@ type Environment interface {
 	Configuration() *Configuration
 	Queue() amboy.Queue
 	Logger() grip.Journaler
+	JiraIssue() grip.Journaler
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -59,11 +60,12 @@ type Environment interface {
 // see the documentation for the corresponding global methods for
 
 type appServicesCache struct {
-	queue  amboy.Queue
-	conf   *Configuration
-	logger grip.Journaler
-	ctx    context.Context
-	mutex  sync.RWMutex
+	queue     amboy.Queue
+	conf      *Configuration
+	logger    grip.Journaler
+	jiraIssue grip.Journaler
+	ctx       context.Context
+	mutex     sync.RWMutex
 }
 
 func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) error {
@@ -76,18 +78,18 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 	catcher.Add(conf.Validate())
 	catcher.Add(c.initSender())
 	catcher.Add(c.initQueue())
-
+	catcher.Add(c.initJira())
 	return catcher.Resolve()
 }
 
 func (c *appServicesCache) initSender() error {
 	sender, err := send.NewXMPPLogger(
-		c.conf.Notification.Name,
-		c.conf.Notification.Target,
+		c.conf.Settings.Notification.Name,
+		c.conf.Settings.Notification.Target,
 		send.XMPPConnectionInfo{
-			Hostname: c.conf.Notification.Host,
-			Username: c.conf.Notification.User,
-			Password: c.conf.Notification.Password,
+			Hostname: c.conf.Settings.Notification.Host,
+			Username: c.conf.Settings.Notification.User,
+			Password: c.conf.Settings.Notification.Password,
 		},
 		grip.GetSender().Level())
 	if err != nil {
@@ -99,22 +101,50 @@ func (c *appServicesCache) initSender() error {
 		return errors.Wrap(err, "problem finding hostname")
 	}
 
-	sender.SetFormatter(func(m message.Composer) (string, error) {
-		return fmt.Sprintf("[%s:%s] %s", c.conf.Notification.Name, host, m.String()), nil
+	err = sender.SetFormatter(func(m message.Composer) (string, error) {
+		return fmt.Sprintf("[%s:%s] %s", c.conf.Settings.Notification.Name, host, m.String()), nil
 	})
+	if err != nil {
+		return errors.Wrap(err, "problem setting formatter")
+	}
 
 	c.logger = logging.MakeGrip(sender)
 
 	return nil
 }
 
+func (c *appServicesCache) initJira() error {
+	if c.conf.Settings.Credentials.Jira.URL == "" {
+		grip.Debug("no jira instance specified, skipping jira logger")
+		c.jiraIssue = logging.MakeGrip(grip.GetSender())
+	}
+
+	sender, err := send.MakeJiraLogger(&send.JiraOptions{
+		Name:         c.conf.Settings.Notification.Name,
+		BaseURL:      c.conf.Settings.Credentials.Jira.URL,
+		Username:     c.conf.Settings.Credentials.Jira.Username,
+		Password:     c.conf.Settings.Credentials.Jira.Password,
+		UseBasicAuth: true,
+	})
+	if err != nil {
+		return errors.Wrap(err, "problem setting up jira logger")
+	}
+
+	if err := sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.GetSender())); err != nil {
+		return errors.Wrap(err, "problem setting error handler")
+	}
+
+	c.jiraIssue = logging.MakeGrip(sender)
+	return nil
+}
+
 func (c *appServicesCache) initQueue() error {
-	c.queue = queue.NewLocalLimitedSize(c.conf.Queue.Workers, c.conf.Queue.Size)
+	c.queue = queue.NewLocalLimitedSize(c.conf.Settings.Queue.Workers, c.conf.Settings.Queue.Size)
 
 	grip.Debug(message.Fields{
 		"op":      "configured local queue",
-		"size":    c.conf.Queue.Size,
-		"workers": c.conf.Queue.Workers,
+		"size":    c.conf.Settings.Queue.Size,
+		"workers": c.conf.Settings.Queue.Workers,
 	})
 
 	return nil
@@ -158,4 +188,11 @@ func (c *appServicesCache) Logger() grip.Journaler {
 	defer c.mutex.RUnlock()
 
 	return c.logger
+}
+
+func (c *appServicesCache) JiraIssue() grip.Journaler {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	return c.jiraIssue
 }

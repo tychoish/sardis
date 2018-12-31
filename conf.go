@@ -15,6 +15,7 @@ type Configuration struct {
 	Settings Settings      `bson:"settings" json:"settings" yaml:"settings"`
 	Mail     []MailConf    `bson:"mail" json:"mail" yaml:"mail"`
 	Repo     []RepoConf    `bson:"repo" json:"repo" yaml:"repo"`
+	Links    []LinkConf    `bson:"links" json:"links" yaml:"links"`
 	Arch     ArchLinuxConf `bson:"arch" json:"arch" yaml:"arch"`
 }
 
@@ -54,6 +55,13 @@ type NotifyConf struct {
 	Host     string `bson:"host" json:"host" yaml:"host"`
 	User     string `bson:"user" json:"user" yaml:"user"`
 	Password string `bson:"password" json:"password" yaml:"password"`
+}
+
+type LinkConf struct {
+	Name   string `bson:"name" json:"name" yaml:"name"`
+	Path   string `bson:"path" json:"path" yaml:"path"`
+	Target string `bson:"target" json:"target" yaml:"target"`
+	Update bool   `bson:"update" json:"update" yaml:"update"`
 }
 
 type Settings struct {
@@ -121,6 +129,10 @@ func (conf *Configuration) Validate() error {
 	}
 
 	for idx, c := range conf.Repo {
+		catcher.Add(errors.Wrapf(c.Validate(), "%d of %T is not valid", idx, c))
+	}
+
+	for idx, c := range conf.Links {
 		catcher.Add(errors.Wrapf(c.Validate(), "%d of %T is not valid", idx, c))
 	}
 
@@ -222,6 +234,39 @@ func (conf *RepoConf) Validate() error {
 
 	if conf.Fetch && conf.LocalSync {
 		return errors.New("cannot specify sync and fetch")
+	}
+
+	return nil
+}
+
+func (conf *LinkConf) Validate() error {
+	if conf.Target == "" {
+		return errors.New("must specify a link target")
+	}
+
+	if conf.Name == "" {
+		base := filepath.Base(conf.Path)
+		fn := filepath.Dir(conf.Path)
+
+		if base != "" && fn != "" {
+			conf.Path = base
+			conf.Name = fn
+		} else {
+			return errors.New("must specify a name for the link")
+		}
+
+		return errors.New("must specify a name")
+	}
+
+	if conf.Path == "" {
+		base := filepath.Base(conf.Name)
+		fn := filepath.Dir(conf.Name)
+		if base != "" && fn != "" {
+			conf.Path = base
+			conf.Name = fn
+		} else {
+			return errors.New("must specify a location for the link")
+		}
 	}
 
 	return nil

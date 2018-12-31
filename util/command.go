@@ -83,9 +83,12 @@ type Command struct {
 	id       string
 
 	continueOnError bool
+	stopOnError     bool
+	ignoreError     bool
 	stdOut          io.Writer
 	stdErr          io.Writer
 	closers         []func() error
+	check           func() bool
 }
 
 func NewCommand() *Command                                  { return &Command{} }
@@ -96,9 +99,12 @@ func (c *Command) Directory(d string) *Command              { c.dir = d; return 
 func (c *Command) Host(h string) *Command                   { c.host = h; return c }
 func (c *Command) Priority(l level.Priority) *Command       { c.priority = l; return c }
 func (c *Command) ID(id string) *Command                    { c.id = id; return c }
-func (c *Command) SetContinue(ignore bool) *Command         { c.continueOnError = ignore; return c }
+func (c *Command) SetContinue(cont bool) *Command           { c.continueOnError = cont; return c }
+func (c *Command) SetStopOnError(stop bool) *Command        { c.stopOnError = stop; return c }
+func (c *Command) SetIgnoreError(ignore bool) *Command      { c.ignoreError = ignore; return c }
 func (c *Command) Environment(e map[string]string) *Command { c.env = e; return c }
 func (c *Command) AddEnv(k, v string) *Command              { c.setupEnv(); c.env[k] = v; return c }
+func (c *Command) SetCheck(chk func() bool) *Command        { c.check = chk; return c }
 
 func (c *Command) Append(cmds ...string) *Command {
 	for _, cmd := range cmds {
@@ -114,6 +120,15 @@ func (c *Command) setupEnv() {
 }
 
 func (c *Command) Run(ctx context.Context) (err error) {
+	if c.check != nil && !c.check() {
+		grip.Debug(message.Fields{
+			"op":  "noop after check returned false",
+			"id":  c.id,
+			"cmd": c.String(),
+		})
+		return
+	}
+
 	c.finalizeWriters()
 	catcher := grip.NewBasicCatcher()
 	defer func() {
@@ -135,10 +150,13 @@ func (c *Command) Run(ctx context.Context) (err error) {
 		}
 
 		err = c.exec(cmd, idx)
-		catcher.Add(err)
+		if !c.ignoreError {
+			catcher.Add(err)
+		}
+
 		if c.continueOnError {
 			continue
-		} else if err != nil {
+		} else if err != nil && c.stopOnError {
 			return
 		}
 	}

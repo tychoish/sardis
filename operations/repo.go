@@ -57,6 +57,10 @@ func updateRepos() cli.Command {
 				}
 			}
 
+			for _, link := range conf.Links {
+				catcher.Add(queue.Put(units.NewSymlinkCreateJob(link)))
+			}
+
 			if catcher.HasErrors() {
 				return catcher.Resolve()
 			}

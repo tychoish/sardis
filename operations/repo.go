@@ -43,6 +43,8 @@ func updateRepos() cli.Command {
 			for _, repo := range conf.Repo {
 				if repo.LocalSync {
 					catcher.Add(queue.Put(units.NewLocalRepoSyncJob(repo.Path)))
+				} else if repo.Fetch {
+					catcher.Add(queue.Put(units.NewRepoFetchJob(repo)))
 				}
 
 				for _, mirror := range repo.Mirrors {

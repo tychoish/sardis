@@ -26,12 +26,15 @@ type MailConf struct {
 }
 
 type RepoConf struct {
-	Path      string   `bson:"path" json:"path" yaml:"path"`
-	Remote    string   `bson:"remote" json:"remote" yaml:"remote"`
-	LocalSync bool     `bson:"sync" json:"sync" yaml:"sync"`
-	Pre       []string `bson:"pre" json:"pre" yaml:"pre"`
-	Post      []string `bson:"post" json:"post" yaml:"post"`
-	Mirrors   []string `bson:"mirrors" json:"mirrors" yaml:"mirrors"`
+	Path       string   `bson:"path" json:"path" yaml:"path"`
+	Remote     string   `bson:"remote" json:"remote" yaml:"remote"`
+	RemoteName string   `bson:"remote_name" json:"remote_name" yaml:"remote_name"`
+	Branch     string   `bson:"branch" json:"branch" yaml:"branch"`
+	LocalSync  bool     `bson:"sync" json:"sync" yaml:"sync"`
+	Fetch      bool     `bson:"fetch" json:"fetch" yaml:"fetch"`
+	Pre        []string `bson:"pre" json:"pre" yaml:"pre"`
+	Post       []string `bson:"post" json:"post" yaml:"post"`
+	Mirrors    []string `bson:"mirrors" json:"mirrors" yaml:"mirrors"`
 }
 
 type ArchLinuxConf struct {
@@ -115,6 +118,10 @@ func (conf *Configuration) Validate() error {
 		&conf.Arch,
 	} {
 		catcher.Add(errors.Wrapf(c.Validate(), "%T is not valid", c))
+	}
+
+	for idx, c := range conf.Repo {
+		catcher.Add(errors.Wrapf(c.Validate(), "%d of %T is not valid", idx, c))
 	}
 
 	return catcher.Resolve()
@@ -202,6 +209,22 @@ func (conf *ArchLinuxConf) Validate() error {
 		}
 	}
 	return catcher.Resolve()
+}
+
+func (conf *RepoConf) Validate() error {
+	if conf.Branch == "" {
+		conf.Branch = "master"
+	}
+
+	if conf.RemoteName == "" {
+		conf.RemoteName = "origin"
+	}
+
+	if conf.Fetch && conf.LocalSync {
+		return errors.New("cannot specify sync and fetch")
+	}
+
+	return nil
 }
 
 func (conf *CredentialsConf) Validate() error {

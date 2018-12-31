@@ -65,6 +65,15 @@ func getLogOutput(out []byte) string {
 	return strings.Trim(strings.Replace(string(out), "\n", "\n\t out -> ", -1), "\n\t out->")
 }
 
+func splitCmdToArgs(cmd string) []string {
+	args, err := shlex.Split(cmd)
+	if err != nil {
+		grip.Error(message.WrapError(err, message.Fields{"input": cmd}))
+		return nil
+	}
+	return args
+}
+
 type Command struct {
 	cmds     [][]string
 	dir      string
@@ -90,6 +99,13 @@ func (c *Command) ID(id string) *Command                    { c.id = id; return 
 func (c *Command) SetContinue(ignore bool) *Command         { c.continueOnError = ignore; return c }
 func (c *Command) Environment(e map[string]string) *Command { c.env = e; return c }
 func (c *Command) AddEnv(k, v string) *Command              { c.setupEnv(); c.env[k] = v; return c }
+
+func (c *Command) Append(cmds ...string) *Command {
+	for _, cmd := range cmds {
+		c.cmds = append(c.cmds, splitCmdToArgs(cmd))
+	}
+	return c
+}
 
 func (c *Command) setupEnv() {
 	if c.env == nil {

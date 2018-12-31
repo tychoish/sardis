@@ -55,7 +55,12 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 			job := NewLocalRepoSyncJob(j.Conf.Path)
 			job.Run(ctx)
 			j.AddError(job.Error())
+		} else if j.Conf.Fetch {
+			job := NewRepoFetchJob(j.Conf)
+			job.Run(ctx)
+			j.AddError(job.Error())
 		}
+
 		grip.Notice(message.Fields{
 			"path": j.Conf.Path,
 			"repo": j.Conf.Remote,
@@ -66,5 +71,16 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 	}
 	args := []string{"git", "clone", j.Conf.Remote, j.Conf.Path}
 
-	j.AddError(util.RunCommand(ctx, j.ID(), level.Debug, args, filepath.Dir(j.Conf.Path), nil))
+	err := util.RunCommand(ctx, j.ID(), level.Debug, args, filepath.Dir(j.Conf.Path), nil)
+	if err != nil {
+		j.AddError(err)
+		return
+	}
+
+	if j.Conf.Post == nil {
+		return
+	}
+
+	j.AddError(util.NewCommand().ID(j.ID()).Priority(level.Info).Directory(j.Conf.Path).Append(j.Conf.Post...).Run(ctx))
+
 }

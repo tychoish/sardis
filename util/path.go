@@ -18,3 +18,11 @@ func GetHomeDir() string {
 
 	return userHome
 }
+
+func GetHostname() string {
+	name, err := os.Hostname()
+	if err != nil {
+		return "UNKNOWN_HOSTNAME"
+	}
+	return name
+}

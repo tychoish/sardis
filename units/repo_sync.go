@@ -66,7 +66,7 @@ func (j *repoSyncJob) buildID() string {
 	tstr := time.Now().Format("2006-01-02::15.04.05")
 
 	if j.isLocal() {
-		return fmt.Sprintf("LOCAL.%s.%d.%s.%s", repoSyncJobName, job.GetNumber(), j.Path, tstr)
+		return fmt.Sprintf("LOCAL.%s.%s.%d.%s.%s", repoSyncJobName, util.GetHostname(), job.GetNumber(), j.Path, tstr)
 	}
 
 	return fmt.Sprintf("REMOTE.%s.%d.%s.%s.%s", repoSyncJobName, job.GetNumber(), j.Host, j.Path, tstr)

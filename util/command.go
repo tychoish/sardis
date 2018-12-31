@@ -223,18 +223,17 @@ func (c *Command) getExecCmds(ctx context.Context) ([]*exec.Cmd, error) {
 
 			out = append(out, cmd)
 		}
-	}
+	} else {
+		for _, args := range c.cmds {
+			cmd, err := getCommand(ctx, args, c.dir, c.env)
+			if err != nil {
+				catcher.Add(err)
+				continue
+			}
 
-	for _, args := range c.cmds {
-		cmd, err := getCommand(ctx, args, c.dir, c.env)
-		if err != nil {
-			catcher.Add(err)
-			continue
+			out = append(out, cmd)
 		}
-
-		out = append(out, cmd)
 	}
-
 	if catcher.HasErrors() {
 		return nil, catcher.Resolve()
 	}

@@ -17,7 +17,7 @@ import (
 const (
 	repoSyncRemoteJobName = "repo-sync-remote"
 
-	remoteUpdateCmdTemplate = "cd %s && git add -A && git pull --rebase --autostash --keep origin master"
+	remoteUpdateCmdTemplate = "git add -A && git pull --rebase --autostash --keep origin master"
 	syncCmdTemplate         = remoteUpdateCmdTemplate + " && git commit -a -m 'auto-update: (%s)'; git push"
 )
 
@@ -66,7 +66,7 @@ func (j *repoSyncRemoteJob) Run(ctx context.Context) {
 		cmds = append(cmds, []string{cmd})
 	}
 
-	cmds = append(cmds, []string{fmt.Sprintf(remoteUpdateCmdTemplate, j.Path)})
+	cmds = append(cmds, []string{remoteUpdateCmdTemplate})
 
 	for _, cmd := range j.PostHook {
 		cmds = append(cmds, []string{cmd})

@@ -88,7 +88,7 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 	if !j.isLocal() {
 		cmds = append(cmds,
 			[]string{"ssh", j.Host,
-				fmt.Sprintf(syncCmdTemplate, j.Path, j.ID()),
+				fmt.Sprintf("cd %s && ", j.Path) + fmt.Sprintf(syncCmdTemplate, j.ID()),
 			})
 	}
 
@@ -113,7 +113,7 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 
 	if !j.isLocal() {
 		cmds = append(cmds,
-			[]string{"ssh", j.Host, fmt.Sprintf(syncCmdTemplate, j.Path, j.ID())},
+			[]string{"ssh", j.Host, fmt.Sprintf("cd %s && ", j.Path) + fmt.Sprintf(syncCmdTemplate, j.ID())},
 			[]string{"git", "pull", "--keep", "--rebase", "--autostash", "origin", "master"},
 		)
 	}

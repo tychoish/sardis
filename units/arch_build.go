@@ -63,7 +63,7 @@ func (j *archAbsBuildJob) Run(ctx context.Context) {
 		return
 	}
 
-	args := []string{"makepkg", "--syncdeps", "--force", "--install"}
+	args := []string{"makepkg", "--syncdeps", "--force", "--install", "--noconfirm"}
 
 	j.AddError(util.RunCommand(ctx, j.ID(), level.Info, args, dir, nil))
 }

@@ -5,7 +5,8 @@ tickets:
   #   description: ""
   #   reporter: "sam.kleinman"
   #   assignee: ""
-  #   type: "bug"
+  #   type: "Bug"
   #   components: []
   #   labels: []
   #   fields: {}
+  #   versions: []

@@ -124,7 +124,7 @@ func setupArchLinux() cli.Command {
 			ctx := env.Context()
 
 			pkgs := []string{}
-			for _, pkg := range conf.Arch.Packages {
+			for _, pkg := range conf.System.Arch.Packages {
 				pkgs = append(pkgs, pkg.Name)
 			}
 
@@ -132,7 +132,7 @@ func setupArchLinux() cli.Command {
 			job.Run(ctx)
 			catcher.Add(job.Error())
 
-			for _, pkg := range conf.Arch.AurPackages {
+			for _, pkg := range conf.System.Arch.AurPackages {
 				job := units.NewArchFetchAurJob(pkg.Name, pkg.Update)
 				job.Run(ctx)
 

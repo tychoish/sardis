@@ -58,7 +58,7 @@ func (j *archAurFetchJob) Run(ctx context.Context) {
 
 	env := sardis.GetEnvironment()
 	conf := env.Configuration()
-	dir := filepath.Join(conf.Arch.BuildPath, j.Name)
+	dir := filepath.Join(conf.System.Arch.BuildPath, j.Name)
 	args := []string{}
 
 	if stat, err := os.Stat(dir); os.IsNotExist(err) {

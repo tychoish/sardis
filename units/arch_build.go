@@ -55,7 +55,7 @@ func (j *archAbsBuildJob) Run(ctx context.Context) {
 
 	env := sardis.GetEnvironment()
 	conf := env.Configuration()
-	dir := filepath.Join(conf.Arch.BuildPath, j.Name)
+	dir := filepath.Join(conf.System.Arch.BuildPath, j.Name)
 	pkgbuild := filepath.Join(dir, "PKGBUILD")
 
 	if _, err := os.Stat(pkgbuild); os.IsNotExist(err) {

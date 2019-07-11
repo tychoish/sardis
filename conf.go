@@ -12,11 +12,11 @@ import (
 )
 
 type Configuration struct {
-	Settings Settings      `bson:"settings" json:"settings" yaml:"settings"`
-	Mail     []MailConf    `bson:"mail" json:"mail" yaml:"mail"`
-	Repo     []RepoConf    `bson:"repo" json:"repo" yaml:"repo"`
-	Links    []LinkConf    `bson:"links" json:"links" yaml:"links"`
-	Arch     ArchLinuxConf `bson:"arch" json:"arch" yaml:"arch"`
+	Settings Settings   `bson:"settings" json:"settings" yaml:"settings"`
+	Mail     []MailConf `bson:"mail" json:"mail" yaml:"mail"`
+	Repo     []RepoConf `bson:"repo" json:"repo" yaml:"repo"`
+	Links    []LinkConf `bson:"links" json:"links" yaml:"links"`
+	System   SystemConf `bson:"system" json:"system" yaml:"system"`
 }
 
 type MailConf struct {
@@ -47,6 +47,15 @@ type ArchLinuxConf struct {
 	Packages []struct {
 		Name string `bson:"name" json:"name" yaml:"name"`
 	} `bson:"packages" json:"packages" yaml:"packages"`
+}
+
+type SystemConf struct {
+	GoPackages []struct {
+		Name    string `bson:"name" json:"name" yaml:"name"`
+		Update  bool   `bson:"update" json:"update" yaml:"update"`
+		Version string `bson:"version" json:"version" yaml:"version"`
+	} `bson:"golang" json:"golang" yaml:"golang"`
+	Arch ArchLinuxConf `bson:"arch" json:"arch" yaml:"arch"`
 }
 
 type NotifyConf struct {
@@ -123,7 +132,7 @@ func (conf *Configuration) Validate() error {
 		&conf.Settings.Notification,
 		&conf.Settings.Queue,
 		&conf.Settings.Credentials,
-		&conf.Arch,
+		&conf.System.Arch,
 	} {
 		catcher.Add(errors.Wrapf(c.Validate(), "%T is not valid", c))
 	}

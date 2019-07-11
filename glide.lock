@@ -4,7 +4,7 @@ imports:
 - name: github.com/mongodb/amboy
   version: 45ee6f1e790a2fdf28a7d6acaf61c2ffc1da9629
 - name: github.com/mongodb/grip
-  version: af5d4f01dce67c1dafa9c9a9334f9cae31b2b437
+  version: e5efdc6c6299ca3b06c6ff739f52d0155ecc3859
 - name: github.com/pkg/errors
   version: 059132a15dd08d6704c67711dae0cf35ab991756
 

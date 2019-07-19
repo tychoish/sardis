@@ -1,8 +1,6 @@
 package operations
 
 import (
-	"context"
-
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
@@ -38,8 +36,9 @@ func bulkCreateTickets() cli.Command {
 		Action: func(c *cli.Context) error {
 			path := c.String(pathFlagName)
 			env := sardis.GetEnvironment()
-			ctx, cancel := context.WithCancel(env.Context())
+			ctx, cancel := env.Context()
 			defer cancel()
+			defer env.Close(ctx)
 
 			conf := env.Configuration()
 			if conf.Settings.Credentials.Jira.URL == "" {

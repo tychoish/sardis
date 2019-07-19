@@ -19,13 +19,16 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/queue"
 	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/level"
 	"github.com/mongodb/grip/logging"
 	"github.com/mongodb/grip/message"
 	"github.com/mongodb/grip/send"
+	"github.com/mongodb/jasper"
 	"github.com/pkg/errors"
 )
 
@@ -46,12 +49,18 @@ func GetEnvironment() Environment {
 type Environment interface {
 	Configure(context.Context, *Configuration) error
 
-	Context() context.Context
+	Context() (context.Context, context.CancelFunc)
 	Configuration() *Configuration
 	Queue() amboy.Queue
 	Logger() grip.Journaler
 	JiraIssue() grip.Journaler
+	Jasper() jasper.Manager
+
+	RegisterCloser(string, CloserFunc)
+	Close(context.Context) error
 }
+
+type CloserFunc func(context.Context) error
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -64,21 +73,50 @@ type appServicesCache struct {
 	conf      *Configuration
 	logger    grip.Journaler
 	jiraIssue grip.Journaler
+	jpm       jasper.Manager
 	ctx       context.Context
+	closers   []closerOp
 	mutex     sync.RWMutex
+}
+
+type closerOp struct {
+	name   string
+	closer CloserFunc
 }
 
 func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	c.conf = conf
-	c.ctx = ctx
+	if c.conf != nil {
+		return errors.New("cannot reconfigure the environment")
+	}
+
 	catcher := grip.NewBasicCatcher()
+	var err error
+	var cancel context.CancelFunc
+
+	c.conf = conf
+	c.ctx, cancel = context.WithCancel(ctx)
+	c.jpm, err = jasper.NewLocalManager(true)
+	catcher.Add(err)
+
+	c.closers = append(c.closers,
+		closerOp{
+			name:   "cancel-app-context",
+			closer: func(_ context.Context) error { cancel(); return nil },
+		},
+		closerOp{
+			name:   "close jasper manager",
+			closer: c.jpm.Close,
+		},
+	)
+
 	catcher.Add(conf.Validate())
 	catcher.Add(c.initSender())
 	catcher.Add(c.initQueue())
 	catcher.Add(c.initJira())
+
 	return catcher.Resolve()
 }
 
@@ -109,7 +147,10 @@ func (c *appServicesCache) initSender() error {
 	}
 
 	c.logger = logging.MakeGrip(sender)
-
+	c.closers = append(c.closers, closerOp{
+		name:   "sender-notify",
+		closer: func(_ context.Context) error { return sender.Close() },
+	})
 	return nil
 }
 
@@ -134,6 +175,11 @@ func (c *appServicesCache) initJira() error {
 		return errors.Wrap(err, "problem setting error handler")
 	}
 
+	c.closers = append(c.closers, closerOp{
+		name:   "sender-jira-issues",
+		closer: func(_ context.Context) error { return sender.Close() },
+	})
+
 	c.jiraIssue = logging.MakeGrip(sender)
 	return nil
 }
@@ -145,6 +191,11 @@ func (c *appServicesCache) initQueue() error {
 		"op":      "configured local queue",
 		"size":    c.conf.Settings.Queue.Size,
 		"workers": c.conf.Settings.Queue.Workers,
+	})
+
+	c.closers = append(c.closers, closerOp{
+		name:   "local-queue-termination",
+		closer: func(_ context.Context) error { c.queue.Runner().Close(); return nil },
 	})
 
 	return nil
@@ -161,11 +212,49 @@ func (c *appServicesCache) Queue() amboy.Queue {
 	return c.queue
 }
 
-func (c *appServicesCache) Context() context.Context {
+func (c *appServicesCache) Jasper() jasper.Manager {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	return c.Jasper()
+}
+
+func (c *appServicesCache) Context() (context.Context, context.CancelFunc) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	return c.ctx
+	return context.WithCancel(c.ctx)
+}
+
+func (c *appServicesCache) Close(ctx context.Context) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	catcher := grip.NewBasicCatcher()
+
+	for idx, op := range c.closers {
+		startAt := time.Now()
+		err := op.closer(ctx)
+		catcher.Add(err)
+		msg := message.Fields{
+			"name":    op.name,
+			"op":      "ran closer",
+			"idx":     idx,
+			"runtime": time.Since(startAt),
+			"percent": len(c.closers) / idx,
+		}
+
+		grip.LogWhen(err == nil, level.Info, msg)
+		grip.Error(message.WrapError(err, msg))
+	}
+
+	return catcher.Resolve()
+}
+
+func (c *appServicesCache) RegisterCloser(n string, cf CloserFunc) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.closers = append(c.closers, closerOp{name: n, closer: cf})
 }
 
 func (c *appServicesCache) Configuration() *Configuration {

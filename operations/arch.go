@@ -35,7 +35,9 @@ func fetchAur() cli.Command {
 		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig()),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
-			ctx := env.Context()
+			ctx, cancel := env.Context()
+			defer cancel()
+			defer env.Close(ctx)
 			catcher := grip.NewBasicCatcher()
 
 			for _, name := range c.StringSlice(nameFlagName) {
@@ -62,7 +64,9 @@ func buildPkg() cli.Command {
 		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig()),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
-			ctx := env.Context()
+			ctx, cancel := env.Context()
+			defer cancel()
+			defer env.Close(ctx)
 			catcher := grip.NewBasicCatcher()
 
 			for _, name := range c.StringSlice(nameFlagName) {
@@ -89,7 +93,9 @@ func installAur() cli.Command {
 		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig()),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
-			ctx := env.Context()
+			ctx, cancel := env.Context()
+			defer cancel()
+			defer env.Close(ctx)
 			catcher := grip.NewBasicCatcher()
 
 			for _, name := range c.StringSlice(nameFlagName) {
@@ -121,7 +127,9 @@ func setupArchLinux() cli.Command {
 			env := sardis.GetEnvironment()
 			conf := env.Configuration()
 			catcher := grip.NewBasicCatcher()
-			ctx := env.Context()
+			ctx, cancel := env.Context()
+			defer cancel()
+			defer env.Close(ctx)
 
 			pkgs := []string{}
 			for _, pkg := range conf.System.Arch.Packages {

@@ -1,7 +1,6 @@
 package operations
 
 import (
-	"context"
 	"os/user"
 	"path/filepath"
 	"time"
@@ -60,7 +59,8 @@ func updateDB() cli.Command {
 		},
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
-			ctx, cancel := context.WithCancel(env.Context())
+			ctx, cancel := env.Context()
+			defer env.Close(ctx)
 			defer cancel()
 
 			job := units.NewMailUpdaterJob(c.String("mail"), c.String("mu"), c.String("daemon"), c.Bool("rebuild"))
@@ -87,7 +87,8 @@ func syncRepo() cli.Command {
 		},
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
-			ctx, cancel := context.WithCancel(env.Context())
+			ctx, cancel := env.Context()
+			defer env.Close(ctx)
 			defer cancel()
 
 			job := units.NewRepoSyncJob(c.String("host"), c.String("path"), nil, nil)
@@ -106,7 +107,8 @@ func syncAllMailRepos() cli.Command {
 		Before: requireConfig(),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
-			ctx, cancel := context.WithCancel(env.Context())
+			ctx, cancel := env.Context()
+			defer env.Close(ctx)
 			defer cancel()
 
 			queue := env.Queue()

@@ -1,7 +1,6 @@
 package operations
 
 import (
-	"context"
 	"os"
 	"strings"
 	"time"
@@ -33,7 +32,8 @@ func updateRepos() cli.Command {
 		Before: requireConfig(),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
-			ctx, cancel := context.WithCancel(env.Context())
+			ctx, cancel := env.Context()
+			defer env.Close(ctx)
 			defer cancel()
 
 			queue := env.Queue()

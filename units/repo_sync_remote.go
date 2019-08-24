@@ -11,7 +11,7 @@ import (
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/level"
 	"github.com/mongodb/grip/message"
-	"github.com/tychoish/sardis/util"
+	"github.com/tychoish/sardis"
 )
 
 const (
@@ -72,7 +72,9 @@ func (j *repoSyncRemoteJob) Run(ctx context.Context) {
 		cmds = append(cmds, []string{cmd})
 	}
 
-	j.AddError(util.RunRemoteCommandGroupContinueOnError(ctx, j.ID(), level.Debug, j.Host, cmds, j.Path))
+	j.AddError(sardis.GetEnvironment().Jasper().CreateCommand(ctx).ID(j.ID()).
+		SetOutputSender(level.Debug, grip.GetSender()).
+		Directory(j.Path).Host(j.Host).Extend(cmds).Run(ctx))
 
 	grip.Info(message.Fields{
 		"op":     "completed repo sync",

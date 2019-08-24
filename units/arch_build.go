@@ -9,10 +9,10 @@ import (
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/job"
 	"github.com/mongodb/amboy/registry"
+	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/level"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
-	"github.com/tychoish/sardis/util"
 )
 
 type archAbsBuildJob struct {
@@ -63,7 +63,7 @@ func (j *archAbsBuildJob) Run(ctx context.Context) {
 		return
 	}
 
-	args := []string{"makepkg", "--syncdeps", "--force", "--install", "--noconfirm"}
-
-	j.AddError(util.RunCommand(ctx, j.ID(), level.Info, args, dir, nil))
+	j.AddError(env.Jasper().CreateCommand(ctx).
+		AppendArgs("makepkg", "--syncdeps", "--force", "--install", "--noconfirm").
+		SetOutputSender(level.Debug, grip.GetSender()).ID(j.ID()).Directory(dir).Run(ctx))
 }

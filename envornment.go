@@ -195,7 +195,7 @@ func (c *appServicesCache) initQueue() error {
 
 	c.closers = append(c.closers, closerOp{
 		name:   "local-queue-termination",
-		closer: func(_ context.Context) error { c.queue.Runner().Close(); return nil },
+		closer: func(ctx context.Context) error { c.queue.Runner().Close(ctx); return nil },
 	})
 
 	return nil

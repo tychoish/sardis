@@ -42,9 +42,9 @@ func updateRepos() cli.Command {
 
 			for _, repo := range conf.Repo {
 				if repo.LocalSync {
-					catcher.Add(queue.Put(units.NewLocalRepoSyncJob(repo.Path)))
+					catcher.Add(queue.Put(ctx, units.NewLocalRepoSyncJob(repo.Path)))
 				} else if repo.Fetch {
-					catcher.Add(queue.Put(units.NewRepoFetchJob(repo)))
+					catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(repo)))
 				}
 
 				for _, mirror := range repo.Mirrors {
@@ -53,19 +53,19 @@ func updateRepos() cli.Command {
 							repo.Path, mirror, hostname)
 						continue
 					}
-					catcher.Add(queue.Put(units.NewRepoSyncRemoteJob(mirror, repo.Path, repo.Pre, repo.Post)))
+					catcher.Add(queue.Put(ctx, units.NewRepoSyncRemoteJob(mirror, repo.Path, repo.Pre, repo.Post)))
 				}
 			}
 
 			for _, link := range conf.Links {
-				catcher.Add(queue.Put(units.NewSymlinkCreateJob(link)))
+				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(link)))
 			}
 
 			if catcher.HasErrors() {
 				return catcher.Resolve()
 			}
 
-			amboy.WaitCtxInterval(ctx, queue, time.Millisecond)
+			amboy.WaitInterval(ctx, queue, time.Millisecond)
 
 			return amboy.ResolveErrors(ctx, queue)
 		},

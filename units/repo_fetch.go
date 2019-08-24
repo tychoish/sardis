@@ -13,7 +13,6 @@ import (
 	"github.com/mongodb/grip/level"
 	"github.com/mongodb/grip/message"
 	"github.com/tychoish/sardis"
-	"github.com/tychoish/sardis/util"
 )
 
 type repoFetchJob struct {
@@ -62,11 +61,13 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 		return
 	}
 
-	args := []string{"git", "pull", "--keep", "--rebase", "--autostash", j.Conf.RemoteName, j.Conf.Branch}
+	jpm := sardis.GetEnvironment().Jasper()
 
-	err := util.RunCommand(ctx, j.ID(), level.Debug, args, j.Conf.Path, nil)
-	if err != nil {
-		j.AddError(err)
+	j.AddError(jpm.CreateCommand(ctx).ID(j.ID()).SetOutputSender(level.Debug, grip.GetSender()).
+		Append("git", "pull", "--keep", "--rebase", "--autostash", j.Conf.RemoteName, j.Conf.Branch).
+		Directory(j.Conf.Path).Run(ctx))
+
+	if j.HasErrors() {
 		return
 	}
 
@@ -74,5 +75,6 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 		return
 	}
 
-	j.AddError(util.NewCommand().ID(j.ID()).Priority(level.Info).Directory(j.Conf.Path).Append(j.Conf.Post...).Run(ctx))
+	j.AddError(jpm.CreateCommand(ctx).ID(j.ID()).SetOutputSender(level.Info, grip.GetSender()).
+		Directory(j.Conf.Path).Add(j.Conf.Post).Run(ctx))
 }

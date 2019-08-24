@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/dependency"
@@ -14,7 +13,6 @@ import (
 	"github.com/mongodb/grip/level"
 	"github.com/mongodb/grip/message"
 	"github.com/tychoish/sardis"
-	"github.com/tychoish/sardis/util"
 )
 
 type repoCloneJob struct {
@@ -69,11 +67,14 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 
 		return
 	}
-	args := []string{"git", "clone", j.Conf.Remote, j.Conf.Path}
 
-	err := util.RunCommand(ctx, j.ID(), level.Debug, args, filepath.Dir(j.Conf.Path), nil)
-	if err != nil {
-		j.AddError(err)
+	jpm := sardis.GetEnvironment().Jasper()
+
+	j.AddError(jpm.CreateCommand(ctx).
+		AppendArgs("git", "clone", j.Conf.Remote, j.Conf.Path).
+		SetOutputSender(level.Debug, grip.GetSender()).ID(j.ID()).Directory(j.Conf.Path).Run(ctx))
+
+	if j.HasErrors() {
 		return
 	}
 
@@ -81,6 +82,6 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 		return
 	}
 
-	j.AddError(util.NewCommand().ID(j.ID()).Priority(level.Info).Directory(j.Conf.Path).Append(j.Conf.Post...).Run(ctx))
-
+	j.AddError(jpm.CreateCommand(ctx).Add(j.Conf.Post).ID(j.ID()).Directory(j.Conf.Path).
+		SetOutputSender(level.Info, grip.GetSender()).Run(ctx))
 }

@@ -8,8 +8,9 @@ import (
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/job"
 	"github.com/mongodb/amboy/registry"
+	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/level"
-	"github.com/tychoish/sardis/util"
+	"github.com/tychoish/sardis"
 )
 
 type archInstallPackagesJob struct {
@@ -48,8 +49,9 @@ func (j *archInstallPackagesJob) Run(ctx context.Context) {
 		return
 	}
 
-	cmd := []string{"pacman", "--sync", "--refresh"}
-	cmd = append(cmd, j.Names...)
+	args := append([]string{"pacman", "--sync", "--refresh"}, j.Names...)
 
-	j.AddError(util.RunCommand(ctx, j.ID(), level.Debug, cmd, "", nil))
+	env := sardis.GetEnvironment()
+	j.AddError(env.Jasper().CreateCommand(ctx).Add(args).
+		SetOutputSender(level.Debug, grip.GetSender()).ID(j.ID()).Run(ctx))
 }

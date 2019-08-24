@@ -13,7 +13,6 @@ import (
 	"github.com/mongodb/grip/level"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
-	"github.com/tychoish/sardis/util"
 )
 
 type archAurFetchJob struct {
@@ -74,5 +73,5 @@ func (j *archAurFetchJob) Run(ctx context.Context) {
 		return
 	}
 
-	j.AddError(util.RunCommand(ctx, j.ID(), level.Debug, args, dir, nil))
+	j.AddError(env.Jasper().CreateCommand(ctx).AppendArgs(args...).SetOutputSender(level.Debug, grip.GetSender()).ID(j.ID()).Directory(dir).Run(ctx))
 }

@@ -116,14 +116,14 @@ func syncAllMailRepos() cli.Command {
 			catcher := grip.NewBasicCatcher()
 
 			for _, mdir := range conf.Mail {
-				catcher.Add(queue.Put(units.NewMailSyncJob(mdir)))
+				catcher.Add(queue.Put(ctx, units.NewMailSyncJob(mdir)))
 			}
 
 			if catcher.HasErrors() {
 				return catcher.Resolve()
 			}
 
-			amboy.WaitCtxInterval(ctx, queue, time.Millisecond)
+			amboy.WaitInterval(ctx, queue, time.Millisecond)
 
 			return amboy.ResolveErrors(ctx, queue)
 		},

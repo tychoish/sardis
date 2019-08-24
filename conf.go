@@ -16,6 +16,7 @@ type Configuration struct {
 	Mail     []MailConf `bson:"mail" json:"mail" yaml:"mail"`
 	Repo     []RepoConf `bson:"repo" json:"repo" yaml:"repo"`
 	Links    []LinkConf `bson:"links" json:"links" yaml:"links"`
+	Hosts    []HostConf `bson:"hosts" json:"hosts" yaml:"hosts"`
 	System   SystemConf `bson:"system" json:"system" yaml:"system"`
 }
 
@@ -134,15 +135,19 @@ func (conf *Configuration) Validate() error {
 		&conf.Settings.Credentials,
 		&conf.System.Arch,
 	} {
-		catcher.Add(errors.Wrapf(c.Validate(), "%T is not valid", c))
+		catcher.Wrapf(c.Validate(), "%T is not valid", c)
 	}
 
 	for idx, c := range conf.Repo {
-		catcher.Add(errors.Wrapf(c.Validate(), "%d of %T is not valid", idx, c))
+		catcher.Wrapf(c.Validate(), "%d of %T is not valid", idx, c)
 	}
 
 	for idx, c := range conf.Links {
-		catcher.Add(errors.Wrapf(c.Validate(), "%d of %T is not valid", idx, c))
+		catcher.Wrapf(c.Validate(), "%d of %T is not valid", idx, c)
+	}
+
+	for idx, c := range conf.Hosts {
+		catcher.Wrapf(c.Validate(), "%d of %T is not valid", idx, c)
 	}
 
 	return catcher.Resolve()
@@ -286,4 +291,29 @@ func (conf *CredentialsConf) Validate() error {
 		return nil
 	}
 	return errors.WithStack(util.UnmarshalFile(conf.Path, &conf))
+}
+
+func (h *HostConf) Validate() error {
+	catcher := grip.NewBasicCatcher()
+
+	catcher.NewWhen(h.Name == "", "cannot have an empty name for a host")
+	catcher.NewWhen(h.Hostname == "", "cannot have an empty host name")
+	catcher.NewWhen(h.Port == 0, "must specify a non-zero port number for a host")
+	catcher.NewWhen(!util.StringSliceContains([]string{"ssh", "jasper"}, h.Protocol), "host protocol must be ssh or jasper")
+
+	if h.Protocol == "ssh" {
+		catcher.NewWhen(h.User == "", "must specify user for ssh hosts")
+	}
+
+	return catcher.Resolve()
+}
+
+func (conf *Configuration) GetHost(name string) (*HostConf, error) {
+	for _, h := range conf.Hosts {
+		if h.Name == name {
+			return &h, nil
+		}
+	}
+
+	return nil, errors.Errorf("could not find a host named '%s'", name)
 }

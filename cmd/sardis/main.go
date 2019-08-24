@@ -8,6 +8,7 @@ import (
 
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/level"
+	jaspercli "github.com/mongodb/jasper/cli"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/operations"
@@ -39,6 +40,7 @@ func buildApp() *cli.App {
 		operations.ArchLinux(),
 		operations.Repo(),
 		operations.Jira(),
+		jaspercli.Jasper(),
 	}
 
 	// These are global options. Use this to configure logging or

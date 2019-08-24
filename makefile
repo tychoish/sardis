@@ -90,6 +90,12 @@ vendor-clean:
 	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/mongodb/grip/
 	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/stretchr/
 	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/stretchr/
+	rm -rf vendor/github.com/mongodb/jasper/vendor/github.com/mongodb/grip/
+	rm -rf vendor/github.com/mongodb/jasper/vendor/github.com/mongodb/amboy/
+	rm -rf vendor/github.com/mongodb/jasper/vendor/github.com/pkg/
+	rm -rf vendor/github.com/mongodb/jasper/vendor/github.com/stretchr/
+	rm -rf vendor/github.com/mongodb/jasper/vendor/github.com/urfave/cli
+	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/urfave/cli
 
 .DEFAULT:build
 .PHONY:build test

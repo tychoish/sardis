@@ -48,29 +48,6 @@ func TestDriverSuiteWithPriorityInstance(t *testing.T) {
 	suite.Run(t, tests)
 }
 
-func TestDriverSuiteWithMgoInstance(t *testing.T) {
-	tests := new(DriverSuite)
-	tests.uuid = uuid.NewV4().String()
-	opts := DefaultMongoDBOptions()
-	opts.DB = "amboy_test"
-	mDriver := NewMgoDriver(
-		"test-"+tests.uuid,
-		opts).(*mgoDriver)
-
-	tests.driverConstructor = func() Driver {
-		return mDriver
-	}
-
-	tests.tearDown = func() {
-		session, jobs := mDriver.getJobsCollection()
-		defer session.Close()
-		err := jobs.DropCollection()
-		grip.Infof("removed %s collection (%+v)", jobs.Name, err)
-	}
-
-	suite.Run(t, tests)
-}
-
 func TestDriverSuiteWithMongoDBInstance(t *testing.T) {
 	tests := new(DriverSuite)
 	tests.uuid = uuid.NewV4().String()
@@ -80,12 +57,15 @@ func TestDriverSuiteWithMongoDBInstance(t *testing.T) {
 		"test-"+tests.uuid,
 		opts).(*mongoDriver)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	tests.driverConstructor = func() Driver {
 		return mDriver
 	}
 
 	tests.tearDown = func() {
-		err := mDriver.getCollection().Drop(nil)
+		err := mDriver.getCollection().Drop(ctx)
 		grip.Infof("removed %s collection (%+v)", mDriver.getCollection().Name(), err)
 	}
 
@@ -178,6 +158,33 @@ func (s *DriverSuite) TestSaveAndGetRoundTripObjects() {
 	}
 }
 
+func (s *DriverSuite) TestSaveAndSaveStatus() {
+	j := job.NewShellJob("echo foo", "")
+	name := j.ID()
+	status := j.Status()
+
+	s.Require().Equal(0, s.driver.Stats(s.ctx).Total)
+
+	s.Require().NoError(s.driver.Put(s.ctx, j))
+	s.Equal(1, s.driver.Stats(s.ctx).Total)
+
+	s.Require().NoError(s.driver.Save(s.ctx, j))
+
+	n, err := s.driver.Get(s.ctx, name)
+	s.Require().NoError(err)
+	status = n.Status()
+	status.Completed = true
+	status.InProgress = false
+	s.Require().NoError(s.driver.SaveStatus(s.ctx, j, status))
+
+	n, err = s.driver.Get(s.ctx, name)
+	s.Require().NoError(err)
+	s.Equal(name, n.ID())
+	s.Equal(status.Completed, n.Status().Completed)
+	s.Equal(status.InProgress, n.Status().InProgress)
+	s.Equal(1, s.driver.Stats(s.ctx).Total)
+}
+
 func (s *DriverSuite) TestReloadRefreshesJobFromMemory() {
 	j := job.NewShellJob("echo foo", "")
 
@@ -234,7 +241,7 @@ func (s *DriverSuite) TestNextMethodReturnsJob() {
 
 	s.NoError(s.driver.Put(s.ctx, j))
 	stats := s.driver.Stats(s.ctx)
-	s.Equal(1, stats.Total)
+	s.Equal(1, stats.Total, "%+v", stats)
 	s.Equal(1, stats.Pending)
 
 	nj := s.driver.Next(s.ctx)

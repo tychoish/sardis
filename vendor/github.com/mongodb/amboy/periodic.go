@@ -15,21 +15,26 @@ import (
 // to a queue, or could be used to perform periodic maintenance
 // (e.g. removing stale jobs or removing stuck jobs in a dependency
 // queue.)
-type QueueOperation func(Queue) error
+type QueueOperation func(context.Context, Queue) error
 
 // QueueOperationConfig describes the behavior of the periodic
 // interval schedulers.
+//
+// The theshold, if ResepectThreshold is set, causes the periodic
+// scheduler to noop if there are more than that many pending jobs.
 type QueueOperationConfig struct {
-	ContinueOnError bool `bson:"continue_on_error" json:"continue_on_error" yaml:"continue_on_error"`
-	LogErrors       bool `bson:"log_errors" json:"log_errors" yaml:"log_errors"`
-	DebugLogging    bool `bson:"debug_logging" json:"debug_logging" yaml:"debug_logging"`
+	ContinueOnError  bool `bson:"continue_on_error" json:"continue_on_error" yaml:"continue_on_error"`
+	LogErrors        bool `bson:"log_errors" json:"log_errors" yaml:"log_errors"`
+	DebugLogging     bool `bson:"debug_logging" json:"debug_logging" yaml:"debug_logging"`
+	RespectThreshold bool `bson:"respect_threshold" json:"respect_threshold" yaml:"respect_threshold"`
+	Threshold        int  `bson:"threshold" json:"threshold" yaml:"threshold"`
 }
 
 // ScheduleJobFactory produces a QueueOpertion that calls a single
 // function which returns a Job and puts that job into the queue.
 func ScheduleJobFactory(op func() Job) QueueOperation {
-	return func(q Queue) error {
-		return q.Put(op())
+	return func(ctx context.Context, q Queue) error {
+		return q.Put(ctx, op())
 	}
 }
 
@@ -40,10 +45,10 @@ func ScheduleJobFactory(op func() Job) QueueOperation {
 // (e.g. continue-on-error semantics). The error returned aggregates
 // all errors encountered.
 func ScheduleManyJobsFactory(op func() []Job) QueueOperation {
-	return func(q Queue) error {
+	return func(ctx context.Context, q Queue) error {
 		catcher := grip.NewCatcher()
 		for _, j := range op() {
-			catcher.Add(q.Put(j))
+			catcher.Add(q.Put(ctx, j))
 		}
 		return catcher.Resolve()
 	}
@@ -56,10 +61,19 @@ func ScheduleManyJobsFactory(op func() []Job) QueueOperation {
 // any (e.g. continue-on-error semantics). The error returned aggregates
 // all errors encountered.
 func ScheduleJobsFromGeneratorFactory(op func() <-chan Job) QueueOperation {
-	return func(q Queue) error {
+	return func(ctx context.Context, q Queue) error {
 		catcher := grip.NewCatcher()
-		for j := range op() {
-			catcher.Add(q.Put(j))
+
+		jobs := op()
+	waitLoop:
+		for {
+			select {
+			case j := <-jobs:
+				catcher.Add(q.Put(ctx, j))
+			case <-ctx.Done():
+				catcher.Add(ctx.Err())
+				break waitLoop
+			}
 		}
 		return catcher.Resolve()
 	}
@@ -71,15 +85,18 @@ func ScheduleJobsFromGeneratorFactory(op func() <-chan Job) QueueOperation {
 // QueueOperations fail, but attempts to run all specified
 // QueueOperations before propagating errors.
 func GroupQueueOperationFactory(first QueueOperation, ops ...QueueOperation) QueueOperation {
-	return func(q Queue) error {
+	return func(ctx context.Context, q Queue) error {
 		catcher := grip.NewCatcher()
 
-		catcher.Add(first(q))
+		catcher.Add(first(ctx, q))
 
 		for _, op := range ops {
-			catcher.Add(op(q))
+			if err := ctx.Err(); err != nil {
+				catcher.Add(err)
+				break
+			}
+			catcher.Add(op(ctx, q))
 		}
-
 		return catcher.Resolve()
 	}
 }
@@ -122,7 +139,7 @@ func PeriodicQueueOperation(ctx context.Context, q Queue, interval time.Duration
 				})
 				return
 			case <-timer.C:
-				if err = scheduleOp(q, op, conf); err != nil {
+				if err = scheduleOp(ctx, q, op, conf); err != nil {
 					return
 				}
 
@@ -140,6 +157,11 @@ func IntervalQueueOperation(ctx context.Context, q Queue, interval time.Duration
 	go func() {
 		var err error
 
+		if interval <= time.Microsecond {
+			grip.Criticalf("invalid interval queue operation '%s'", interval)
+			return
+		}
+
 		defer func() {
 			err = recovery.HandlePanicWithError(recover(), err, "interval background job scheduler")
 
@@ -156,23 +178,25 @@ func IntervalQueueOperation(ctx context.Context, q Queue, interval time.Duration
 			}
 		}()
 
-		initialWait := time.Since(startAt)
-		if initialWait > time.Second {
-			grip.InfoWhen(conf.DebugLogging, message.Fields{
-				"message": "waiting initial, interval to start scheduling jobs",
-				"period":  initialWait,
-				"conf":    conf,
-			})
-			time.Sleep(initialWait)
+		for {
+			if !startAt.Before(time.Now()) {
+				break
+			}
+			startAt = startAt.Add(interval)
 		}
 
-		if err = scheduleOp(q, op, conf); err != nil {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		if ctx.Err() != nil {
 			return
 		}
 
-		count := 0
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
+		count := 1
+		if err = scheduleOp(ctx, q, op, conf); err != nil {
+			return
+		}
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -184,7 +208,7 @@ func IntervalQueueOperation(ctx context.Context, q Queue, interval time.Duration
 				})
 				return
 			case <-ticker.C:
-				if err = scheduleOp(q, op, conf); err != nil {
+				if err = scheduleOp(ctx, q, op, conf); err != nil {
 					return
 				}
 
@@ -194,8 +218,12 @@ func IntervalQueueOperation(ctx context.Context, q Queue, interval time.Duration
 	}()
 }
 
-func scheduleOp(q Queue, op QueueOperation, conf QueueOperationConfig) error {
-	if err := errors.Wrap(op(q), "problem encountered during periodic job scheduling"); err != nil {
+func scheduleOp(ctx context.Context, q Queue, op QueueOperation, conf QueueOperationConfig) error {
+	if conf.RespectThreshold && q.Stats(ctx).Pending > conf.Threshold {
+		return nil
+	}
+
+	if err := errors.Wrap(op(ctx, q), "problem encountered during periodic job scheduling"); err != nil {
 		if conf.ContinueOnError {
 			grip.WarningWhen(conf.LogErrors, err)
 		} else {

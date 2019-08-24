@@ -1,14 +1,13 @@
 package send
 
 import (
-	"crypto/tls"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	xmpp "github.com/mattn/go-xmpp"
 	"github.com/mongodb/grip/message"
-	"github.com/pkg/errors"
 )
 
 type xmppLogger struct {
@@ -124,7 +123,7 @@ func constructXMPPLogger(name, target string, info XMPPConnectionInfo) (Sender, 
 	}
 
 	s.reset = func() {
-		_ = s.SetFormatter(s.formatter)
+		_ = s.SetFormatter(MakeXMPPFormatter(s.Name()))
 		fallback.SetPrefix(fmt.Sprintf("[%s] ", s.Name()))
 	}
 
@@ -133,7 +132,7 @@ func constructXMPPLogger(name, target string, info XMPPConnectionInfo) (Sender, 
 
 func (s *xmppLogger) Send(m message.Composer) {
 	if s.Level().ShouldLog(m) {
-		text, err := s.Formatter(m)
+		text, err := s.formatter(m)
 		if err != nil {
 			s.ErrorHandler(err, m)
 			return
@@ -168,21 +167,15 @@ type xmppClientImpl struct {
 }
 
 func (c *xmppClientImpl) Create(info XMPPConnectionInfo) error {
-	opts := &xmpp.Options{
-		Host:     fmt.Sprintf("%s:5222", info.Hostname),
-		User:     info.Username,
-		Password: info.Password,
-		NoTLS:    true,
-		StartTLS: false,
-		TLSConfig: &tls.Config{
-			ServerName:         info.Hostname,
-			InsecureSkipVerify: true,
-		},
-	}
-	client, err := opts.NewClient()
+	client, err := xmpp.NewClient(info.Hostname, info.Username, info.Password, false)
 	if err != nil {
-		return errors.Wrapf(err, "cannot connect to server '%s', as '%s'",
-			info.Hostname, info.Username)
+		errs := []string{err.Error()}
+		client, err = xmpp.NewClientNoTLS(info.Hostname, info.Username, info.Password, false)
+		if err != nil {
+			errs = append(errs, err.Error())
+			return fmt.Errorf("cannot connect to server '%s', as '%s': %s",
+				info.Hostname, info.Username, strings.Join(errs, "; "))
+		}
 	}
 
 	c.Client = client

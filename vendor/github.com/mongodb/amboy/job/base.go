@@ -140,15 +140,6 @@ func (b *Base) Error() error {
 	return errors.New(strings.Join(b.status.Errors, "\n"))
 }
 
-// ErrorCount reflects the total number of errors that the job has
-// encountered.
-func (b *Base) ErrorCount() int {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
-	return len(b.status.Errors)
-}
-
 // Priority returns the priority value, and is part of the amboy.Job
 // interface.
 func (b *Base) Priority() int {
@@ -216,6 +207,10 @@ func (b *Base) UpdateTimeInfo(i amboy.JobTimeInfo) {
 
 	if !i.WaitUntil.IsZero() {
 		b.timeInfo.WaitUntil = i.WaitUntil
+	}
+
+	if !i.DispatchBy.IsZero() {
+		b.timeInfo.DispatchBy = i.DispatchBy
 	}
 
 	if i.MaxTime != 0 {

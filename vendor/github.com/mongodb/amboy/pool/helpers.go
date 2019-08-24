@@ -17,7 +17,32 @@ type workUnit struct {
 	cancel context.CancelFunc
 }
 
-func runJob(ctx context.Context, job amboy.Job) {
+func executeJob(ctx context.Context, id string, job amboy.Job, q amboy.Queue) {
+	runJob(ctx, job, q, time.Now())
+
+	r := message.Fields{
+		"job":           job.ID(),
+		"job_type":      job.Type().Name,
+		"duration_secs": job.TimeInfo().Duration().Seconds(),
+		"queue_type":    fmt.Sprintf("%T", q),
+		"stat":          job.Status(),
+		"pool":          id,
+	}
+	if err := job.Error(); err != nil {
+		r["error"] = err.Error()
+		grip.Error(r)
+	} else {
+		grip.Debug(r)
+	}
+
+}
+
+func runJob(ctx context.Context, job amboy.Job, q amboy.Queue, startAt time.Time) {
+	ti := amboy.JobTimeInfo{
+		Start: time.Now(),
+	}
+	job.UpdateTimeInfo(ti)
+
 	maxTime := job.TimeInfo().MaxTime
 	if maxTime > 0 {
 		var cancel context.CancelFunc
@@ -26,36 +51,6 @@ func runJob(ctx context.Context, job amboy.Job) {
 	}
 
 	job.Run(ctx)
-}
-
-func handleJob(ctx context.Context, job amboy.Job, q amboy.Queue) {
-	start := time.Now()
-
-	executeJob(ctx, job, q, start)
-
-	ti := job.TimeInfo()
-
-	r := message.Fields{
-		"job":           job.ID(),
-		"job_type":      job.Type().Name,
-		"duration_secs": ti.Duration().Seconds(),
-		"queue_type":    fmt.Sprintf("%T", q),
-	}
-	if err := job.Error(); err != nil {
-		r["error"] = err.Error()
-		grip.Error(r)
-	} else {
-		grip.Debug(r)
-	}
-}
-
-func executeJob(ctx context.Context, job amboy.Job, q amboy.Queue, startAt time.Time) {
-	ti := amboy.JobTimeInfo{
-		Start: startAt,
-	}
-	job.UpdateTimeInfo(ti)
-
-	runJob(ctx, job)
 
 	// we want the final end time to include
 	// marking complete, but setting it twice is
@@ -66,10 +61,9 @@ func executeJob(ctx context.Context, job amboy.Job, q amboy.Queue, startAt time.
 	q.Complete(ctx, job)
 	ti.End = time.Now()
 	job.UpdateTimeInfo(ti)
-
 }
 
-func worker(ctx context.Context, jobs <-chan workUnit, q amboy.Queue, wg *sync.WaitGroup) {
+func worker(ctx context.Context, id string, jobs <-chan workUnit, q amboy.Queue, wg *sync.WaitGroup) {
 	var (
 		err    error
 		job    amboy.Job
@@ -87,7 +81,7 @@ func worker(ctx context.Context, jobs <-chan workUnit, q amboy.Queue, wg *sync.W
 				q.Complete(ctx, job)
 			}
 			// start a replacement worker.
-			go worker(ctx, jobs, q, wg)
+			go worker(ctx, id, jobs, q, wg)
 		}
 
 		if cancel != nil {
@@ -106,7 +100,7 @@ func worker(ctx context.Context, jobs <-chan workUnit, q amboy.Queue, wg *sync.W
 
 			job = wu.job
 			cancel = wu.cancel
-			executeJob(ctx, job, q, time.Now())
+			executeJob(ctx, id, job, q)
 			cancel()
 		}
 	}

@@ -19,7 +19,7 @@ func GetDirectoryOfFile() string {
 // implementation that checks for the existence of a file. If the file
 // exist the dependency becomes a noop.
 type CreatesFileSuite struct {
-	dep      *CreatesFile
+	dep      *createsFile
 	packages []string
 	suite.Suite
 }
@@ -33,7 +33,7 @@ func (s *CreatesFileSuite) SetupSuite() {
 }
 
 func (s *CreatesFileSuite) SetupTest() {
-	s.dep = NewCreatesFileInstance()
+	s.dep = makeCreatesFile()
 }
 
 func (s *CreatesFileSuite) TestInstanceImplementsManagerInterface() {
@@ -42,7 +42,8 @@ func (s *CreatesFileSuite) TestInstanceImplementsManagerInterface() {
 
 func (s *CreatesFileSuite) TestConstructorCreatesObjectWithFileNameSet() {
 	for _, dir := range s.packages {
-		dep := NewCreatesFile(dir)
+		dep, ok := NewCreatesFile(dir).(*createsFile)
+		s.True(ok)
 		s.Equal(dir, dep.FileName)
 	}
 }

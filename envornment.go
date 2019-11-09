@@ -215,7 +215,7 @@ func (c *appServicesCache) Queue() amboy.Queue {
 func (c *appServicesCache) Jasper() jasper.Manager {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	return c.Jasper()
+	return c.jpm
 }
 
 func (c *appServicesCache) Context() (context.Context, context.CancelFunc) {

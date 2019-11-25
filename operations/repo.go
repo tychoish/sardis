@@ -30,7 +30,15 @@ func updateRepos() cli.Command {
 		Name:   "update",
 		Usage:  "update a local and remote git repository according to the config",
 		Before: requireConfig(),
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "repo",
+				Usage: "specify a local repository to udpate",
+			},
+		},
 		Action: func(c *cli.Context) error {
+			repoName := c.String("repo")
+
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer env.Close(ctx)
@@ -41,6 +49,10 @@ func updateRepos() cli.Command {
 			catcher := grip.NewBasicCatcher()
 
 			for _, repo := range conf.Repo {
+				if repoName != "" && repo.Name != repoName {
+					continue
+				}
+
 				if repo.LocalSync {
 					catcher.Add(queue.Put(ctx, units.NewLocalRepoSyncJob(repo.Path)))
 				} else if repo.Fetch {

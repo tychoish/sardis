@@ -28,6 +28,7 @@ type MailConf struct {
 }
 
 type RepoConf struct {
+	Name       string   `bson:"name" json:"name" yaml:"name"`
 	Path       string   `bson:"path" json:"path" yaml:"path"`
 	Remote     string   `bson:"remote" json:"remote" yaml:"remote"`
 	RemoteName string   `bson:"remote_name" json:"remote_name" yaml:"remote_name"`

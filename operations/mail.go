@@ -7,6 +7,7 @@ import (
 
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/message"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
@@ -86,16 +87,35 @@ func syncRepo() cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			host := c.String("host")
+			path := c.String("path")
+
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer env.Close(ctx)
 			defer cancel()
 
-			job := units.NewRepoSyncJob(c.String("host"), c.String("path"), nil, nil)
+			job := units.NewRepoSyncJob(host, path, nil, nil)
 			grip.Infof("starting: %s", job.ID())
 			job.Run(ctx)
 
-			return errors.Wrap(job.Error(), "job encountered problem")
+			err := job.Error()
+			if err != nil {
+				env.Logger().Error(message.WrapError(err, message.Fields{
+					"message": "encountered problem syncing repository",
+					"host":    host,
+					"path":    path,
+				}))
+				return err
+			}
+
+			env.Logger().Info(message.Fields{
+				"message": "successfully synchronized repository",
+				"host":    host,
+				"path":    path,
+			})
+
+			return nil
 		},
 	}
 }
@@ -124,7 +144,14 @@ func syncAllMailRepos() cli.Command {
 			}
 
 			amboy.WaitInterval(ctx, queue, time.Millisecond)
-			return errors.WithStack(amboy.ResolveErrors(ctx, queue))
+			err := errors.WithStack(amboy.ResolveErrors(ctx, queue))
+			if err != nil {
+				env.Logger().Error(message.WrapError(err, "completed sync mail operation with error"))
+				return err
+			}
+
+			env.Logger().Info("completed mail sync operation successfully")
+			return nil
 		},
 	}
 }

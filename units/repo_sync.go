@@ -137,8 +137,7 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 
 	for idx, cmd := range cmds {
 		jpm.CreateCommand(ctx).ID(j.ID()).Add(cmd).
-			SetOutputSender(level.Debug, grip.GetSender()).
-			SetErrorSender(level.Error, grip.GetSender()).
+			SetCombinedSender(level.Debug, grip.GetSender()).
 			Prerequisite(func() bool {
 				grip.Debug(message.Fields{
 					"args":  cmd,

@@ -69,14 +69,15 @@ type CloserFunc func(context.Context) error
 // see the documentation for the corresponding global methods for
 
 type appServicesCache struct {
-	queue     amboy.Queue
-	conf      *Configuration
-	logger    grip.Journaler
-	jiraIssue grip.Journaler
-	jpm       jasper.Manager
-	ctx       context.Context
-	closers   []closerOp
-	mutex     sync.RWMutex
+	queue      amboy.Queue
+	conf       *Configuration
+	logger     grip.Journaler
+	jiraIssue  grip.Journaler
+	jpm        jasper.Manager
+	ctx        context.Context
+	rootCancel context.CancelFunc
+	closers    []closerOp
+	mutex      sync.RWMutex
 }
 
 type closerOp struct {
@@ -94,28 +95,23 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 
 	catcher := grip.NewBasicCatcher()
 	var err error
-	var cancel context.CancelFunc
 
 	c.conf = conf
-	c.ctx, cancel = context.WithCancel(ctx)
-	c.jpm, err = jasper.NewSynchronizedManager(true)
+	c.ctx, c.rootCancel = context.WithCancel(ctx)
+	c.jpm, err = jasper.NewSynchronizedManager(false)
 	catcher.Add(err)
-
-	c.closers = append(c.closers,
-		closerOp{
-			name:   "cancel-app-context",
-			closer: func(_ context.Context) error { cancel(); return nil },
-		},
-		closerOp{
-			name:   "close jasper manager",
-			closer: c.jpm.Close,
-		},
-	)
 
 	catcher.Add(conf.Validate())
 	catcher.Add(c.initSender())
 	catcher.Add(c.initQueue())
 	catcher.Add(c.initJira())
+
+	c.closers = append(c.closers,
+		closerOp{
+			name:   "close jasper manager",
+			closer: c.jpm.Close,
+		},
+	)
 
 	return catcher.Resolve()
 }
@@ -249,6 +245,7 @@ func (c *appServicesCache) Close(ctx context.Context) error {
 		grip.Error(message.WrapError(err, msg))
 	}
 
+	c.rootCancel()
 	return catcher.Resolve()
 }
 

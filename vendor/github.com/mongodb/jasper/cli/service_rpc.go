@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/kardianos/service"
+	"github.com/evergreen-ci/service"
 	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/recovery"
 	"github.com/mongodb/jasper"
-	"github.com/mongodb/jasper/rpc"
+	"github.com/mongodb/jasper/options"
+	"github.com/mongodb/jasper/remote"
+	"github.com/mongodb/jasper/util"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -23,7 +26,7 @@ func serviceCommandRPC(cmd string, operation serviceOperation) cli.Command {
 	return cli.Command{
 		Name:  RPCService,
 		Usage: fmt.Sprintf("%s an RPC service", cmd),
-		Flags: append(serviceLoggingFlags(),
+		Flags: append(serviceFlags(),
 			cli.StringFlag{
 				Name:   hostFlagName,
 				EnvVar: rpcHostEnvVar,
@@ -40,24 +43,26 @@ func serviceCommandRPC(cmd string, operation serviceOperation) cli.Command {
 				Name:  credsFilePathFlagName,
 				Usage: "the path to the file containing the RPC service credentials",
 			},
-			cli.StringFlag{
-				Name:  userFlagName,
-				Usage: "the user who will run the RPC service",
-			},
 		),
-		Before: validatePort(portFlagName),
+		Before: mergeBeforeFuncs(
+			validatePort(portFlagName),
+			validateLogLevel(logLevelFlagName),
+			validateLimits(limitNumFilesFlagName, limitNumProcsFlagName, limitLockedMemoryFlagName, limitVirtualMemoryFlagName),
+		),
 		Action: func(c *cli.Context) error {
-			manager, err := jasper.NewLocalManager(false)
+			manager, err := jasper.NewSynchronizedManager(false)
 			if err != nil {
 				return errors.Wrap(err, "error creating RPC manager")
 			}
 
 			daemon := newRPCDaemon(c.String(hostFlagName), c.Int(portFlagName), manager, c.String(credsFilePathFlagName), makeLogger(c))
 
-			config := serviceConfig(RPCService, buildRunCommand(c, RPCService))
-			config.UserName = c.String(userFlagName)
+			config := serviceConfig(RPCService, c, buildRunCommand(c, RPCService))
 
-			return operation(daemon, config)
+			if err := operation(daemon, config); !c.Bool(quietFlagName) {
+				return err
+			}
+			return nil
 		},
 	}
 }
@@ -67,12 +72,12 @@ type rpcDaemon struct {
 	Port          int
 	CredsFilePath string
 	Manager       jasper.Manager
-	Logger        *jasper.Logger
+	Logger        *options.Logger
 
 	exit chan struct{}
 }
 
-func newRPCDaemon(host string, port int, manager jasper.Manager, credsFilePath string, logger *jasper.Logger) *rpcDaemon {
+func newRPCDaemon(host string, port int, manager jasper.Manager, credsFilePath string, logger *options.Logger) *rpcDaemon {
 	return &rpcDaemon{
 		Host:          host,
 		Port:          port,
@@ -84,17 +89,15 @@ func newRPCDaemon(host string, port int, manager jasper.Manager, credsFilePath s
 
 func (d *rpcDaemon) Start(s service.Service) error {
 	if d.Logger != nil {
-		sender, err := d.Logger.Configure()
-		if err != nil {
-			return errors.Wrap(err, "could not set up logging")
+		if err := setupLogger(d.Logger); err != nil {
+			return errors.Wrap(err, "")
 		}
-		grip.SetSender(sender)
 	}
 
 	d.exit = make(chan struct{})
 	if d.Manager == nil {
 		var err error
-		if d.Manager, err = jasper.NewLocalManager(false); err != nil {
+		if d.Manager, err = jasper.NewSynchronizedManager(false); err != nil {
 			return errors.Wrap(err, "failed to construct RPC manager")
 		}
 	}
@@ -103,6 +106,7 @@ func (d *rpcDaemon) Start(s service.Service) error {
 	go handleDaemonSignals(ctx, cancel, d.exit)
 
 	go func(ctx context.Context, d *rpcDaemon) {
+		defer recovery.LogStackTraceAndContinue("rpc service")
 		grip.Error(errors.Wrap(d.run(ctx), "error running RPC service"))
 	}(ctx, d)
 
@@ -118,7 +122,7 @@ func (d *rpcDaemon) run(ctx context.Context) error {
 	return errors.Wrap(runServices(ctx, d.newService), "error running RPC service")
 }
 
-func (d *rpcDaemon) newService(ctx context.Context) (jasper.CloseFunc, error) {
+func (d *rpcDaemon) newService(ctx context.Context) (util.CloseFunc, error) {
 	if d.Manager == nil {
 		return nil, errors.New("manager is not set on RPC service")
 	}
@@ -130,16 +134,15 @@ func (d *rpcDaemon) newService(ctx context.Context) (jasper.CloseFunc, error) {
 
 // newRPCService creates an RPC service around the manager serving requests on
 // the host and port.
-func newRPCService(ctx context.Context, host string, port int, manager jasper.Manager, credsFilePath string) (jasper.CloseFunc, error) {
+func newRPCService(ctx context.Context, host string, port int, manager jasper.Manager, credsFilePath string) (util.CloseFunc, error) {
 	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to resolve RPC address")
 	}
 
-	closeService, err := rpc.StartServiceWithFile(ctx, manager, addr, credsFilePath)
+	closeService, err := remote.StartRPCServiceWithFile(ctx, manager, addr, credsFilePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "error starting RPC service")
 	}
-
 	return closeService, nil
 }

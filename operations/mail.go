@@ -124,8 +124,7 @@ func syncAllMailRepos() cli.Command {
 			}
 
 			amboy.WaitInterval(ctx, queue, time.Millisecond)
-
-			return amboy.ResolveErrors(ctx, queue)
+			return errors.WithStack(amboy.ResolveErrors(ctx, queue))
 		},
 	}
 }

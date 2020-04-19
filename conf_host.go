@@ -8,7 +8,8 @@ import (
 
 	"github.com/mongodb/jasper"
 	jaspercli "github.com/mongodb/jasper/cli"
-	"github.com/mongodb/jasper/rpc"
+	"github.com/mongodb/jasper/options"
+	"github.com/mongodb/jasper/remote"
 	"github.com/pkg/errors"
 )
 
@@ -23,10 +24,11 @@ type HostConf struct {
 func (h *HostConf) Jasper(ctx context.Context) (jasper.Manager, error) {
 	switch h.Protocol {
 	case "ssh":
-		remoteOpts := jasper.RemoteOptions{
-			Host: h.Hostname,
-			User: h.User,
-		}
+		remoteOpts := options.Remote{
+			RemoteConfig: options.RemoteConfig{
+				Host: h.Hostname,
+				User: h.User,
+			}}
 		clientOpts := jaspercli.ClientOptions{
 			BinaryPath: "sardis",
 			Type:       jaspercli.RPCService,
@@ -45,7 +47,7 @@ func (h *HostConf) Jasper(ctx context.Context) (jasper.Manager, error) {
 		dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 
-		return rpc.NewClient(dialCtx, serviceAddr, nil)
+		return remote.NewRPCClient(dialCtx, serviceAddr, nil)
 	default:
 		return nil, errors.New("unsupported jasper protocol")
 	}

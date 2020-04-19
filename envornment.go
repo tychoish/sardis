@@ -98,7 +98,7 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 
 	c.conf = conf
 	c.ctx, cancel = context.WithCancel(ctx)
-	c.jpm, err = jasper.NewLocalManager(true)
+	c.jpm, err = jasper.NewSynchronizedManager(true)
 	catcher.Add(err)
 
 	c.closers = append(c.closers,
@@ -160,12 +160,14 @@ func (c *appServicesCache) initJira() error {
 		c.jiraIssue = logging.MakeGrip(grip.GetSender())
 	}
 
-	sender, err := send.MakeJiraLogger(&send.JiraOptions{
-		Name:         c.conf.Settings.Notification.Name,
-		BaseURL:      c.conf.Settings.Credentials.Jira.URL,
-		Username:     c.conf.Settings.Credentials.Jira.Username,
-		Password:     c.conf.Settings.Credentials.Jira.Password,
-		UseBasicAuth: true,
+	sender, err := send.MakeJiraLogger(c.ctx, &send.JiraOptions{
+		Name:    c.conf.Settings.Notification.Name,
+		BaseURL: c.conf.Settings.Credentials.Jira.URL,
+		BasicAuthOpts: send.JiraBasicAuth{
+			UseBasicAuth: true,
+			Username:     c.conf.Settings.Credentials.Jira.Username,
+			Password:     c.conf.Settings.Credentials.Jira.Password,
+		},
 	})
 	if err != nil {
 		return errors.Wrap(err, "problem setting up jira logger")
@@ -239,8 +241,8 @@ func (c *appServicesCache) Close(ctx context.Context) error {
 			"name":    op.name,
 			"op":      "ran closer",
 			"idx":     idx,
+			"num_ops": len(c.closers),
 			"runtime": time.Since(startAt),
-			"percent": len(c.closers) / idx,
 		}
 
 		grip.LogWhen(err == nil, level.Info, msg)

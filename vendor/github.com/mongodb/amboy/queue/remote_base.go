@@ -6,15 +6,24 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
 	"github.com/pkg/errors"
 )
 
+type remoteQueue interface {
+	amboy.Queue
+	SetDriver(remoteQueueDriver) error
+	Driver() remoteQueueDriver
+}
+
 type remoteBase struct {
+	id         string
 	started    bool
-	driver     Driver
+	driver     remoteQueueDriver
+	dispatcher Dispatcher
 	driverType string
 	channel    chan amboy.Job
 	blocked    map[string]struct{}
@@ -25,10 +34,15 @@ type remoteBase struct {
 
 func newRemoteBase() *remoteBase {
 	return &remoteBase{
+		id:         uuid.New().String(),
 		channel:    make(chan amboy.Job),
 		blocked:    make(map[string]struct{}),
 		dispatched: make(map[string]struct{}),
 	}
+}
+
+func (q *remoteBase) ID() string {
+	return q.driver.ID()
 }
 
 // Put adds a Job to the queue. It is generally an error to add the
@@ -84,10 +98,6 @@ func (q *remoteBase) jobServer(ctx context.Context) {
 				continue
 			}
 
-			if !isDispatchable(job.Status()) {
-				continue
-			}
-
 			// therefore return any pending job or job
 			// that has a timed out lock.
 			q.channel <- job
@@ -103,12 +113,19 @@ func (q *remoteBase) Started() bool {
 	return q.started
 }
 
+func (q *remoteBase) Save(ctx context.Context, j amboy.Job) error {
+	return q.driver.Save(ctx, j)
+}
+
 // Complete takes a context and, asynchronously, marks the job
 // complete, in the queue.
 func (q *remoteBase) Complete(ctx context.Context, j amboy.Job) {
 	if ctx.Err() != nil {
 		return
 	}
+
+	q.dispatcher.Complete(ctx, j)
+
 	const retryInterval = time.Second
 	timer := time.NewTimer(0)
 	defer timer.Stop()
@@ -117,6 +134,7 @@ func (q *remoteBase) Complete(ctx context.Context, j amboy.Job) {
 	id := j.ID()
 	count := 0
 
+	var err error
 	for {
 		count++
 		select {
@@ -124,8 +142,8 @@ func (q *remoteBase) Complete(ctx context.Context, j amboy.Job) {
 			return
 		case <-timer.C:
 			stat := j.Status()
-			stat.InProgress = false
 			stat.Completed = true
+			stat.InProgress = false
 			j.SetStatus(stat)
 
 			ti := j.TimeInfo()
@@ -134,9 +152,10 @@ func (q *remoteBase) Complete(ctx context.Context, j amboy.Job) {
 				End:   time.Now(),
 			})
 
-			if err := q.driver.Save(ctx, j); err != nil {
-				if time.Since(startAt) > time.Minute+LockTimeout {
-					grip.Error(message.WrapError(err, message.Fields{
+			err = q.driver.Complete(ctx, j)
+			if err != nil {
+				if time.Since(startAt) > time.Minute+amboy.LockTimeout {
+					grip.Warning(message.WrapError(err, message.Fields{
 						"job_id":      id,
 						"job_type":    j.Type().Name,
 						"driver_type": q.driverType,
@@ -145,7 +164,7 @@ func (q *remoteBase) Complete(ctx context.Context, j amboy.Job) {
 						"message":     "job took too long to mark complete",
 					}))
 				} else if count > 10 {
-					grip.Error(message.WrapError(err, message.Fields{
+					grip.Warning(message.WrapError(err, message.Fields{
 						"job_id":      id,
 						"driver_type": q.driverType,
 						"job_type":    j.Type().Name,
@@ -153,25 +172,22 @@ func (q *remoteBase) Complete(ctx context.Context, j amboy.Job) {
 						"retry_count": count,
 						"message":     "after 10 retries, aborting marking job complete",
 					}))
+				} else if isMongoDupKey(err) {
+					grip.Warning(message.WrapError(err, message.Fields{
+						"job_id":      id,
+						"driver_type": q.driverType,
+						"job_type":    j.Type().Name,
+						"driver_id":   q.driver.ID(),
+						"retry_count": count,
+						"message":     "attempting to complete job without lock",
+					}))
 				} else {
 					timer.Reset(retryInterval)
 					continue
 				}
 			}
 
-			grip.Error(message.WrapError(q.driver.Unlock(ctx, j),
-				message.Fields{
-					"job_id":      id,
-					"job_type":    j.Type().Name,
-					"driver_type": q.driverType,
-					"driver_id":   q.driver.ID(),
-					"message":     "problem unlocking remote job",
-					"impact": []string{
-						"stuck jobs",
-						"redundant work",
-						"collisions",
-					},
-				}))
+			j.AddError(err)
 
 			q.mutex.Lock()
 			defer q.mutex.Unlock()
@@ -243,19 +259,19 @@ func (q *remoteBase) SetRunner(r amboy.Runner) error {
 // Driver provides access to the embedded driver instance which
 // provides access to the Queue's persistence layer. This method is
 // not part of the amboy.Queue interface.
-func (q *remoteBase) Driver() Driver {
+func (q *remoteBase) Driver() remoteQueueDriver {
 	return q.driver
 }
 
 // SetDriver allows callers to inject at runtime alternate driver
 // instances. It is an error to change Driver instances after starting
 // a queue. This method is not part of the amboy.Queue interface.
-func (q *remoteBase) SetDriver(d Driver) error {
+func (q *remoteBase) SetDriver(d remoteQueueDriver) error {
 	if q.Started() {
 		return errors.New("cannot change drivers after starting queue")
 	}
-
 	q.driver = d
+	q.driver.SetDispatcher(q.dispatcher)
 	q.driverType = fmt.Sprintf("%T", d)
 	return nil
 }
@@ -321,14 +337,13 @@ func (q *remoteBase) canDispatch(j amboy.Job) bool {
 }
 
 func isDispatchable(stat amboy.JobStatusInfo) bool {
-	// don't return completed jobs for any reason
 	if stat.Completed {
 		return false
 	}
-
-	// don't return an inprogress job if the mod
-	// time is less than the lock timeout
-	if stat.InProgress && time.Since(stat.ModificationTime) < LockTimeout {
+	if stat.InProgress {
+		if time.Since(stat.ModificationTime) > amboy.LockTimeout {
+			return true
+		}
 		return false
 	}
 

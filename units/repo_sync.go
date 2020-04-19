@@ -133,9 +133,21 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 		return
 	}
 
-	j.AddError(sardis.GetEnvironment().Jasper().CreateCommand(ctx).ID(j.ID()).
-		SetOutputSender(level.Debug, grip.GetSender()).
-		Directory(j.Path).Host(j.Host).Extend(cmds).Run(ctx))
+	jpm := sardis.GetEnvironment().Jasper()
+
+	for idx, cmd := range cmds {
+		jpm.CreateCommand(ctx).ID(j.ID()).SetOutputSender(level.Info, grip.GetSender()).Add(cmd).
+			Prerequisite(func() bool {
+				grip.Debug(message.Fields{
+					"args":  cmd,
+					"job":   j.ID(),
+					"num":   idx,
+					"total": len(cmds),
+				})
+				return true
+			}).Run(ctx)
+
+	}
 
 	grip.Info(message.Fields{
 		"op":     "completed repo sync",

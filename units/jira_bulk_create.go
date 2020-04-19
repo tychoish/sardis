@@ -58,7 +58,7 @@ func (j *jiraBulkCreateJob) Run(ctx context.Context) {
 		return
 	}
 
-	if !level.IsValidPriority(data.Priority) {
+	if data.Priority.IsValid() {
 		data.Priority = level.Info
 	}
 

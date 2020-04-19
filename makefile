@@ -96,6 +96,13 @@ vendor-clean:
 	rm -rf vendor/github.com/mongodb/jasper/vendor/github.com/stretchr/
 	rm -rf vendor/github.com/mongodb/jasper/vendor/github.com/urfave/cli
 	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/urfave/cli
+	rm -rf vendor/github.com/mongodb/jasper/vendor/gopkg.in/mgo.v2
+	rm -rf vendor/github.com/mongodb/jasper/vendor/go.mongodb.org/mongo-driver
+	rm -rf vendor/github.com/mongodb/amboy/vendor/go.mongodb.org/mongo-driver
+	rm -rf vendor/github.com/mongodb/jasper/vendor/golang.org/x/sys
+	rm -rf vendor/github.com/mongodb/grip/vendor/golang.org/x/sys
+	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/pkg/errors
+
 
 .DEFAULT:build
 .PHONY:build test

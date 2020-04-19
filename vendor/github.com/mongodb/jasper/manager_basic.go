@@ -4,26 +4,28 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
+	"github.com/mongodb/jasper/options"
+	"github.com/mongodb/jasper/util"
 	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
 )
 
 type basicProcessManager struct {
-	id                 string
-	procs              map[string]Process
-	skipDefaultTrigger bool
-	blocking           bool
-	tracker            ProcessTracker
+	id            string
+	procs         map[string]Process
+	useSSHLibrary bool
+	tracker       ProcessTracker
+	loggers       LoggingCache
 }
 
-func newBasicProcessManager(procs map[string]Process, skipDefaultTrigger bool, blocking bool, trackProcs bool) (Manager, error) {
+func newBasicProcessManager(procs map[string]Process, trackProcs bool, useSSHLibrary bool) (Manager, error) {
 	m := basicProcessManager{
-		procs:              procs,
-		blocking:           blocking,
-		skipDefaultTrigger: skipDefaultTrigger,
-		id:                 uuid.Must(uuid.NewV4()).String(),
+		procs:         procs,
+		id:            uuid.New().String(),
+		useSSHLibrary: useSSHLibrary,
+		loggers:       NewLoggingCache(),
 	}
 	if trackProcs {
 		tracker, err := NewProcessTracker(m.id)
@@ -39,33 +41,38 @@ func (m *basicProcessManager) ID() string {
 	return m.id
 }
 
-func (m *basicProcessManager) CreateProcess(ctx context.Context, opts *CreateOptions) (Process, error) {
+func (m *basicProcessManager) CreateProcess(ctx context.Context, opts *options.Create) (Process, error) {
 	opts.AddEnvVar(ManagerEnvironID, m.id)
 
-	var (
-		proc Process
-		err  error
-	)
-
-	if m.blocking {
-		proc, err = newBlockingProcess(ctx, opts)
-	} else {
-		proc, err = newBasicProcess(ctx, opts)
+	if opts.Remote != nil && m.useSSHLibrary {
+		opts.Remote.UseSSHLibrary = true
 	}
 
+	proc, err := NewProcess(ctx, opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "problem constructing local process")
+		return nil, errors.Wrap(err, "problem constructing process")
 	}
 
-	// TODO this will race because it runs later
-	if !m.skipDefaultTrigger {
-		_ = proc.RegisterTrigger(ctx, makeDefaultTrigger(ctx, m, opts, proc.ID()))
-	}
+	grip.Warning(message.WrapError(m.loggers.Put(proc.ID(), &options.CachedLogger{
+		ID:      proc.ID(),
+		Manager: m.id,
+		Error:   util.ConvertWriter(opts.Output.GetError()),
+		Output:  util.ConvertWriter(opts.Output.GetOutput()),
+	}), message.Fields{
+		"message": "problem caching logger for process",
+		"process": proc.ID(),
+		"manager": m.ID(),
+	}))
+
+	// This trigger is not guaranteed to be registered since the process may
+	// have already completed. One way to guarantee it runs could be to add this
+	// as a closer to CreateOptions.
+	_ = proc.RegisterTrigger(ctx, makeDefaultTrigger(ctx, m, opts, proc.ID()))
 
 	if m.tracker != nil {
 		// The process may have terminated already, so don't return on error.
 		if err := m.tracker.Add(proc.Info(ctx)); err != nil {
-			grip.Warning(message.WrapError(err, "problem adding local process to tracker during process creation"))
+			grip.Warning(message.WrapError(err, "problem adding process to tracker during process creation"))
 		}
 	}
 
@@ -74,8 +81,18 @@ func (m *basicProcessManager) CreateProcess(ctx context.Context, opts *CreateOpt
 	return proc, nil
 }
 
+func (m *basicProcessManager) LoggingCache(_ context.Context) LoggingCache { return m.loggers }
+
 func (m *basicProcessManager) CreateCommand(ctx context.Context) *Command {
 	return NewCommand().ProcConstructor(m.CreateProcess)
+}
+
+func (m *basicProcessManager) WriteFile(ctx context.Context, opts options.WriteFile) error {
+	if err := opts.Validate(); err != nil {
+		return errors.Wrap(err, "invalid file options")
+	}
+
+	return errors.Wrap(opts.DoWrite(), "problem writing data")
 }
 
 func (m *basicProcessManager) Register(ctx context.Context, proc Process) error {
@@ -95,7 +112,7 @@ func (m *basicProcessManager) Register(ctx context.Context, proc Process) error 
 	if m.tracker != nil {
 		// The process may have terminated already, so don't return on error.
 		if err := m.tracker.Add(proc.Info(ctx)); err != nil {
-			grip.Warning(message.WrapError(err, "problem adding local process to tracker during process registration"))
+			grip.Warning(message.WrapError(err, "problem adding process to tracker during process registration"))
 		}
 	}
 
@@ -108,8 +125,12 @@ func (m *basicProcessManager) Register(ctx context.Context, proc Process) error 
 	return nil
 }
 
-func (m *basicProcessManager) List(ctx context.Context, f Filter) ([]Process, error) {
+func (m *basicProcessManager) List(ctx context.Context, f options.Filter) ([]Process, error) {
 	out := []Process{}
+
+	if err := f.Validate(); err != nil {
+		return out, errors.Wrap(err, "invalid filter")
+	}
 
 	for _, proc := range m.procs {
 		if ctx.Err() != nil {
@@ -120,23 +141,23 @@ func (m *basicProcessManager) List(ctx context.Context, f Filter) ([]Process, er
 		info := proc.Info(cctx)
 		cancel()
 		switch {
-		case f == Running:
+		case f == options.Running:
 			if info.IsRunning {
 				out = append(out, proc)
 			}
-		case f == Terminated:
+		case f == options.Terminated:
 			if !info.IsRunning {
 				out = append(out, proc)
 			}
-		case f == Successful:
+		case f == options.Successful:
 			if info.Successful {
 				out = append(out, proc)
 			}
-		case f == Failed:
+		case f == options.Failed:
 			if info.Complete && !info.Successful {
 				out = append(out, proc)
 			}
-		case f == All:
+		case f == options.All:
 			out = append(out, proc)
 		}
 	}
@@ -157,6 +178,7 @@ func (m *basicProcessManager) Clear(ctx context.Context) {
 	for procID, proc := range m.procs {
 		if proc.Complete(ctx) {
 			delete(m.procs, procID)
+			m.loggers.Remove(procID)
 		}
 	}
 }
@@ -165,7 +187,7 @@ func (m *basicProcessManager) Close(ctx context.Context) error {
 	if len(m.procs) == 0 {
 		return nil
 	}
-	procs, err := m.List(ctx, Running)
+	procs, err := m.List(ctx, options.Running)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -197,8 +219,12 @@ func (m *basicProcessManager) Group(ctx context.Context, name string) ([]Process
 			return nil, errors.WithStack(ctx.Err())
 		}
 
-		if sliceContains(proc.GetTags(), name) {
-			out = append(out, proc)
+	addTag:
+		for _, t := range proc.GetTags() {
+			if t == name {
+				out = append(out, proc)
+				break addTag
+			}
 		}
 	}
 

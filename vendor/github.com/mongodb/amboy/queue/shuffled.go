@@ -16,12 +16,15 @@ package queue
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/pool"
 	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/message"
 	"github.com/mongodb/grip/recovery"
 	"github.com/pkg/errors"
 )
@@ -33,18 +36,27 @@ import (
 type shuffledLocal struct {
 	operations chan func(map[string]amboy.Job, map[string]amboy.Job, map[string]amboy.Job, *fixedStorage)
 	capacity   int
+	id         string
 	starter    sync.Once
+	scopes     ScopeManager
+	dispatcher Dispatcher
 	runner     amboy.Runner
 }
 
 // NewShuffledLocal provides a queue implementation that shuffles the
 // order of jobs, relative the insertion order.
 func NewShuffledLocal(workers, capacity int) amboy.Queue {
-	q := &shuffledLocal{}
+	q := &shuffledLocal{
+		scopes:   NewLocalScopeManager(),
+		capacity: capacity,
+		id:       fmt.Sprintf("queue.local.unordered.shuffled.%s", uuid.New().String()),
+	}
+	q.dispatcher = NewDispatcher(q)
 	q.runner = pool.NewLocalWorkers(workers, q)
-	q.capacity = capacity
 	return q
 }
+
+func (q *shuffledLocal) ID() string { return q.id }
 
 // Start takes a context object and starts the embedded Runner instance
 // and the queue's own background dispatching thread. Returns an error
@@ -113,12 +125,53 @@ func (q *shuffledLocal) Put(ctx context.Context, j amboy.Job) error {
 		_, isDispatched := dispatched[id]
 
 		if isPending || isCompleted || isDispatched {
-			ret <- errors.Errorf("job '%s' already exists", id)
+			ret <- amboy.NewDuplicateJobErrorf("job '%s' already exists", id)
 		}
 
 		pending[id] = j
 
 		close(ret)
+	}
+
+	select {
+	case <-ctx.Done():
+		return errors.WithStack(ctx.Err())
+	case q.operations <- op:
+		return <-ret
+	}
+}
+
+func (q *shuffledLocal) Save(ctx context.Context, j amboy.Job) error {
+	id := j.ID()
+
+	if !q.Started() {
+		return errors.Errorf("cannot save job %s; queue not started", id)
+	}
+
+	ret := make(chan error)
+	op := func(
+		pending map[string]amboy.Job,
+		completed map[string]amboy.Job,
+		dispatched map[string]amboy.Job,
+		toDelete *fixedStorage,
+	) {
+		defer close(ret)
+		if _, ok := pending[id]; ok {
+			pending[id] = j
+			return
+		}
+
+		if _, ok := completed[id]; ok {
+			completed[id] = j
+			return
+		}
+
+		if _, ok := dispatched[id]; ok {
+			dispatched[id] = j
+			return
+		}
+
+		ret <- errors.Errorf("job '%s' does not exist", id)
 	}
 
 	select {
@@ -307,6 +360,10 @@ func (q *shuffledLocal) Next(ctx context.Context) amboy.Job {
 				continue
 			}
 
+			if err := q.scopes.Acquire(j.ID(), j.Scopes()); err != nil {
+				continue
+			}
+
 			select {
 			case <-ctx.Done():
 				return
@@ -322,7 +379,16 @@ func (q *shuffledLocal) Next(ctx context.Context) amboy.Job {
 	case <-ctx.Done():
 		return nil
 	case q.operations <- op:
-		return <-ret
+		j := <-ret
+		if j == nil {
+			return nil
+		}
+		if err := q.dispatcher.Dispatch(ctx, j); err != nil {
+			_ = q.Put(ctx, j)
+			return nil
+		}
+
+		return j
 	}
 }
 
@@ -334,20 +400,14 @@ func (q *shuffledLocal) Complete(ctx context.Context, j amboy.Job) {
 		return
 	}
 
+	q.dispatcher.Complete(ctx, j)
 	op := func(
 		pending map[string]amboy.Job,
 		completed map[string]amboy.Job,
 		dispatched map[string]amboy.Job,
 		toDelete *fixedStorage,
 	) {
-
 		id := j.ID()
-
-		if ctx.Err() != nil {
-			grip.Noticef("did not complete %s job, because operation "+
-				"was canceled.", id)
-			return
-		}
 
 		completed[id] = j
 		delete(dispatched, id)
@@ -358,6 +418,15 @@ func (q *shuffledLocal) Complete(ctx context.Context, j amboy.Job) {
 				delete(completed, toDelete.Pop())
 			}
 		}
+
+		grip.Warning(message.WrapError(
+			q.scopes.Release(j.ID(), j.Scopes()),
+			message.Fields{
+				"id":     j.ID(),
+				"scopes": j.Scopes(),
+				"queue":  q.ID(),
+				"op":     "releasing scope lock during completion",
+			}))
 	}
 
 	select {

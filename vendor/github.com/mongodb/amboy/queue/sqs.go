@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/google/uuid"
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/pool"
 	"github.com/mongodb/amboy/registry"
@@ -26,8 +27,10 @@ const region string = "us-east-1"
 type sqsFIFOQueue struct {
 	sqsClient  *sqs.SQS
 	sqsURL     string
+	id         string
 	started    bool
 	numRunning int
+	dispatcher Dispatcher
 	tasks      struct { // map jobID to job information
 		completed map[string]bool
 		all       map[string]amboy.Job
@@ -41,14 +44,16 @@ type sqsFIFOQueue struct {
 // removed from the queue, and therefore may not handle jobs across
 // restarts.
 func NewSQSFifoQueue(queueName string, workers int) (amboy.Queue, error) {
-	q := &sqsFIFOQueue{}
+	q := &sqsFIFOQueue{
+		sqsClient: sqs.New(session.Must(session.NewSession(&aws.Config{
+			Region: aws.String(region),
+		}))),
+		id: fmt.Sprintf("queue.remote.sqs.fifo..%s", uuid.New().String()),
+	}
 	q.tasks.completed = make(map[string]bool)
 	q.tasks.all = make(map[string]amboy.Job)
 	q.runner = pool.NewLocalWorkers(workers, q)
-	sess := session.Must(session.NewSession(&aws.Config{
-		Region: aws.String(region),
-	}))
-	q.sqsClient = sqs.New(sess)
+	q.dispatcher = NewDispatcher(q)
 	result, err := q.sqsClient.CreateQueue(&sqs.CreateQueueInput{
 		QueueName: aws.String(fmt.Sprintf("%s.fifo", queueName)),
 		Attributes: map[string]*string{
@@ -60,6 +65,13 @@ func NewSQSFifoQueue(queueName string, workers int) (amboy.Queue, error) {
 	}
 	q.sqsURL = *result.QueueUrl
 	return q, nil
+}
+
+func (q *sqsFIFOQueue) ID() string {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	return q.id
 }
 
 func (q *sqsFIFOQueue) Put(ctx context.Context, j amboy.Job) error {
@@ -81,7 +93,7 @@ func (q *sqsFIFOQueue) Put(ctx context.Context, j amboy.Job) error {
 	}
 
 	if _, ok := q.tasks.all[name]; ok {
-		return errors.Errorf("cannot add %s because duplicate job already exists", name)
+		return amboy.NewDuplicateJobErrorf("cannot add %s because duplicate job already exists", name)
 	}
 
 	dedupID := strings.Replace(j.ID(), " ", "", -1) //remove all spaces
@@ -107,8 +119,27 @@ func (q *sqsFIFOQueue) Put(ctx context.Context, j amboy.Job) error {
 	if err != nil {
 		return errors.Wrap(err, "Error sending message in Put")
 	}
-	q.tasks.all[j.ID()] = j
+	q.tasks.all[name] = j
 	return nil
+}
+
+func (q *sqsFIFOQueue) Save(ctx context.Context, j amboy.Job) error {
+	name := j.ID()
+
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	if !q.Started() {
+		return errors.Errorf("cannot save job %s; queue not started", name)
+	}
+
+	if _, ok := q.tasks.all[name]; !ok {
+		return errors.Errorf("cannot save '%s' because a job does not exist with that name", name)
+	}
+
+	q.tasks.all[name] = j
+	return nil
+
 }
 
 // Returns the next job in the queue. These calls are
@@ -146,6 +177,11 @@ func (q *sqsFIFOQueue) Next(ctx context.Context) amboy.Job {
 		return nil
 	}
 
+	if err := q.dispatcher.Dispatch(ctx, job); err != nil {
+		_ = q.Put(ctx, job)
+		return nil
+	}
+
 	if job.TimeInfo().IsStale() {
 		return nil
 	}
@@ -174,6 +210,7 @@ func (q *sqsFIFOQueue) Complete(ctx context.Context, job amboy.Job) {
 		return
 	}
 	name := job.ID()
+	q.dispatcher.Complete(ctx, job)
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 	if ctx.Err() != nil {
@@ -190,7 +227,6 @@ func (q *sqsFIFOQueue) Complete(ctx context.Context, job amboy.Job) {
 		savedJob.SetStatus(job.Status())
 		savedJob.UpdateTimeInfo(job.TimeInfo())
 	}
-
 }
 
 // Returns a channel that produces completed Job objects.

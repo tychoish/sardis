@@ -136,11 +136,12 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 	jpm := sardis.GetEnvironment().Jasper()
 
 	for idx, cmd := range cmds {
-		jpm.CreateCommand(ctx).ID(j.ID()).Add(cmd).
+		jpm.CreateCommand(ctx).ID(j.ID()).Add(cmd).Directory(j.Path).
 			SetCombinedSender(level.Debug, grip.GetSender()).
 			Prerequisite(func() bool {
 				grip.Debug(message.Fields{
 					"args":  cmd,
+					"path":  j.Path,
 					"job":   j.ID(),
 					"num":   idx,
 					"total": len(cmds),

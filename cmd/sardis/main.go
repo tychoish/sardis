@@ -40,6 +40,7 @@ func buildApp() *cli.App {
 		operations.ArchLinux(),
 		operations.Repo(),
 		operations.Jira(),
+		operations.RunCommand(),
 		jaspercli.Jasper(),
 	}
 

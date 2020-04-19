@@ -12,12 +12,13 @@ import (
 )
 
 type Configuration struct {
-	Settings Settings   `bson:"settings" json:"settings" yaml:"settings"`
-	Mail     []MailConf `bson:"mail" json:"mail" yaml:"mail"`
-	Repo     []RepoConf `bson:"repo" json:"repo" yaml:"repo"`
-	Links    []LinkConf `bson:"links" json:"links" yaml:"links"`
-	Hosts    []HostConf `bson:"hosts" json:"hosts" yaml:"hosts"`
-	System   SystemConf `bson:"system" json:"system" yaml:"system"`
+	Settings Settings      `bson:"settings" json:"settings" yaml:"settings"`
+	Mail     []MailConf    `bson:"mail" json:"mail" yaml:"mail"`
+	Repo     []RepoConf    `bson:"repo" json:"repo" yaml:"repo"`
+	Links    []LinkConf    `bson:"links" json:"links" yaml:"links"`
+	Hosts    []HostConf    `bson:"hosts" json:"hosts" yaml:"hosts"`
+	System   SystemConf    `bson:"system" json:"system" yaml:"system"`
+	Commands []CommandConf `bson:"commands" json:"commands" yaml:"commands"`
 }
 
 type MailConf struct {
@@ -114,6 +115,12 @@ type AmboyConf struct {
 	Size    int `bson:"size" json:"size" yaml:"size"`
 }
 
+type CommandConf struct {
+	Name      string `bson:"name" json:"name" yaml:"name"`
+	Directory string `bson:"directory" json:"directory" yaml:"directory"`
+	Command   string `bson:"command" json:"command" yaml:"command"`
+}
+
 func LoadConfiguration(fn string) (*Configuration, error) {
 	out := &Configuration{}
 
@@ -148,6 +155,10 @@ func (conf *Configuration) Validate() error {
 	}
 
 	for idx, c := range conf.Hosts {
+		catcher.Wrapf(c.Validate(), "%d of %T is not valid", idx, c)
+	}
+
+	for idx, c := range conf.Commands {
 		catcher.Wrapf(c.Validate(), "%d of %T is not valid", idx, c)
 	}
 
@@ -317,4 +328,20 @@ func (conf *Configuration) GetHost(name string) (*HostConf, error) {
 	}
 
 	return nil, errors.Errorf("could not find a host named '%s'", name)
+}
+
+func (conf *CommandConf) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(conf.Name == "", "commands must have a name")
+	catcher.NewWhen(conf.Command == "", "commands must have specify commands")
+	return catcher.Resolve()
+}
+
+func (conf *Configuration) ExportCommands() map[string]CommandConf {
+	out := make(map[string]CommandConf, len(conf.Commands))
+	for idx := range conf.Commands {
+		cmd := conf.Commands[idx]
+		out[cmd.Name] = cmd
+	}
+	return out
 }

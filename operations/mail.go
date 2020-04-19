@@ -92,8 +92,8 @@ func syncRepo() cli.Command {
 
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
-			defer env.Close(ctx)
 			defer cancel()
+			defer env.Close(ctx)
 
 			job := units.NewRepoSyncJob(host, path, nil, nil)
 			grip.Infof("starting: %s", job.ID())

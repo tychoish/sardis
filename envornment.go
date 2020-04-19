@@ -24,7 +24,6 @@ import (
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/amboy/queue"
 	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/level"
 	"github.com/mongodb/grip/logging"
 	"github.com/mongodb/grip/message"
 	"github.com/mongodb/grip/send"
@@ -241,8 +240,8 @@ func (c *appServicesCache) Close(ctx context.Context) error {
 			"runtime": time.Since(startAt),
 		}
 
-		grip.LogWhen(err == nil, level.Info, msg)
-		grip.Error(message.WrapError(err, msg))
+		grip.DebugWhen(err == nil, msg)
+		grip.Notice(message.WrapError(err, msg))
 	}
 
 	c.rootCancel()

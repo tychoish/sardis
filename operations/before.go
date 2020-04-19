@@ -62,3 +62,22 @@ func requirePathExists(flagName string) cli.BeforeFunc {
 		return c.Set(flagName, path)
 	}
 }
+
+func requireCommandsSet(flagName string) cli.BeforeFunc {
+	return func(c *cli.Context) error {
+		flg := c.StringSlice(flagName)
+		if len(flg) == 0 {
+			if c.NArg() == 0 {
+				return errors.New("must specify a command name")
+			}
+
+			catcher := grip.NewBasicCatcher()
+			catcher.Add(c.Set(flagName, c.Args().First()))
+			for _, it := range c.Args().Tail() {
+				catcher.Add(c.Set(flagName, it))
+			}
+			return catcher.Resolve()
+		}
+		return nil
+	}
+}

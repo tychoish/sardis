@@ -136,7 +136,9 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 	jpm := sardis.GetEnvironment().Jasper()
 
 	for idx, cmd := range cmds {
-		jpm.CreateCommand(ctx).ID(j.ID()).SetOutputSender(level.Info, grip.GetSender()).Add(cmd).
+		jpm.CreateCommand(ctx).ID(j.ID()).Add(cmd).
+			SetOutputSender(level.Debug, grip.GetSender()).
+			SetErrorSender(level.Error, grip.GetSender()).
 			Prerequisite(func() bool {
 				grip.Debug(message.Fields{
 					"args":  cmd,

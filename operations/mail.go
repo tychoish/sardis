@@ -95,7 +95,7 @@ func syncRepo() cli.Command {
 			defer cancel()
 			defer env.Close(ctx)
 
-			notify := env.y
+			notify := env.Logger()
 
 			job := units.NewRepoSyncJob(host, path, nil, nil)
 			grip.Infof("starting: %s", job.ID())
@@ -133,8 +133,8 @@ func syncAllMailRepos() cli.Command {
 			defer cancel()
 			defer env.Close(ctx)
 
-			queue := env.Queue()
 			notify := env.Logger()
+			queue := env.Queue()
 			conf := env.Configuration()
 			catcher := grip.NewBasicCatcher()
 

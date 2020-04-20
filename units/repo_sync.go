@@ -70,7 +70,9 @@ func (j *repoSyncJob) buildID() string {
 		return fmt.Sprintf("LOCAL.%s.%s.%d.%s.%s", repoSyncJobName, util.GetHostname(), job.GetNumber(), j.Path, tstr)
 	}
 
-	return fmt.Sprintf("REMOTE.%s.%d.%s.%s.%s", repoSyncJobName, job.GetNumber(), j.Host, j.Path, tstr)
+	host, _ := os.Hostname()
+
+	return fmt.Sprintf("REMOTE.%s.%d.%s-%s.%s.%s", repoSyncJobName, job.GetNumber(), host, j.Host, j.Path, tstr)
 }
 
 func (j *repoSyncJob) isLocal() bool {

@@ -61,8 +61,8 @@ func updateDB() cli.Command {
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
-			defer env.Close(ctx)
 			defer cancel()
+			defer env.Close(ctx)
 
 			job := units.NewMailUpdaterJob(c.String("mail"), c.String("mu"), c.String("daemon"), c.Bool("rebuild"))
 			job.Run(ctx)
@@ -95,13 +95,15 @@ func syncRepo() cli.Command {
 			defer cancel()
 			defer env.Close(ctx)
 
+			notify := env.y
+
 			job := units.NewRepoSyncJob(host, path, nil, nil)
 			grip.Infof("starting: %s", job.ID())
 			job.Run(ctx)
 
 			err := job.Error()
 			if err != nil {
-				env.Logger().Error(message.WrapError(err, message.Fields{
+				notify.Error(message.WrapError(err, message.Fields{
 					"message": "encountered problem syncing repository",
 					"host":    host,
 					"path":    path,
@@ -109,7 +111,7 @@ func syncRepo() cli.Command {
 				return err
 			}
 
-			env.Logger().Info(message.Fields{
+			notify.Notice(message.Fields{
 				"message": "successfully synchronized repository",
 				"host":    host,
 				"path":    path,
@@ -128,10 +130,11 @@ func syncAllMailRepos() cli.Command {
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
-			defer env.Close(ctx)
 			defer cancel()
+			defer env.Close(ctx)
 
 			queue := env.Queue()
+			notify := env.Logger()
 			conf := env.Configuration()
 			catcher := grip.NewBasicCatcher()
 
@@ -146,11 +149,12 @@ func syncAllMailRepos() cli.Command {
 			amboy.WaitInterval(ctx, queue, time.Millisecond)
 			err := errors.WithStack(amboy.ResolveErrors(ctx, queue))
 			if err != nil {
-				env.Logger().Error(message.WrapError(err, "completed sync mail operation with error"))
+				notify.Error(message.WrapError(err, "completed sync mail operation with error"))
 				return err
 			}
 
-			env.Logger().Info("completed mail sync operation successfully")
+			notify.Notice("completed mail sync operation successfully")
+
 			return nil
 		},
 	}

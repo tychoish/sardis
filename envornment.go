@@ -134,14 +134,17 @@ func (c *appServicesCache) initSender() error {
 		return errors.Wrap(err, "problem finding hostname")
 	}
 
-	err = sender.SetFormatter(func(m message.Composer) (string, error) {
+	if err = sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.GetSender())); err != nil {
+		return errors.Wrap(err, "problem setting error handler")
+	}
+
+	if err = sender.SetFormatter(func(m message.Composer) (string, error) {
 		return fmt.Sprintf("[%s:%s] %s", c.conf.Settings.Notification.Name, host, m.String()), nil
-	})
-	if err != nil {
+	}); err != nil {
 		return errors.Wrap(err, "problem setting formatter")
 	}
 
-	c.logger = logging.MakeGrip(sender)
+	c.logger = logging.MakeGrip(send.NewConfiguredMultiSender(sender, grip.GetSender()))
 	c.closers = append(c.closers, closerOp{
 		name:   "sender-notify",
 		closer: func(_ context.Context) error { return sender.Close() },

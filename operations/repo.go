@@ -41,8 +41,8 @@ func updateRepos() cli.Command {
 
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
-			defer env.Close(ctx)
 			defer cancel()
+			defer env.Close(ctx)
 
 			queue := env.Queue()
 			conf := env.Configuration()

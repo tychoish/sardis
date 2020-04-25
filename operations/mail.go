@@ -154,7 +154,6 @@ func syncAllMailRepos() cli.Command {
 			}
 
 			notify.Notice("completed mail sync operation successfully")
-
 			return nil
 		},
 	}

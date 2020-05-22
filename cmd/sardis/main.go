@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/level"
-	jaspercli "github.com/mongodb/jasper/cli"
+	"github.com/deciduosity/grip"
+	"github.com/deciduosity/grip/level"
+	jaspercli "github.com/deciduosity/jasper/cli"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/operations"

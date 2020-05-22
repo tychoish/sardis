@@ -6,10 +6,10 @@ import (
 	"net"
 	"time"
 
-	"github.com/mongodb/jasper"
-	jaspercli "github.com/mongodb/jasper/cli"
-	"github.com/mongodb/jasper/options"
-	"github.com/mongodb/jasper/remote"
+	"github.com/deciduosity/jasper"
+	jaspercli "github.com/deciduosity/jasper/cli"
+	"github.com/deciduosity/jasper/options"
+	"github.com/deciduosity/jasper/remote"
 	"github.com/pkg/errors"
 )
 

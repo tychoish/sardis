@@ -1,7 +1,8 @@
 package operations
 
 import (
-	"github.com/mongodb/grip"
+	"github.com/deciduosity/grip"
+	"github.com/deciduosity/grip/message"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
 	"github.com/urfave/cli"
@@ -136,11 +137,21 @@ func setupArchLinux() cli.Command {
 				pkgs = append(pkgs, pkg.Name)
 			}
 
+			grip.Info(message.Fields{
+				"path":     conf.System.Arch.BuildPath,
+				"packages": len(pkgs),
+				"aur":      len(conf.System.Arch.AurPackages),
+			})
 			job := units.NewArchInstallPackageJob(pkgs)
 			job.Run(ctx)
 			catcher.Add(job.Error())
 
 			for _, pkg := range conf.System.Arch.AurPackages {
+				grip.Info(message.Fields{
+					"name":   pkg.Name,
+					"update": pkg.Update,
+				})
+
 				job := units.NewArchFetchAurJob(pkg.Name, pkg.Update)
 				job.Run(ctx)
 

@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/message"
+	"github.com/deciduosity/grip"
+	"github.com/deciduosity/grip/message"
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli"
 )

@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mongodb/amboy"
-	"github.com/mongodb/amboy/dependency"
-	"github.com/mongodb/amboy/job"
-	"github.com/mongodb/amboy/registry"
-	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/message"
+	"github.com/deciduosity/amboy"
+	"github.com/deciduosity/amboy/dependency"
+	"github.com/deciduosity/amboy/job"
+	"github.com/deciduosity/amboy/registry"
+	"github.com/deciduosity/grip"
+	"github.com/deciduosity/grip/message"
 	"github.com/tychoish/sardis"
 )
 

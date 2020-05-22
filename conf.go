@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/send"
+	"github.com/deciduosity/grip"
+	"github.com/deciduosity/grip/send"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis/util"
 )

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mongodb/amboy"
-	"github.com/mongodb/amboy/job"
-	"github.com/mongodb/amboy/registry"
-	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/level"
+	"github.com/deciduosity/amboy"
+	"github.com/deciduosity/amboy/job"
+	"github.com/deciduosity/amboy/registry"
+	"github.com/deciduosity/grip"
+	"github.com/deciduosity/grip/level"
 	"github.com/tychoish/sardis"
 )
 

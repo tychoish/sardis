@@ -21,13 +21,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mongodb/amboy"
-	"github.com/mongodb/amboy/queue"
-	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/logging"
-	"github.com/mongodb/grip/message"
-	"github.com/mongodb/grip/send"
-	"github.com/mongodb/jasper"
+	"github.com/deciduosity/amboy"
+	"github.com/deciduosity/amboy/queue"
+	"github.com/deciduosity/grip"
+	"github.com/deciduosity/grip/logging"
+	"github.com/deciduosity/grip/message"
+	"github.com/deciduosity/grip/send"
+	"github.com/deciduosity/jasper"
 	"github.com/pkg/errors"
 )
 
@@ -205,7 +205,7 @@ func (c *appServicesCache) Queue() amboy.Queue {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	if !c.queue.Started() {
+	if !c.queue.Info().Started {
 		grip.Alert(errors.Wrap(c.queue.Start(c.ctx), "problem starting queue"))
 	}
 

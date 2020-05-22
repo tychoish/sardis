@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mongodb/amboy"
-	"github.com/mongodb/grip"
+	"github.com/deciduosity/amboy"
+	"github.com/deciduosity/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
 	"github.com/urfave/cli"

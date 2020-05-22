@@ -1,7 +1,7 @@
 package operations
 
 import (
-	"github.com/mongodb/grip"
+	"github.com/deciduosity/grip"
 	"github.com/urfave/cli"
 )
 

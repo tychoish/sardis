@@ -6,11 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mongodb/amboy"
-	"github.com/mongodb/amboy/job"
-	"github.com/mongodb/amboy/registry"
-	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/level"
+	"github.com/deciduosity/amboy"
+	"github.com/deciduosity/amboy/job"
+	"github.com/deciduosity/amboy/registry"
+	"github.com/deciduosity/grip"
+	"github.com/deciduosity/grip/level"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 )
@@ -65,5 +65,5 @@ func (j *archAbsBuildJob) Run(ctx context.Context) {
 
 	j.AddError(env.Jasper().CreateCommand(ctx).
 		AppendArgs("makepkg", "--syncdeps", "--force", "--install", "--noconfirm").
-		SetOutputSender(level.Debug, grip.GetSender()).ID(j.ID()).Directory(dir).Run(ctx))
+		SetOutputSender(level.Info, grip.GetSender()).ID(j.ID()).Directory(dir).Run(ctx))
 }

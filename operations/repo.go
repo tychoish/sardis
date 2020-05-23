@@ -49,7 +49,7 @@ func updateRepos() cli.Command {
 			catcher := grip.NewBasicCatcher()
 
 			for _, repo := range conf.Repo {
-				if repoName != "" && repo.Name != repoName {
+				if repo.Name != repoName {
 					continue
 				}
 

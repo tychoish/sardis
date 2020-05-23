@@ -73,7 +73,7 @@ func (j *repoSyncRemoteJob) Run(ctx context.Context) {
 	}
 
 	j.AddError(sardis.GetEnvironment().Jasper().CreateCommand(ctx).ID(j.ID()).
-		SetOutputSender(level.Debug, grip.GetSender()).
+		SetOutputSender(level.Info, grip.GetSender()).
 		Directory(j.Path).Host(j.Host).Extend(cmds).Run(ctx))
 
 	grip.Info(message.Fields{

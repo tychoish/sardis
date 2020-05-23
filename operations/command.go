@@ -43,10 +43,11 @@ func RunCommand() cli.Command {
 					Append(cmd.Command).SetCombinedSender(level.Info, grip.GetSender()).
 					Prerequisite(func() bool {
 						grip.Info(message.Fields{
-							"cmd": name,
-							"dir": cmd.Directory,
-							"num": idx + 1,
-							"len": len(ops),
+							"cmd":  name,
+							"dir":  cmd.Directory,
+							"exec": cmd.Command,
+							"num":  idx + 1,
+							"len":  len(ops),
 						})
 						return true
 					}).Run(ctx)

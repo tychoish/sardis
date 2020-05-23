@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"os"
 	"path/filepath"
 	"time"
 
@@ -66,8 +67,10 @@ func updateRepos() cli.Command {
 }
 
 func syncRepo() cli.Command {
+	host, err := os.Hostname()
+	grip.Warning(err)
 	return cli.Command{
-		Name:  "repo",
+		Name:  "sync",
 		Usage: "sync a local and remote git repository",
 		Flags: []cli.Flag{
 			cli.StringFlag{
@@ -76,7 +79,7 @@ func syncRepo() cli.Command {
 			},
 			cli.StringFlag{
 				Name:  "host",
-				Value: "LOCAL",
+				Value: host,
 			},
 		},
 		Action: func(c *cli.Context) error {

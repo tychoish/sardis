@@ -17,12 +17,13 @@ func SyncRepo(ctx context.Context, queue amboy.Queue, conf *sardis.Configuration
 		return errors.WithStack(err)
 	}
 
+	seen := 0
 	catcher := grip.NewCatcher()
 	for _, repo := range conf.Repo {
 		if repo.Name != name {
 			continue
 		}
-
+		seen++
 		if repo.LocalSync {
 			catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path)))
 		} else if repo.Fetch {
@@ -39,5 +40,6 @@ func SyncRepo(ctx context.Context, queue amboy.Queue, conf *sardis.Configuration
 		}
 	}
 
+	catcher.NewWhen(seen == 0, "now matching repos found")
 	return catcher.Resolve()
 }

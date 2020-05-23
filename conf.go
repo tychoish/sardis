@@ -22,6 +22,7 @@ type Configuration struct {
 }
 
 type MailConf struct {
+	Name   string `bson:"name" json:"name" yaml:"name"`
 	Path   string `bson:"path" json:"path" yaml:"path"`
 	Remote string `bson:"remote" json:"remote" yaml:"remote"`
 	Emacs  string `bson:"emacs" json:"emacs" yaml:"emacs"`

@@ -21,7 +21,7 @@ func Mail() cli.Command {
 		Usage: "a collections of commands to manage the maildir deployment",
 		Subcommands: []cli.Command{
 			updateDB(),
-			syncRepo(),
+			syncMailRepo(),
 			syncAllMailRepos(),
 		},
 	}
@@ -72,7 +72,7 @@ func updateDB() cli.Command {
 	}
 }
 
-func syncRepo() cli.Command {
+func syncMailRepo() cli.Command {
 	return cli.Command{
 		Name:  "repo",
 		Usage: "sync a local and remote git repository",
@@ -80,6 +80,12 @@ func syncRepo() cli.Command {
 			cli.StringFlag{
 				Name:  "path",
 				Value: filepath.Join(util.GetHomeDir(), "mail"),
+				Usage: "path to the mail repository",
+			},
+			cli.StringFlag{
+				Name:  "name",
+				Value: "mail",
+				Usage: "specify the name of the repository",
 			},
 			cli.StringFlag{
 				Name:  "host",

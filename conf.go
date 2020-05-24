@@ -84,7 +84,14 @@ type Settings struct {
 }
 
 type CredentialsConf struct {
-	Path string `bson:"path" json:"path" yaml:"path"`
+	Path    string `bson:"path" json:"path" yaml:"path"`
+	Twitter struct {
+		Username       string `bson:"username" json:"username" yaml:"username"`
+		ConsumerKey    string `bson:"consumer_key" json:"consumer_key" yaml:"consumer_key"`
+		ConsumerSecret string `bson:"consumer_secret" json:"consumer_secret" yaml:"consumer_secret"`
+		OauthToken     string `bson:"oauth_token" json:"oauth_token" yaml:"oauth_token"`
+		OauthSecret    string `bson:"oauth_secret" json:"oauth_secret" yaml:"oauth_secret"`
+	} `bson:"twitter" json:"twitter" yaml:"twitter"`
 	Jira struct {
 		Username string `bson:"username" json:"username" yaml:"username"`
 		Password string `bson:"password" json:"password" yaml:"password"`
@@ -100,15 +107,18 @@ type CredentialsConf struct {
 		Password string `bson:"password" json:"password" yaml:"password"`
 		Token    string `bson:"token" json:"token" yaml:"token"`
 	} `bson:"github" json:"github" yaml:"github"`
-	AWS struct {
-		Key    string `bson:"key" json:"key" yaml:"key"`
-		Secret string `bson:"secret" json:"secret" yaml:"secret"`
-		Token  string `bson:"token" json:"token" yaml:"token"`
-	} `bson:"aws" json:"aws" yaml:"aws"`
+	AWS []CredentialsAWS `bson:"aws" json:"aws" yaml:"aws"`
 	RHN struct {
 		Username string `bson:"username" json:"username" yaml:"username"`
 		Password string `bson:"password" json:"password" yaml:"password"`
 	} `bson:"rhn" json:"rhn" yaml:"rhn"`
+}
+
+type CredentialsAWS struct {
+	Profile string `bson:"profile" json:"profile" yaml:"profile"`
+	Key     string `bson:"key" json:"key" yaml:"key"`
+	Secret  string `bson:"secret" json:"secret" yaml:"secret"`
+	Token   string `bson:"token" json:"token" yaml:"token"`
 }
 
 type AmboyConf struct {

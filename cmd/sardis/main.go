@@ -35,6 +35,7 @@ func buildApp() *cli.App {
 	app.Commands = []cli.Command{
 		operations.HelloWorld(),
 		operations.Notify(),
+		operations.Tweet(),
 		operations.Version(),
 		operations.Mail(),
 		operations.ArchLinux(),

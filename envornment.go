@@ -1,5 +1,5 @@
 /*
-Package sardis holds a a number of application level constants and
+kage sardis holds a a number of application level constants and
 shared resources for the sardis application.
 
 Services Cache
@@ -52,8 +52,10 @@ type Environment interface {
 	Configuration() *Configuration
 	Queue() amboy.Queue
 	Logger() grip.Journaler
-	JiraIssue() grip.Journaler
 	Jasper() jasper.Manager
+
+	Twitter() grip.Journaler
+	JiraIssue() grip.Journaler
 
 	RegisterCloser(string, CloserFunc)
 	Close(context.Context) error
@@ -285,4 +287,27 @@ func (c *appServicesCache) JiraIssue() grip.Journaler {
 	defer c.mutex.RUnlock()
 
 	return c.jiraIssue
+}
+
+func (c *appServicesCache) Twitter() grip.Journaler {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	conf := c.conf.Settings.Credentials.Twitter
+	grip.Info(conf)
+	twitter, err := send.MakeTwitterLogger(c.ctx, &send.TwitterOptions{
+		Name:           conf.Username + ".sardis",
+		ConsumerKey:    conf.ConsumerKey,
+		ConsumerSecret: conf.ConsumerSecret,
+		AccessSecret:   conf.OauthSecret,
+		AccessToken:    conf.OauthToken,
+	})
+	if err != nil {
+		grip.Critical(message.WrapError(err, "problem constructing twitter sender."))
+		return c.logger
+	}
+
+	logger := logging.MakeGrip(twitter)
+
+	return logger
 }

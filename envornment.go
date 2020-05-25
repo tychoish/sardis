@@ -118,6 +118,8 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 }
 
 func (c *appServicesCache) initSender() error {
+	root := grip.GetSender()
+	levels := root.Level()
 	sender, err := send.NewXMPPLogger(
 		c.conf.Settings.Notification.Name,
 		c.conf.Settings.Notification.Target,
@@ -126,7 +128,12 @@ func (c *appServicesCache) initSender() error {
 			Username: c.conf.Settings.Notification.User,
 			Password: c.conf.Settings.Notification.Password,
 		},
-		grip.GetSender().Level())
+		levels)
+	if err != nil {
+		return errors.Wrap(err, "problem creating sender")
+	}
+
+	desktop, err := send.NewDesktopNotify(c.conf.Settings.Notification.Name, levels)
 	if err != nil {
 		return errors.Wrap(err, "problem creating sender")
 	}
@@ -136,7 +143,7 @@ func (c *appServicesCache) initSender() error {
 		return errors.Wrap(err, "problem finding hostname")
 	}
 
-	if err = sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.GetSender())); err != nil {
+	if err = sender.SetErrorHandler(send.ErrorHandlerFromSender(root)); err != nil {
 		return errors.Wrap(err, "problem setting error handler")
 	}
 
@@ -146,7 +153,7 @@ func (c *appServicesCache) initSender() error {
 		return errors.Wrap(err, "problem setting formatter")
 	}
 
-	c.logger = logging.MakeGrip(send.NewConfiguredMultiSender(sender, grip.GetSender()))
+	c.logger = logging.MakeGrip(send.NewConfiguredMultiSender(sender, desktop, root))
 	c.closers = append(c.closers, closerOp{
 		name:   "sender-notify",
 		closer: func(_ context.Context) error { return sender.Close() },

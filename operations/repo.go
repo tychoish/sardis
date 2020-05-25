@@ -2,7 +2,6 @@ package operations
 
 import (
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/deciduosity/amboy"
@@ -11,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
-	"github.com/tychoish/sardis/util"
 	"github.com/urfave/cli"
 )
 
@@ -27,18 +25,19 @@ func Repo() cli.Command {
 }
 
 func updateRepos() cli.Command {
+	const repoFlagName = "repo"
 	return cli.Command{
-		Name:   "update",
-		Usage:  "update a local and remote git repository according to the config",
-		Before: requireConfig(),
+		Name:  "update",
+		Usage: "update a local and remote git repository according to the config",
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  "repo",
+				Name:  repoFlagName,
 				Usage: "specify a local repository to updpate",
 			},
 		},
+		Before: mergeBeforeFuncs(requireConfig(), requireStringOrFirstArgSet(repoFlagName)),
 		Action: func(c *cli.Context) error {
-			repoName := c.String("repo")
+			repoName := c.String(repoFlagName)
 
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
@@ -69,22 +68,23 @@ func updateRepos() cli.Command {
 func syncRepo() cli.Command {
 	host, err := os.Hostname()
 	grip.Warning(err)
+	const nameFlagName = "name"
 	return cli.Command{
 		Name:  "sync",
 		Usage: "sync a local and remote git repository",
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  "name",
-				Value: filepath.Join(util.GetHomeDir(), "mail"),
+				Name: nameFlagName,
 			},
 			cli.StringFlag{
 				Name:  "host",
 				Value: host,
 			},
 		},
+		Before: requireStringOrFirstArgSet(nameFlagName),
 		Action: func(c *cli.Context) error {
 			host := c.String("host")
-			name := c.String("name")
+			name := c.String(nameFlagName)
 
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()

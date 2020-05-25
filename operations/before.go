@@ -81,3 +81,16 @@ func requireCommandsSet(flagName string) cli.BeforeFunc {
 		return nil
 	}
 }
+
+func requireStringOrFirstArgSet(flagName string) cli.BeforeFunc {
+	return func(c *cli.Context) error {
+		value := c.String(flagName)
+		if value == "" {
+			if c.NArg() != 1 {
+				return errors.Errorf("must specify a '%s'", flagName)
+			}
+			value = c.Args().Get(0)
+		}
+		return c.Set(flagName, value)
+	}
+}

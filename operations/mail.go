@@ -95,11 +95,24 @@ func syncMailRepo() cli.Command {
 		Action: func(c *cli.Context) error {
 			host := c.String("host")
 			path := c.String("path")
+			name := c.String("name")
 
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
 			defer env.Close(ctx)
+			if path == "" && name != "" {
+				for _, repo := range env.Configuration().Mail {
+					if repo.Name == name {
+						path = repo.Path
+						break
+					}
+				}
+			}
+
+			if path == "" {
+				return errors.New("no matching repo defined")
+			}
 
 			notify := env.Logger()
 

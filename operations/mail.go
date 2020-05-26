@@ -2,7 +2,6 @@ package operations
 
 import (
 	"os/user"
-	"path/filepath"
 	"time"
 
 	"github.com/deciduosity/amboy"
@@ -11,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
-	"github.com/tychoish/sardis/util"
 	"github.com/urfave/cli"
 )
 
@@ -73,33 +71,24 @@ func updateDB() cli.Command {
 }
 
 func syncMailRepo() cli.Command {
+	const nameFlagName = "name"
 	return cli.Command{
 		Name:  "repo",
 		Usage: "sync a local and remote git repository",
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  "path",
-				Value: filepath.Join(util.GetHomeDir(), "mail"),
-				Usage: "path to the mail repository",
-			},
-			cli.StringFlag{
-				Name:  "name",
-				Value: "mail",
+				Name:  nameFlagName,
+				Value: "personal",
 				Usage: "specify the name of the repository",
-			},
-			cli.StringFlag{
-				Name:  "host",
-				Value: "LOCAL",
 			},
 			cli.BoolFlag{
 				Name:  "skipUpdate",
 				Usage: "when specified, do not update the mail directory",
 			},
 		},
+		Before: requireStringOrFirstArgSet(nameFlagName),
 		Action: func(c *cli.Context) error {
-			host := c.String("host")
-			path := c.String("path")
-			name := c.String("name")
+			name := c.String(nameFlagName)
 			skipUpdate := c.Bool("skipUpdate")
 
 			env := sardis.GetEnvironment()
@@ -107,30 +96,22 @@ func syncMailRepo() cli.Command {
 			defer cancel()
 			defer env.Close(ctx)
 			var conf sardis.MailConf
-			if path != "" {
-				for _, repo := range env.Configuration().Mail {
-					if repo.Path == path {
-						conf = repo
-						break
-					}
-				}
-			} else if name != "" {
-				for _, repo := range env.Configuration().Mail {
-					if repo.Name == name {
-						conf = repo
-						path = repo.Path
-						break
-					}
+			grip.Info(name)
+			for _, repo := range env.Configuration().Mail {
+				grip.Notice(repo)
+				if repo.Name == name {
+					conf = repo
+					break
 				}
 			}
 
-			if path == "" {
-				return errors.New("no matching repo defined")
+			if conf.Name == "" {
+				return errors.Errorf("no matching for '%s' defined", name)
 			}
 
 			notify := env.Logger()
 
-			job := units.NewRepoSyncJob(host, path, nil, nil)
+			job := units.NewMailSyncJob(conf)
 			grip.Infof("starting: %s", job.ID())
 			job.Run(ctx)
 
@@ -138,8 +119,8 @@ func syncMailRepo() cli.Command {
 			if err != nil {
 				notify.Error(message.WrapError(err, message.Fields{
 					"message": "encountered problem syncing repository",
-					"host":    host,
-					"path":    path,
+					"name":    conf.Name,
+					"path":    conf.Path,
 				}))
 				return err
 			}
@@ -152,6 +133,8 @@ func syncMailRepo() cli.Command {
 					notify.Error(message.WrapError(err, message.Fields{
 						"message": "problem updating mail database",
 						"emacs":   conf.Emacs,
+						"name":    conf.Name,
+						"path":    conf.Path,
 					}))
 					return err
 				}
@@ -159,8 +142,8 @@ func syncMailRepo() cli.Command {
 
 			notify.Notice(message.Fields{
 				"message": "successfully synchronized repository",
-				"host":    host,
-				"path":    path,
+				"name":    conf.Name,
+				"path":    conf.Path,
 			})
 
 			return nil

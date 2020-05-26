@@ -71,7 +71,7 @@ func buildApp() *cli.App {
 		path := c.String("conf")
 		conf, err := sardis.LoadConfiguration(path)
 		if err != nil {
-			grip.Debug(errors.Wrap(err, "problem loading config"))
+			grip.Warning(errors.Wrap(err, "problem loading config"))
 			return nil
 		}
 

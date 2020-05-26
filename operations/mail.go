@@ -91,19 +91,33 @@ func syncMailRepo() cli.Command {
 				Name:  "host",
 				Value: "LOCAL",
 			},
+			cli.BoolFlag{
+				Name:  "skipUpdate",
+				Usage: "when specified, do not update the mail directory",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			host := c.String("host")
 			path := c.String("path")
 			name := c.String("name")
+			skipUpdate := c.Bool("skipUpdate")
 
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
 			defer env.Close(ctx)
-			if path == "" && name != "" {
+			var conf sardis.MailConf
+			if path != "" {
+				for _, repo := range env.Configuration().Mail {
+					if repo.Path == path {
+						conf = repo
+						break
+					}
+				}
+			} else if name != "" {
 				for _, repo := range env.Configuration().Mail {
 					if repo.Name == name {
+						conf = repo
 						path = repo.Path
 						break
 					}
@@ -128,6 +142,19 @@ func syncMailRepo() cli.Command {
 					"path":    path,
 				}))
 				return err
+			}
+
+			if !skipUpdate {
+				job = units.NewMailUpdaterJob(conf.Path, conf.MuPath, conf.Emacs, false)
+				grip.Infof("updating mu db: %s", job.ID())
+				job.Run(ctx)
+				if err = job.Error(); err != nil {
+					notify.Error(message.WrapError(err, message.Fields{
+						"message": "problem updating mail database",
+						"emacs":   conf.Emacs,
+					}))
+					return err
+				}
 			}
 
 			notify.Notice(message.Fields{

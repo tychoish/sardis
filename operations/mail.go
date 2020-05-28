@@ -96,9 +96,7 @@ func syncMailRepo() cli.Command {
 			defer cancel()
 			defer env.Close(ctx)
 			var conf sardis.MailConf
-			grip.Info(name)
 			for _, repo := range env.Configuration().Mail {
-				grip.Notice(repo)
 				if repo.Name == name {
 					conf = repo
 					break

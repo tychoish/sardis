@@ -314,7 +314,5 @@ func (c *appServicesCache) Twitter() grip.Journaler {
 		return c.logger
 	}
 
-	logger := logging.MakeGrip(twitter)
-
-	return logger
+	return logging.MakeGrip(send.NewConfiguredMultiSender(twitter, grip.GetSender()))
 }

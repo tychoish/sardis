@@ -65,6 +65,47 @@ func updateRepos() cli.Command {
 	}
 }
 
+func cleanupeRepos() cli.Command {
+	const repoFlagName = "repo"
+	return cli.Command{
+		Name:  "update",
+		Usage: "update a local and remote git repository according to the config",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  repoFlagName,
+				Usage: "specify a local repository to updpate",
+			},
+		},
+		Before: mergeBeforeFuncs(requireConfig(), requireStringOrFirstArgSet(repoFlagName)),
+		Action: func(c *cli.Context) error {
+			repoName := c.String(repoFlagName)
+
+			env := sardis.GetEnvironment()
+			ctx, cancel := env.Context()
+			defer cancel()
+			defer env.Close(ctx)
+
+			queue := env.Queue()
+			conf := env.Configuration()
+			catcher := grip.NewBasicCatcher()
+
+			catcher.Add(units.SyncRepo(ctx, queue, conf, repoName))
+
+			for _, link := range conf.Links {
+				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(link)))
+			}
+
+			if catcher.HasErrors() {
+				return catcher.Resolve()
+			}
+
+			amboy.WaitInterval(ctx, queue, time.Millisecond)
+
+			return amboy.ResolveErrors(ctx, queue)
+		},
+	}
+}
+
 func syncRepo() cli.Command {
 	host, err := os.Hostname()
 	grip.Warning(err)

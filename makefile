@@ -48,7 +48,7 @@ test:
 	@grep -s -q -e "^PASS" $(buildDir)/test.ftdc.out
 coverage:$(buildDir)/cover.out
 	@go tool cover -func=$< | sed -E 's%github.com/.*/$(name)/%%' | column -t
-coverage-html:$(buildDir)/cover.html 
+coverage-html:$(buildDir)/cover.html
 
 benchmark:
 	go test -v -benchmem $(benchArgs) -timeout=20m ./...
@@ -103,6 +103,8 @@ vendor-clean:
 	rm -rf vendor/github.com/mongodb/grip/vendor/golang.org/x/sys
 	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/pkg/errors
 
+clean:
+	rm -rf $(name) $(buildDir)/$(name)
 
 .DEFAULT:build
 .PHONY:build test

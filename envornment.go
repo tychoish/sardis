@@ -301,7 +301,6 @@ func (c *appServicesCache) Twitter() grip.Journaler {
 	defer c.mutex.RUnlock()
 
 	conf := c.conf.Settings.Credentials.Twitter
-	grip.Info(conf)
 	twitter, err := send.MakeTwitterLogger(c.ctx, &send.TwitterOptions{
 		Name:           conf.Username + ".sardis",
 		ConsumerKey:    conf.ConsumerKey,
@@ -313,6 +312,14 @@ func (c *appServicesCache) Twitter() grip.Journaler {
 		grip.Critical(message.WrapError(err, "problem constructing twitter sender."))
 		return c.logger
 	}
+	root := grip.GetSender()
 
-	return logging.MakeGrip(send.NewConfiguredMultiSender(twitter, grip.GetSender()))
+	if err = twitter.SetErrorHandler(send.ErrorHandlerFromSender(root)); err != nil {
+		grip.Critical(message.WrapError(err, "problem error handler for twitter sender."))
+		return c.logger
+	}
+
+	logger := logging.MakeGrip(send.NewConfiguredMultiSender(twitter, root))
+
+	return logger
 }

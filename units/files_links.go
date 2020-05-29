@@ -49,14 +49,13 @@ func NewSymlinkCreateJob(conf sardis.LinkConf) amboy.Job {
 
 func (j *symlinkCreateJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
-
 	dst := filepath.Join(j.Conf.Path, j.Conf.Name)
 
-	if _, err := os.Stat(dst); !os.IsNotExist(err) {
+	if _, err := os.Stat(j.Conf.Path); !os.IsNotExist(err) {
 		if !j.Conf.Update {
 			return
 		}
-		target, err := filepath.EvalSymlinks(dst)
+		target, err := filepath.EvalSymlinks(j.Conf.Path)
 		if err != nil {
 			j.AddError(err)
 			return
@@ -68,20 +67,20 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 				"id":         j.ID(),
 				"op":         "removed incorrect link target",
 				"old_target": target,
-				"new_target": j.Conf.Target,
-				"link":       dst,
+				"name":       j.Conf.Name,
+				"target":     j.Conf.Target,
 				"err":        j.HasErrors(),
 			})
 		}
 	}
 
-	j.AddError(os.Symlink(j.Conf.Target, dst))
+	j.AddError(os.Symlink(j.Conf.Path, j.Conf.Target))
 
 	grip.Info(message.Fields{
 		"op":  "created new symbolic link",
 		"id":  j.ID(),
-		"src": j.Conf.Target,
-		"dst": dst,
+		"src": j.Conf.Path,
+		"dst": j.Conf.Target,
 		"err": j.HasErrors(),
 	})
 }

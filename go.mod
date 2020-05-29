@@ -5,10 +5,9 @@ go 1.14
 replace github.com/nutmegdevelopment/sumologic => github.com/tychoish/sumologic v0.0.0-20200521155714-c2840dd463d0
 
 require (
-	github.com/aws/aws-sdk-go v1.31.4 // indirect
-	github.com/deciduosity/amboy v0.0.0-20200522022153-94c42ab9205c
-	github.com/deciduosity/grip v0.0.0-20200524175003-6ec0c220be09
-	github.com/deciduosity/jasper v0.0.0-20200523230815-c72d4432c8d7
+	github.com/deciduosity/amboy v0.0.0-20200529182733-b32c6eeef7f5
+	github.com/deciduosity/grip v0.0.0-20200529193719-caaa6d86281e
+	github.com/deciduosity/jasper v0.0.0-20200525185637-a2512bf662c2
 	github.com/frankban/quicktest v1.10.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/mitchellh/go-homedir v1.1.0

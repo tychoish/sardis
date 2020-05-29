@@ -60,21 +60,21 @@ func (j *repoSyncRemoteJob) Run(ctx context.Context) {
 		"op": "running",
 	})
 
-	cmds := [][]string{}
-
-	for _, cmd := range j.PreHook {
-		cmds = append(cmds, []string{cmd})
-	}
-
-	cmds = append(cmds, []string{remoteUpdateCmdTemplate})
-
-	for _, cmd := range j.PostHook {
-		cmds = append(cmds, []string{cmd})
-	}
-
-	j.AddError(sardis.GetEnvironment().Jasper().CreateCommand(ctx).ID(j.ID()).
+	cmd := sardis.GetEnvironment().Jasper().CreateCommand(ctx).ID(j.ID()).
 		SetOutputSender(level.Info, grip.GetSender()).
-		Directory(j.Path).Host(j.Host).Extend(cmds).Run(ctx))
+		Directory(j.Path).Host(j.Host)
+
+	for _, c := range j.PreHook {
+		cmd.Add([]string{c})
+	}
+
+	cmd.Add([]string{fmt.Sprintf(syncCmdTemplate, j.ID())})
+
+	for _, c := range j.PostHook {
+		cmd.Add([]string{c})
+	}
+
+	j.AddError(cmd.Run(ctx))
 
 	grip.Info(message.Fields{
 		"op":     "completed repo sync",

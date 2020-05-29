@@ -24,11 +24,6 @@ func SyncRepo(ctx context.Context, queue amboy.Queue, conf *sardis.Configuration
 			continue
 		}
 		seen++
-		if repo.LocalSync {
-			catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path)))
-		} else if repo.Fetch {
-			catcher.Add(queue.Put(ctx, NewRepoFetchJob(repo)))
-		}
 
 		for _, mirror := range repo.Mirrors {
 			if strings.Contains(mirror, hostname) {
@@ -37,6 +32,12 @@ func SyncRepo(ctx context.Context, queue amboy.Queue, conf *sardis.Configuration
 				continue
 			}
 			catcher.Add(queue.Put(ctx, NewRepoSyncRemoteJob(mirror, repo.Path, repo.Pre, repo.Post)))
+		}
+
+		if repo.LocalSync {
+			catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path)))
+		} else if repo.Fetch {
+			catcher.Add(queue.Put(ctx, NewRepoFetchJob(repo)))
 		}
 	}
 

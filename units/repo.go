@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/deciduosity/amboy"
 	"github.com/deciduosity/grip"
@@ -33,6 +34,13 @@ func SyncRepo(ctx context.Context, queue amboy.Queue, conf *sardis.Configuration
 			}
 			catcher.Add(queue.Put(ctx, NewRepoSyncRemoteJob(mirror, repo.Path, repo.Pre, repo.Post)))
 		}
+
+		// wait here to make sure that the remote job has
+		// completed syncing.
+		//
+		// When we do larger syncing here, we might want to
+		// have more dependency system.
+		amboy.WaitInterval(ctx, queue, time.Millisecond)
 
 		if repo.LocalSync {
 			catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path)))

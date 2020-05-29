@@ -74,7 +74,7 @@ func syncMailRepo() cli.Command {
 	const nameFlagName = "name"
 	return cli.Command{
 		Name:  "repo",
-		Usage: "sync a local and remote git repository",
+		Usage: "sync a single local and remote git repository",
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  nameFlagName,
@@ -108,6 +108,9 @@ func syncMailRepo() cli.Command {
 			}
 
 			notify := env.Logger()
+			if skipUpdate {
+				conf.Emacs = ""
+			}
 
 			job := units.NewMailSyncJob(conf)
 			grip.Infof("starting: %s", job.ID())

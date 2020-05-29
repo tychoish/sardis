@@ -8,6 +8,7 @@ import (
 
 	"github.com/deciduosity/grip"
 	"github.com/deciduosity/grip/level"
+	"github.com/deciduosity/grip/send"
 	jaspercli "github.com/deciduosity/jasper/cli"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
@@ -94,6 +95,12 @@ func buildApp() *cli.App {
 func loggingSetup(name, priority string) {
 	grip.SetName(name)
 	sender := grip.GetSender()
+
+	sys, err := send.MakeSystemdLogger()
+	if err == nil {
+		sender = send.NewConfiguredMultiSender(sys, grip.GetSender())
+	}
+
 	li := sender.Level()
 	li.Threshold = level.FromString(priority)
 	sender.SetLevel(li)

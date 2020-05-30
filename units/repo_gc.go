@@ -4,11 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/deciduosity/amboy"
 	"github.com/deciduosity/amboy/dependency"
 	"github.com/deciduosity/amboy/job"
 	"github.com/deciduosity/amboy/registry"
+	"github.com/deciduosity/grip"
+	"github.com/deciduosity/grip/level"
+	"github.com/deciduosity/grip/message"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 )
@@ -21,7 +25,7 @@ type repoCleanupJob struct {
 const repoCleanupJobName = "repo-gc"
 
 func init() {
-	registry.AddJobType(repoCleanupJobName, func() amboy.Job { return repoCleanupJobFactoryt() })
+	registry.AddJobType(repoCleanupJobName, func() amboy.Job { return repoCleanupJobFactory() })
 }
 
 func repoCleanupJobFactory() *repoCleanupJob {
@@ -52,6 +56,17 @@ func (j *repoCleanupJob) Run(ctx context.Context) {
 	}
 
 	env := sardis.GetEnvironment()
+	sender := grip.GetSender()
 
-	j.AddError(env.Jasper().CreateCommand(ctx).Directory(j.Path).AppendArgs("git", "gc").Run(ctx))
+	startAt := time.Now()
+	j.AddError(env.Jasper().CreateCommand(ctx).
+		SetOutputSender(level.Info, sender).
+		SetErrorSender(level.Error, sender).
+		Directory(j.Path).AppendArgs("git", "gc").Run(ctx))
+
+	grip.Notice(message.Fields{
+		"op":   "git gc",
+		"repo": j.Path,
+		"secs": time.Since(startAt).Seconds(),
+	})
 }

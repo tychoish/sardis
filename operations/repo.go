@@ -7,6 +7,7 @@ import (
 	"github.com/deciduosity/amboy"
 	"github.com/deciduosity/grip"
 	"github.com/deciduosity/grip/message"
+	"github.com/deciduosity/utility"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
@@ -20,6 +21,7 @@ func Repo() cli.Command {
 		Subcommands: []cli.Command{
 			updateRepos(),
 			syncRepo(),
+			cleanupeRepos(),
 		},
 	}
 }
@@ -68,35 +70,43 @@ func updateRepos() cli.Command {
 func cleanupeRepos() cli.Command {
 	const repoFlagName = "repo"
 	return cli.Command{
-		Name:  "update",
-		Usage: "update a local and remote git repository according to the config",
+		Name:  "gc",
+		Usage: "run repository cleanup",
 		Flags: []cli.Flag{
-			cli.StringFlag{
+			cli.StringSliceFlag{
 				Name:  repoFlagName,
-				Usage: "specify a local repository to updpate",
+				Usage: "specify a local repository to cleanup",
 			},
 		},
-		Before: mergeBeforeFuncs(requireConfig(), requireStringOrFirstArgSet(repoFlagName)),
+		Before: setAllTailArguements(repoFlagName),
 		Action: func(c *cli.Context) error {
-			repoName := c.String(repoFlagName)
+			repos := c.StringSlice(repoFlagName)
 
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
 			defer env.Close(ctx)
 
-			queue := env.Queue()
-			conf := env.Configuration()
-			catcher := grip.NewBasicCatcher()
-
-			catcher.Add(units.SyncRepo(ctx, queue, conf, repoName))
-
-			for _, link := range conf.Links {
-				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(link)))
+			var allRepos bool
+			if len(repos) == 0 {
+				allRepos = true
 			}
 
-			if catcher.HasErrors() {
-				return catcher.Resolve()
+			queue := env.Queue()
+			catcher := grip.NewBasicCatcher()
+			for _, repo := range env.Configuration().Repo {
+				if !allRepos && !utility.StringSliceContains(repos, repo.Name) {
+					continue
+				}
+
+				catcher.Add(queue.Put(ctx, units.NewRepoCleanupJob(repo.Path)))
+			}
+			for _, repo := range env.Configuration().Mail {
+				if !allRepos && !utility.StringSliceContains(repos, repo.Name) {
+					continue
+				}
+
+				catcher.Add(queue.Put(ctx, units.NewRepoCleanupJob(repo.Path)))
 			}
 
 			amboy.WaitInterval(ctx, queue, time.Millisecond)

@@ -50,9 +50,10 @@ func (j *mailSyncJob) Run(ctx context.Context) {
 	}
 
 	if j.Conf.MuPath == "" || j.Conf.Emacs == "" {
-		grip.Info(message.Fields{
+		grip.Debug(message.Fields{
 			"message": "skipping mail update for repo",
 			"path":    j.Conf.Path,
+			"name":    j.Conf.Name,
 		})
 	} else {
 		jobs = append(jobs, NewMailUpdaterJob(j.Conf.Path, j.Conf.MuPath, j.Conf.Emacs, false))

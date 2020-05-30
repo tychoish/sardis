@@ -25,7 +25,10 @@ func main() {
 	// environment.
 	app := buildApp()
 	err := app.Run(os.Args)
-	grip.EmergencyFatal(err)
+	grip.Error(err)
+	if err != nil {
+		os.Exit(1)
+	}
 }
 
 func buildApp() *cli.App {
@@ -96,12 +99,12 @@ func loggingSetup(name, priority string) {
 	grip.SetName(name)
 	sender := grip.GetSender()
 
-	sys, err := send.MakeSystemdLogger()
-	if err == nil {
-		sender = send.NewConfiguredMultiSender(sys, grip.GetSender())
-	}
-
 	li := sender.Level()
 	li.Threshold = level.FromString(priority)
 	sender.SetLevel(li)
+
+	sys, err := send.NewSystemdLogger(name, send.LevelInfo{Threshold: level.FromString(priority), Default: level.Info})
+	if err == nil {
+		grip.SetSender(send.NewConfiguredMultiSender(sys, sender))
+	}
 }

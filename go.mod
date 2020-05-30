@@ -8,7 +8,7 @@ require (
 	github.com/deciduosity/amboy v0.0.0-20200529182733-b32c6eeef7f5
 	github.com/deciduosity/grip v0.0.0-20200529193719-caaa6d86281e
 	github.com/deciduosity/jasper v0.0.0-20200525185637-a2512bf662c2
-	github.com/frankban/quicktest v1.10.0 // indirect
+	github.com/deciduosity/utility v0.0.0-20200521233144-556c4888c866
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkg/errors v0.9.1

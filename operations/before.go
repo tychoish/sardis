@@ -94,3 +94,14 @@ func requireStringOrFirstArgSet(flagName string) cli.BeforeFunc {
 		return c.Set(flagName, value)
 	}
 }
+
+func setAllTailArguements(flagName string) cli.BeforeFunc {
+	return func(c *cli.Context) error {
+		for _, a := range c.Args().Tail() {
+			if err := c.Set(flagName, a); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}

@@ -24,6 +24,7 @@ import (
 	"github.com/deciduosity/amboy"
 	"github.com/deciduosity/amboy/queue"
 	"github.com/deciduosity/grip"
+	"github.com/deciduosity/grip/level"
 	"github.com/deciduosity/grip/logging"
 	"github.com/deciduosity/grip/message"
 	"github.com/deciduosity/grip/send"
@@ -119,7 +120,7 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 
 func (c *appServicesCache) initSender() error {
 	root := grip.GetSender()
-	levels := root.Level()
+	levels := send.LevelInfo{Default: level.Notice, Threshold: level.Info}
 	sender, err := send.NewXMPPLogger(
 		c.conf.Settings.Notification.Name,
 		c.conf.Settings.Notification.Target,

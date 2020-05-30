@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/shlex"
 	"github.com/deciduosity/amboy"
 	"github.com/deciduosity/amboy/dependency"
 	"github.com/deciduosity/amboy/job"
@@ -86,72 +85,21 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 		j.AddError(errors.Errorf("path '%s' does not exist", j.Path))
 	}
 
-	cmds := [][]string{}
+	err := sardis.GetEnvironment().Jasper().CreateCommand(ctx).Priority(level.Info).
+		ID(j.ID()).Directory(j.Path).SetCombinedSender(level.Info, grip.GetSender()).
+		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && ", j.Path)+fmt.Sprintf(syncCmdTemplate, j.ID())).
+		Append(j.PreHook...).
+		AppendArgs("git", "add", "-A").
+		AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", "origin", "master").
+		Bash("git ls-files -d | xargs -r git rm --ignore-unmatch --quiet -- ").
+		AppendArgs("git", "add", "-A").
+		Bash(fmt.Sprintf("git commit -a -m 'update: (%s)' || true", j.ID())).
+		AppendArgs("git", "push").
+		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, fmt.Sprintf(syncCmdTemplate, j.ID()))).
+		AppendArgsWhen(!j.isLocal(), "git", "pull", "--keep", "--rebase", "--autostash", "origin", "master").
+		Append(j.PostHook...).Run(ctx)
 
-	if !j.isLocal() {
-		cmds = append(cmds,
-			[]string{"ssh", j.Host,
-				fmt.Sprintf("cd %s && ", j.Path) + fmt.Sprintf(syncCmdTemplate, j.ID()),
-			})
-	}
-
-	for _, cmd := range j.PreHook {
-		args, err := shlex.Split(cmd)
-		if err != nil {
-			j.AddError(err)
-			continue
-		}
-
-		cmds = append(cmds, args)
-	}
-
-	cmds = append(cmds,
-		[]string{"git", "add", "-A"},
-		[]string{"git", "pull", "--keep", "--rebase", "--autostash", "origin", "master"},
-		[]string{"bash", "-c", "git ls-files -d | xargs -r git rm --ignore-unmatch --quiet -- "},
-		[]string{"git", "add", "-A"},
-		[]string{"bash", "-c", fmt.Sprintf("git commit -a -m 'update: (%s)' || true", j.ID())},
-		[]string{"git", "push"},
-	)
-
-	if !j.isLocal() {
-		cmds = append(cmds,
-			[]string{"ssh", j.Host, fmt.Sprintf("cd %s && ", j.Path) + fmt.Sprintf(syncCmdTemplate, j.ID())},
-			[]string{"git", "pull", "--keep", "--rebase", "--autostash", "origin", "master"},
-		)
-	}
-
-	for _, cmd := range j.PostHook {
-		args, err := shlex.Split(cmd)
-		if err != nil {
-			j.AddError(err)
-			continue
-		}
-
-		cmds = append(cmds, args)
-	}
-
-	if j.HasErrors() {
-		return
-	}
-
-	jpm := sardis.GetEnvironment().Jasper()
-
-	for idx, cmd := range cmds {
-		jpm.CreateCommand(ctx).ID(j.ID()).Add(cmd).Directory(j.Path).
-			SetCombinedSender(level.Info, grip.GetSender()).
-			Prerequisite(func() bool {
-				grip.Debug(message.Fields{
-					"args":  cmd,
-					"path":  j.Path,
-					"job":   j.ID(),
-					"num":   idx,
-					"total": len(cmds),
-				})
-				return true
-			}).Run(ctx)
-
-	}
+	j.AddError(err)
 
 	grip.Info(message.Fields{
 		"op":     "completed repo sync",

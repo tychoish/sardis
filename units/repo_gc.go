@@ -56,13 +56,11 @@ func (j *repoCleanupJob) Run(ctx context.Context) {
 	}
 
 	env := sardis.GetEnvironment()
-	sender := grip.GetSender()
-
 	startAt := time.Now()
 	j.AddError(env.Jasper().CreateCommand(ctx).
-		SetOutputSender(level.Info, sender).
-		SetErrorSender(level.Error, sender).
-		Directory(j.Path).AppendArgs("git", "gc").Run(ctx))
+		Directory(j.Path).AppendArgs("git", "gc").
+		SetCombinedSender(level.Info, grip.GetSender()).
+		Run(ctx))
 
 	grip.Notice(message.Fields{
 		"op":   "git gc",

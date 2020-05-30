@@ -19,14 +19,15 @@ func Repo() cli.Command {
 		Name:  "repo",
 		Usage: "a collections of commands to manage repositories",
 		Subcommands: []cli.Command{
-			updateRepos(),
-			syncRepo(),
-			cleanupeRepos(),
+			repoUpdate(),
+			repoSync(),
+			repoCleanup(),
+			repoStatus(),
 		},
 	}
 }
 
-func updateRepos() cli.Command {
+func repoUpdate() cli.Command {
 	const repoFlagName = "repo"
 	return cli.Command{
 		Name:  "update",
@@ -67,7 +68,7 @@ func updateRepos() cli.Command {
 	}
 }
 
-func cleanupeRepos() cli.Command {
+func repoCleanup() cli.Command {
 	const repoFlagName = "repo"
 	return cli.Command{
 		Name:  "gc",
@@ -116,7 +117,7 @@ func cleanupeRepos() cli.Command {
 	}
 }
 
-func syncRepo() cli.Command {
+func repoSync() cli.Command {
 	host, err := os.Hostname()
 	grip.Warning(err)
 	const nameFlagName = "name"
@@ -188,4 +189,52 @@ func syncRepo() cli.Command {
 			return nil
 		},
 	}
+}
+
+func repoStatus() cli.Command {
+	const repoFlagName = "repo"
+	return cli.Command{
+		Name:  "status",
+		Usage: "report on the status of repos",
+		Flags: []cli.Flag{
+			cli.StringSliceFlag{
+				Name:  repoFlagName,
+				Usage: "specify a local repository to cleanup",
+			},
+		},
+		Before: setAllTailArguements(repoFlagName),
+		Action: func(c *cli.Context) error {
+			repos := c.StringSlice(repoFlagName)
+			var allRepos bool
+			if len(repos) == 0 {
+				allRepos = true
+			}
+
+			env := sardis.GetEnvironment()
+			ctx, cancel := env.Context()
+			defer cancel()
+			defer env.Close(ctx)
+
+			catcher := grip.NewBasicCatcher()
+			for _, repo := range env.Configuration().Repo {
+				if !allRepos && !utility.StringSliceContains(repos, repo.Name) {
+					continue
+				}
+				j := units.NewRepoStatusJob(repo.Path)
+				j.Run(ctx)
+				catcher.Add(j.Error())
+			}
+			for _, repo := range env.Configuration().Mail {
+				if !allRepos && !utility.StringSliceContains(repos, repo.Name) {
+					continue
+				}
+
+				j := units.NewRepoStatusJob(repo.Path)
+				j.Run(ctx)
+				catcher.Add(j.Error())
+			}
+			return catcher.Resolve()
+		},
+	}
+
 }

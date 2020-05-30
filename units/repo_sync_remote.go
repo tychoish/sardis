@@ -55,26 +55,22 @@ func NewRepoSyncRemoteJob(host, path string, pre, post []string) amboy.Job {
 
 func (j *repoSyncRemoteJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
+
 	grip.Info(message.Fields{
 		"id": j.ID(),
 		"op": "running",
 	})
 
-	cmd := sardis.GetEnvironment().Jasper().CreateCommand(ctx).ID(j.ID()).
+	err := sardis.GetEnvironment().Jasper().CreateCommand(ctx).
+		ID(j.ID()).Priority(level.Info).
+		Directory(j.Path).Host(j.Host).
 		SetOutputSender(level.Info, grip.GetSender()).
-		Directory(j.Path).Host(j.Host)
+		Append(j.PreHook...).
+		AppendArgs(fmt.Sprintf(syncCmdTemplate, j.ID())).
+		Append(j.PostHook...).
+		Run(ctx)
 
-	for _, c := range j.PreHook {
-		cmd.Add([]string{c})
-	}
-
-	cmd.Add([]string{fmt.Sprintf(syncCmdTemplate, j.ID())})
-
-	for _, c := range j.PostHook {
-		cmd.Add([]string{c})
-	}
-
-	j.AddError(cmd.Run(ctx))
+	j.AddError(err)
 
 	grip.Info(message.Fields{
 		"op":     "completed repo sync",

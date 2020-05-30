@@ -61,20 +61,18 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 		return
 	}
 
-	jpm := sardis.GetEnvironment().Jasper()
+	cmd := sardis.GetEnvironment().Jasper().CreateCommand(ctx)
 
-	j.AddError(jpm.CreateCommand(ctx).ID(j.ID()).SetOutputSender(level.Debug, grip.GetSender()).
+	j.AddError(cmd.ID(j.ID()).Directory(j.Conf.Path).
+		SetOutputSender(level.Info, grip.GetSender()).
 		Append("git", "pull", "--keep", "--rebase", "--autostash", j.Conf.RemoteName, j.Conf.Branch).
-		Directory(j.Conf.Path).Run(ctx))
+		Add(j.Conf.Post).
+		Run(ctx))
 
-	if j.HasErrors() {
-		return
-	}
-
-	if j.Conf.Post == nil {
-		return
-	}
-
-	j.AddError(jpm.CreateCommand(ctx).ID(j.ID()).SetOutputSender(level.Info, grip.GetSender()).
-		Directory(j.Conf.Path).Add(j.Conf.Post).Run(ctx))
+	grip.Notice(message.Fields{
+		"path":   j.Conf.Path,
+		"repo":   j.Conf.Remote,
+		"errors": j.HasErrors(),
+		"op":     "repo fetch",
+	})
 }

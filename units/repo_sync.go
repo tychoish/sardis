@@ -85,6 +85,11 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 		j.AddError(errors.Errorf("path '%s' does not exist", j.Path))
 	}
 
+	grip.Info(message.Fields{
+		"id": j.ID(),
+		"op": "running",
+	})
+
 	err := sardis.GetEnvironment().Jasper().CreateCommand(ctx).Priority(level.Info).
 		ID(j.ID()).Directory(j.Path).SetCombinedSender(level.Info, grip.GetSender()).
 		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && ", j.Path)+fmt.Sprintf(syncCmdTemplate, j.ID())).

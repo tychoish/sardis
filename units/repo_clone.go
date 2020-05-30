@@ -68,20 +68,20 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 		return
 	}
 
-	jpm := sardis.GetEnvironment().Jasper()
+	cmd := sardis.GetEnvironment().Jasper().CreateCommand(ctx)
 
-	j.AddError(jpm.CreateCommand(ctx).
+	j.AddError(cmd.ID(j.ID()).
+		Priority(level.Info).
+		Directory(j.Conf.Path).
+		SetOutputSender(level.Info, grip.GetSender()).
 		AppendArgs("git", "clone", j.Conf.Remote, j.Conf.Path).
-		SetOutputSender(level.Debug, grip.GetSender()).ID(j.ID()).Directory(j.Conf.Path).Run(ctx))
+		Add(j.Conf.Post).
+		Run(ctx))
 
-	if j.HasErrors() {
-		return
-	}
-
-	if j.Conf.Post == nil {
-		return
-	}
-
-	j.AddError(jpm.CreateCommand(ctx).Add(j.Conf.Post).ID(j.ID()).Directory(j.Conf.Path).
-		SetOutputSender(level.Info, grip.GetSender()).Run(ctx))
+	grip.Notice(message.Fields{
+		"path":   j.Conf.Path,
+		"repo":   j.Conf.Remote,
+		"errors": j.HasErrors(),
+		"op":     "repo clone",
+	})
 }

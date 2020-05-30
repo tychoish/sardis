@@ -55,16 +55,25 @@ func (j *repoCleanupJob) Run(ctx context.Context) {
 		return
 	}
 
-	env := sardis.GetEnvironment()
+	grip.Info(message.Fields{
+		"id": j.ID(),
+		"op": "running",
+	})
+
+	cmd := sardis.GetEnvironment().Jasper()
+
 	startAt := time.Now()
-	j.AddError(env.Jasper().CreateCommand(ctx).
-		Directory(j.Path).AppendArgs("git", "gc").
+
+	j.AddError(cmd.CreateCommand(ctx).Priority(level.Info).
+		ID(j.ID()).Directory(j.Path).
 		SetCombinedSender(level.Info, grip.GetSender()).
+		AppendArgs("git", "gc").
 		Run(ctx))
 
 	grip.Notice(message.Fields{
-		"op":   "git gc",
-		"repo": j.Path,
-		"secs": time.Since(startAt).Seconds(),
+		"op":     "git gc",
+		"repo":   j.Path,
+		"secs":   time.Since(startAt).Seconds(),
+		"errors": j.HasErrors(),
 	})
 }

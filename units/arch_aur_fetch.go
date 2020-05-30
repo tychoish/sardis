@@ -73,5 +73,7 @@ func (j *archAurFetchJob) Run(ctx context.Context) {
 		return
 	}
 
-	j.AddError(env.Jasper().CreateCommand(ctx).AppendArgs(args...).SetOutputSender(level.Debug, grip.GetSender()).ID(j.ID()).Directory(dir).Run(ctx))
+	j.AddError(env.Jasper().CreateCommand(ctx).ID(j.ID()).Directory(dir).
+		Priority(level.Info).SetOutputSender(level.Debug, grip.GetSender()).
+		AppendArgs(args...).Run(ctx))
 }

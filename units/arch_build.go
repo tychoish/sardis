@@ -63,7 +63,7 @@ func (j *archAbsBuildJob) Run(ctx context.Context) {
 		return
 	}
 
-	j.AddError(env.Jasper().CreateCommand(ctx).
+	j.AddError(env.Jasper().CreateCommand(ctx).ID(j.ID()).Priority(level.Info).
 		AppendArgs("makepkg", "--syncdeps", "--force", "--install", "--noconfirm").
 		SetOutputSender(level.Info, grip.GetSender()).ID(j.ID()).Directory(dir).Run(ctx))
 }

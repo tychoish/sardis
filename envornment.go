@@ -58,6 +58,7 @@ type Environment interface {
 	Twitter() grip.Journaler
 	JiraIssue() grip.Journaler
 
+	AddCloseError(string, error)
 	RegisterCloser(string, CloserFunc)
 	Close(context.Context) error
 }
@@ -75,6 +76,7 @@ type appServicesCache struct {
 	conf       *Configuration
 	logger     grip.Journaler
 	jiraIssue  grip.Journaler
+	twitter    grip.Journaler
 	jpm        jasper.Manager
 	ctx        context.Context
 	rootCancel context.CancelFunc
@@ -104,22 +106,22 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 	catcher.Add(err)
 
 	catcher.Add(conf.Validate())
-	catcher.Add(c.initSender())
 	catcher.Add(c.initQueue())
-	catcher.Add(c.initJira())
 
-	c.closers = append(c.closers,
-		closerOp{
-			name:   "close jasper manager",
-			closer: c.jpm.Close,
-		},
-	)
+	c.appendCloser("close-jasper", c.jpm.Close)
 
 	return catcher.Resolve()
 }
 
 func (c *appServicesCache) initSender() error {
 	root := grip.GetSender()
+
+	var loggers []send.Sender
+	defer func() {
+		loggers = append(loggers, root)
+		c.logger = logging.MakeGrip(send.NewConfiguredMultiSender(loggers...))
+	}()
+
 	levels := send.LevelInfo{Default: level.Notice, Threshold: level.Info}
 	sender, err := send.NewXMPPLogger(
 		c.conf.Settings.Notification.Name,
@@ -133,11 +135,8 @@ func (c *appServicesCache) initSender() error {
 	if err != nil {
 		return errors.Wrap(err, "problem creating sender")
 	}
-
-	desktop, err := send.NewDesktopNotify(c.conf.Settings.Notification.Name, levels)
-	if err != nil {
-		return errors.Wrap(err, "problem creating sender")
-	}
+	loggers = append(loggers, sender)
+	c.appendCloser("sender-notify", func(_ context.Context) error { return sender.Close() })
 
 	host, err := os.Hostname()
 	if err != nil {
@@ -154,18 +153,26 @@ func (c *appServicesCache) initSender() error {
 		return errors.Wrap(err, "problem setting formatter")
 	}
 
-	c.logger = logging.MakeGrip(send.NewConfiguredMultiSender(sender, desktop, root))
-	c.closers = append(c.closers, closerOp{
-		name:   "sender-notify",
-		closer: func(_ context.Context) error { return sender.Close() },
-	})
+	desktop, err := send.NewDesktopNotify(c.conf.Settings.Notification.Name, levels)
+	if err != nil {
+		return errors.Wrap(err, "problem creating sender")
+	}
+	loggers = append(loggers, desktop)
+
 	return nil
 }
 
 func (c *appServicesCache) initJira() error {
+	root := grip.GetSender()
+	loggers := []send.Sender{}
+	defer func() {
+		loggers = append(loggers, root)
+		c.jiraIssue = logging.MakeGrip(send.NewConfiguredMultiSender(loggers...))
+	}()
+
 	if c.conf.Settings.Credentials.Jira.URL == "" {
-		grip.Debug("no jira instance specified, skipping jira logger")
-		c.jiraIssue = logging.MakeGrip(grip.GetSender())
+		grip.Warning("jira credentials are not configured")
+		return nil
 	}
 
 	sender, err := send.MakeJiraLogger(c.ctx, &send.JiraOptions{
@@ -180,17 +187,41 @@ func (c *appServicesCache) initJira() error {
 	if err != nil {
 		return errors.Wrap(err, "problem setting up jira logger")
 	}
+	loggers = append(loggers, sender)
+	c.appendCloser("sender-jira-issue", func(_ context.Context) error { return sender.Close() })
 
-	if err := sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.GetSender())); err != nil {
+	if err := sender.SetErrorHandler(send.ErrorHandlerFromSender(root)); err != nil {
 		return errors.Wrap(err, "problem setting error handler")
 	}
 
-	c.closers = append(c.closers, closerOp{
-		name:   "sender-jira-issues",
-		closer: func(_ context.Context) error { return sender.Close() },
+	return nil
+}
+
+func (c *appServicesCache) initTwitter() error {
+	root := grip.GetSender()
+	loggers := []send.Sender{}
+	defer func() {
+		loggers = append(loggers, root)
+		c.twitter = logging.MakeGrip(send.NewConfiguredMultiSender(loggers...))
+	}()
+
+	conf := c.conf.Settings.Credentials.Twitter
+	twitter, err := send.MakeTwitterLogger(c.ctx, &send.TwitterOptions{
+		Name:           conf.Username + ".sardis",
+		ConsumerKey:    conf.ConsumerKey,
+		ConsumerSecret: conf.ConsumerSecret,
+		AccessSecret:   conf.OauthSecret,
+		AccessToken:    conf.OauthToken,
 	})
 
-	c.jiraIssue = logging.MakeGrip(sender)
+	if err != nil {
+		return errors.Wrap(err, "problem constructing twitter sender.")
+	}
+
+	if err = twitter.SetErrorHandler(send.ErrorHandlerFromSender(root)); err != nil {
+		return errors.Wrap(err, "problem error handler for twitter sender.")
+	}
+
 	return nil
 }
 
@@ -235,6 +266,22 @@ func (c *appServicesCache) Context() (context.Context, context.CancelFunc) {
 	return context.WithCancel(c.ctx)
 }
 
+func (c *appServicesCache) AddCloseError(name string, err error) {
+	if err == nil {
+		return
+	}
+
+	c.RegisterCloser(name, func(_ context.Context) error { return err })
+}
+
+func (c *appServicesCache) addError(name string, err error) {
+	if err == nil {
+		return
+	}
+
+	c.appendCloser(name, func(_ context.Context) error { return err })
+}
+
 func (c *appServicesCache) Close(ctx context.Context) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -261,11 +308,15 @@ func (c *appServicesCache) Close(ctx context.Context) error {
 	return catcher.Resolve()
 }
 
+func (c *appServicesCache) appendCloser(name string, fn CloserFunc) {
+	c.closers = append(c.closers, closerOp{name: name, closer: fn})
+}
+
 func (c *appServicesCache) RegisterCloser(n string, cf CloserFunc) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	c.closers = append(c.closers, closerOp{name: n, closer: cf})
+	c.appendCloser(n, cf)
 }
 
 func (c *appServicesCache) Configuration() *Configuration {
@@ -285,42 +336,58 @@ func (c *appServicesCache) Configuration() *Configuration {
 
 func (c *appServicesCache) Logger() grip.Journaler {
 	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	if c.logger != nil {
+		c.mutex.RUnlock()
+		return c.logger
+	}
+	c.mutex.RUnlock()
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	err := c.initSender()
+
+	grip.Critical(message.WrapError(err, "problem configuring notification sender"))
+	c.addError("notify-constructor", err)
 
 	return c.logger
 }
 
 func (c *appServicesCache) JiraIssue() grip.Journaler {
 	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	if c.jiraIssue != nil {
+		c.mutex.RUnlock()
+		return c.logger
+	}
+	c.mutex.RUnlock()
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	err := c.initJira()
+
+	grip.Critical(message.WrapError(err, "problem configuring jira connection"))
+	c.addError("jira-constructor", err)
 
 	return c.jiraIssue
 }
 
 func (c *appServicesCache) Twitter() grip.Journaler {
 	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-
-	conf := c.conf.Settings.Credentials.Twitter
-	twitter, err := send.MakeTwitterLogger(c.ctx, &send.TwitterOptions{
-		Name:           conf.Username + ".sardis",
-		ConsumerKey:    conf.ConsumerKey,
-		ConsumerSecret: conf.ConsumerSecret,
-		AccessSecret:   conf.OauthSecret,
-		AccessToken:    conf.OauthToken,
-	})
-	if err != nil {
-		grip.Critical(message.WrapError(err, "problem constructing twitter sender."))
-		return c.logger
+	if c.twitter != nil {
+		c.mutex.RUnlock()
+		return c.twitter
 	}
-	root := grip.GetSender()
+	c.mutex.RUnlock()
 
-	if err = twitter.SetErrorHandler(send.ErrorHandlerFromSender(root)); err != nil {
-		grip.Critical(message.WrapError(err, "problem error handler for twitter sender."))
-		return c.logger
-	}
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
-	logger := logging.MakeGrip(send.NewConfiguredMultiSender(twitter, root))
+	err := c.initTwitter()
 
-	return logger
+	grip.Critical(message.WrapError(err, "problem configuring twitter client"))
+	c.addError("twitter-constructor", err)
+
+	return c.jiraIssue
+
 }

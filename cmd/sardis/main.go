@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/deciduosity/grip"
 	"github.com/deciduosity/grip/level"
@@ -102,9 +103,13 @@ func loggingSetup(name, priority string) {
 	li := sender.Level()
 	li.Threshold = level.FromString(priority)
 	sender.SetLevel(li)
-
-	sys, err := send.NewSystemdLogger(name, send.LevelInfo{Threshold: level.FromString(priority), Default: level.Info})
-	if err == nil {
-		grip.SetSender(send.NewConfiguredMultiSender(sys, sender))
+	if runtime.GOOS == "linux" {
+		sys := send.MakeDefaultSystem()
+		catcher := grip.NewBasicCatcher()
+		catcher.Add(sys.SetLevel(send.LevelInfo{Threshold: level.FromString(priority), Default: level.Info}))
+		catcher.Add(sys.SetName(name))
+		if !catcher.HasErrors() {
+			grip.SetSender(send.NewConfiguredMultiSender(sys, sender))
+		}
 	}
 }

@@ -3,6 +3,7 @@ package operations
 import (
 	"fmt"
 
+	"github.com/cheynewallace/tabby"
 	"github.com/deciduosity/grip"
 	"github.com/deciduosity/grip/level"
 	"github.com/deciduosity/grip/message"
@@ -14,12 +15,16 @@ import (
 func RunCommand() cli.Command {
 	const commandFlagName = "command"
 	return cli.Command{
-		Name: "run",
+		Name:  "run",
+		Usage: "runs a predefined command",
 		Flags: []cli.Flag{
 			cli.StringSliceFlag{
 				Name:  joinFlagNames(commandFlagName, "c"),
 				Usage: "specify a default flag name",
 			},
+		},
+		Subcommands: []cli.Command{
+			listCommands(),
 		},
 		Before: mergeBeforeFuncs(
 			requireConfig(),
@@ -59,5 +64,25 @@ func RunCommand() cli.Command {
 			return nil
 		},
 	}
+}
 
+func listCommands() cli.Command {
+	return cli.Command{
+		Name:   "list",
+		Usage:  "return a list of defined commands",
+		Before: requireConfig(),
+		Action: func(c *cli.Context) error {
+			env := sardis.GetEnvironment()
+
+			table := tabby.New()
+			table.AddHeader("Name", "Command", "Directory")
+			for _, cmd := range env.Configuration().Commands {
+				table.AddLine(cmd.Name, cmd.Command, cmd.Directory)
+			}
+
+			table.Print()
+
+			return nil
+		},
+	}
 }

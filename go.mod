@@ -5,6 +5,7 @@ go 1.14
 replace github.com/nutmegdevelopment/sumologic => github.com/tychoish/sumologic v0.0.0-20200521155714-c2840dd463d0
 
 require (
+	github.com/cheynewallace/tabby v1.1.0
 	github.com/deciduosity/amboy v0.0.0-20200529182733-b32c6eeef7f5
 	github.com/deciduosity/grip v0.0.0-20200529193719-caaa6d86281e
 	github.com/deciduosity/jasper v0.0.0-20200525185637-a2512bf662c2

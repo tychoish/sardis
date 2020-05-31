@@ -38,7 +38,6 @@ func buildApp() *cli.App {
 	app.Version = "0.0.1-pre"
 
 	app.Commands = []cli.Command{
-		operations.HelloWorld(),
 		operations.Notify(),
 		operations.Tweet(),
 		operations.Version(),

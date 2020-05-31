@@ -13,7 +13,7 @@ import (
 
 func Notify() cli.Command {
 	return cli.Command{
-		Name:  "xmpp",
+		Name:  "notify, xmpp",
 		Usage: "send an xmpp message",
 		Subcommands: []cli.Command{
 			notifyPipe(),

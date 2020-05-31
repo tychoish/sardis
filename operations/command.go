@@ -29,7 +29,7 @@ func RunCommand() cli.Command {
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
-			defer env.Close(ctx)
+
 			conf := env.Configuration()
 
 			cmds := conf.ExportCommands()

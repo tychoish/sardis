@@ -88,8 +88,9 @@ func buildApp() *cli.App {
 
 	}
 	app.After = func(c *cli.Context) error {
+		err := sardis.GetEnvironment().Close(ctx)
 		cancel()
-		return nil
+		return err
 	}
 
 	return app
@@ -104,11 +105,14 @@ func loggingSetup(name, priority string) {
 	li.Threshold = level.FromString(priority)
 	sender.SetLevel(li)
 	if runtime.GOOS == "linux" {
-		sys := send.MakeDefaultSystem()
-		catcher := grip.NewBasicCatcher()
-		catcher.Add(sys.SetLevel(send.LevelInfo{Threshold: level.FromString(priority), Default: level.Info}))
-		catcher.Add(sys.SetName(name))
-		if !catcher.HasErrors() {
+		sys, err := send.MakeDefaultSystem()
+		if err != nil {
+			return
+		}
+		sys.SetName(name)
+
+		err = sys.SetLevel(send.LevelInfo{Threshold: level.FromString(priority), Default: level.Info})
+		if err != nil {
 			grip.SetSender(send.NewConfiguredMultiSender(sys, sender))
 		}
 	}

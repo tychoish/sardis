@@ -45,7 +45,6 @@ func repoUpdate() cli.Command {
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
-			defer env.Close(ctx)
 
 			queue := env.Queue()
 			conf := env.Configuration()
@@ -86,7 +85,6 @@ func repoCleanup() cli.Command {
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
-			defer env.Close(ctx)
 
 			var allRepos bool
 			if len(repos) == 0 {
@@ -141,7 +139,6 @@ func repoSync() cli.Command {
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
-			defer env.Close(ctx)
 
 			notify := env.Logger()
 			conf := env.Configuration()
@@ -213,7 +210,6 @@ func repoStatus() cli.Command {
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
-			defer env.Close(ctx)
 
 			catcher := grip.NewBasicCatcher()
 			for _, repo := range env.Configuration().Repo {

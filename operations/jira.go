@@ -38,7 +38,6 @@ func bulkCreateTickets() cli.Command {
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
-			defer env.Close(ctx)
 
 			conf := env.Configuration()
 			if conf.Settings.Credentials.Jira.URL == "" {

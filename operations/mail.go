@@ -60,7 +60,6 @@ func updateDB() cli.Command {
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
-			defer env.Close(ctx)
 
 			job := units.NewMailUpdaterJob(c.String("mail"), c.String("mu"), c.String("daemon"), c.Bool("rebuild"))
 			job.Run(ctx)
@@ -94,7 +93,7 @@ func syncMailRepo() cli.Command {
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
-			defer env.Close(ctx)
+
 			var conf sardis.MailConf
 			for _, repo := range env.Configuration().Mail {
 				if repo.Name == name {
@@ -161,7 +160,6 @@ func syncAllMailRepos() cli.Command {
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
-			defer env.Close(ctx)
 
 			notify := env.Logger()
 			queue := env.Queue()

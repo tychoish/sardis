@@ -41,6 +41,7 @@ func buildApp() *cli.App {
 		operations.Notify(),
 		operations.Tweet(),
 		operations.Version(),
+		operations.Admin(),
 		operations.Mail(),
 		operations.ArchLinux(),
 		operations.Repo(),

@@ -148,12 +148,6 @@ func repoSync() cli.Command {
 					j := units.NewMailSyncJob(repo)
 					j.Run(ctx)
 					if err := j.Error(); err != nil {
-						notify.Error(message.WrapError(err, message.Fields{
-							"message": "encountered problem syncing repository",
-							"host":    host,
-							"repo":    name,
-						}))
-
 						return errors.Wrap(j.Error(), "problem syncing mail repo")
 					}
 					return nil
@@ -168,12 +162,6 @@ func repoSync() cli.Command {
 			amboy.WaitInterval(ctx, queue, time.Millisecond)
 
 			if err := amboy.ResolveErrors(ctx, queue); err != nil {
-				notify.Error(message.WrapError(err, message.Fields{
-					"message": "encountered problem syncing repository",
-					"host":    host,
-					"repo":    name,
-				}))
-
 				return errors.Wrap(err, "problem found executing jobs")
 			}
 

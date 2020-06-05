@@ -12,6 +12,7 @@ import (
 	"github.com/deciduosity/grip"
 	"github.com/deciduosity/grip/level"
 	"github.com/deciduosity/grip/message"
+	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 )
 
@@ -61,12 +62,18 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 		return
 	}
 
+	if j.Conf.RemoteName == "" || j.Conf.Branch == "" {
+		j.AddError(errors.New("repo-fetch requires defined remote name and branch for the repo"))
+		return
+	}
+
 	cmd := sardis.GetEnvironment().Jasper().CreateCommand(ctx)
 
 	j.AddError(cmd.ID(j.ID()).Directory(j.Conf.Path).
 		SetOutputSender(level.Info, grip.GetSender()).
-		Append("git", "pull", "--keep", "--rebase", "--autostash", j.Conf.RemoteName, j.Conf.Branch).
-		Add(j.Conf.Post).
+		Append(j.Conf.Pre...).
+		AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", j.Conf.RemoteName, j.Conf.Branch).
+		Append(j.Conf.Post...).
 		Run(ctx))
 
 	grip.Notice(message.Fields{

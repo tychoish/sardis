@@ -51,7 +51,7 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 	dst := filepath.Join(j.Conf.Path, j.Conf.Name)
 
-	if _, err := os.Stat(j.Conf.Path); !os.IsNotExist(err) {
+	if _, err := os.Stat(j.Conf.Path); os.IsNotExist(err) {
 		if !j.Conf.Update {
 			return
 		}

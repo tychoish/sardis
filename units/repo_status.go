@@ -56,8 +56,9 @@ func (j *repoStatusJob) Run(ctx context.Context) {
 	}
 
 	grip.Info(message.Fields{
-		"id": j.ID(),
-		"op": "running",
+		"id":   j.ID(),
+		"op":   "running",
+		"path": j.Path,
 	})
 
 	cmd := sardis.GetEnvironment().Jasper()

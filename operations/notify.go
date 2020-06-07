@@ -13,8 +13,9 @@ import (
 
 func Notify() cli.Command {
 	return cli.Command{
-		Name:  "notify, xmpp",
-		Usage: "send an xmpp message",
+		Name:    "notify",
+		Aliases: []string{"xmpp"},
+		Usage:   "send an xmpp message",
 		Subcommands: []cli.Command{
 			notifyPipe(),
 			notifySend(),

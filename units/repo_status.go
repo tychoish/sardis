@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/deciduosity/amboy"
@@ -69,6 +70,8 @@ func (j *repoStatusJob) Run(ctx context.Context) {
 		ID(j.ID()).Directory(j.Path).
 		SetOutputSender(level.Info, grip.GetSender()).
 		AppendArgs("git", "status").
+		AppendArgs("git", "log", "--date=relative", "--decorate", "-n", "1",
+			fmt.Sprintf("--format=%s:", filepath.Base(j.Path))+`%N (%cr) "%s"`).
 		Run(ctx))
 
 	grip.Debug(message.Fields{

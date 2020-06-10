@@ -15,8 +15,8 @@ import (
 
 type HostConf struct {
 	Name     string `bson:"name" json:"name" yaml:"name"`
-	User     string `bson:"host" json:"host" yaml:"host"`
-	Hostname string `bson:"host_name" json:"host_name" yaml:"host_name"`
+	User     string `bson:"user" json:"user" yaml:"user"`
+	Hostname string `bson:"host" json:"host" yaml:"host"`
 	Port     int    `bson:"port" json:"port" yaml:"port"`
 	Protocol string `bson:"protocol" json:"protocol" yaml:"protocol"`
 }

@@ -32,7 +32,7 @@ func SyncRepo(ctx context.Context, queue amboy.Queue, conf *sardis.Configuration
 					repo.Path, mirror, hostname)
 				continue
 			}
-			catcher.Add(queue.Put(ctx, NewRepoSyncRemoteJob(mirror, repo.Path, repo.Pre, repo.Post)))
+			catcher.Add(queue.Put(ctx, NewRepoSyncRemoteJob(mirror, repo.Path, repo.Pre, nil)))
 		}
 
 		// wait here to make sure that the remote job has
@@ -43,7 +43,7 @@ func SyncRepo(ctx context.Context, queue amboy.Queue, conf *sardis.Configuration
 		amboy.WaitInterval(ctx, queue, time.Millisecond)
 
 		if repo.LocalSync {
-			catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path)))
+			catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path, repo.Pre, repo.Post)))
 		} else if repo.Fetch {
 			catcher.Add(queue.Put(ctx, NewRepoFetchJob(repo)))
 		}

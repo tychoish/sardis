@@ -43,10 +43,12 @@ func repoSyncFactory() *repoSyncJob {
 	return j
 }
 
-func NewLocalRepoSyncJob(path string) amboy.Job {
+func NewLocalRepoSyncJob(path string, pre, post []string) amboy.Job {
 	j := repoSyncFactory()
 	j.Host = "LOCAL"
 	j.Path = path
+	j.PreHook = pre
+	j.PostHook = post
 	j.SetID(j.buildID())
 	return j
 }

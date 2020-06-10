@@ -3,6 +3,8 @@ package units
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/deciduosity/amboy"
 	"github.com/deciduosity/amboy/dependency"
@@ -45,9 +47,17 @@ func NewMailSyncJob(conf sardis.MailConf) amboy.Job {
 func (j *mailSyncJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 
-	jobs := []amboy.Job{
-		NewRepoSyncJob(j.Conf.Remote, j.Conf.Path, nil, nil),
+	jobs := []amboy.Job{}
+	hostname, _ := os.Hostname()
+
+	for _, m := range j.Conf.Mirrors {
+		if strings.Contains(m, hostname) {
+			continue
+		}
+		jobs = append(jobs, NewRepoSyncRemoteJob(m, j.Conf.Path, nil, nil))
 	}
+
+	jobs = append(jobs, NewRepoSyncJob(j.Conf.Remote, j.Conf.Path, nil, nil))
 
 	if j.Conf.MuPath == "" || j.Conf.Emacs == "" {
 		grip.Debug(message.Fields{
@@ -70,5 +80,4 @@ func (j *mailSyncJob) Run(ctx context.Context) {
 			break
 		}
 	}
-
 }

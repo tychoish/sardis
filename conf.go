@@ -22,11 +22,12 @@ type Configuration struct {
 }
 
 type MailConf struct {
-	Name   string `bson:"name" json:"name" yaml:"name"`
-	Path   string `bson:"path" json:"path" yaml:"path"`
-	Remote string `bson:"remote" json:"remote" yaml:"remote"`
-	Emacs  string `bson:"emacs" json:"emacs" yaml:"emacs"`
-	MuPath string `bson:"mu_path" json:"mu_path" yaml:"mu_path"`
+	Name    string   `bson:"name" json:"name" yaml:"name"`
+	Path    string   `bson:"path" json:"path" yaml:"path"`
+	Remote  string   `bson:"remote" json:"remote" yaml:"remote"`
+	Emacs   string   `bson:"emacs" json:"emacs" yaml:"emacs"`
+	MuPath  string   `bson:"mu_path" json:"mu_path" yaml:"mu_path"`
+	Mirrors []string `bson:"mirrors" json:"mirrors" yaml:"mirrors"`
 }
 
 type RepoConf struct {

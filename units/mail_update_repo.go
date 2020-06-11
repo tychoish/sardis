@@ -70,10 +70,6 @@ func (j *mailSyncJob) Run(ctx context.Context) {
 	}
 
 	for _, job := range jobs {
-		grip.Info(message.Fields{
-			"id": job.ID(),
-			"op": "running",
-		})
 		job.Run(ctx)
 		j.AddError(job.Error())
 		if j.HasErrors() {

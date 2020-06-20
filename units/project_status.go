@@ -81,5 +81,4 @@ func (j *projectStatusJob) Run(ctx context.Context) {
 
 		j.AddError(cmd.Run(ctx))
 	}
-
 }

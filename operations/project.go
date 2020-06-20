@@ -18,6 +18,8 @@ func Project() cli.Command {
 		Usage: "commands for managing groups of repositories",
 		Subcommands: []cli.Command{
 			projectStatus(),
+			projectClone(),
+			projectFetch(),
 		},
 	}
 }
@@ -46,6 +48,72 @@ func projectStatus() cli.Command {
 
 			for _, proj := range projs {
 				if err := amboy.RunJob(ctx, units.NewProjectStatusJob(proj)); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		},
+	}
+}
+
+func projectFetch() cli.Command {
+	const projectFlagName = "project"
+	return cli.Command{
+		Name:  "fetch",
+		Usage: "updates (git pull) all repos in a project",
+		Flags: []cli.Flag{
+			cli.StringSliceFlag{
+				Name:  joinFlagNames(projectFlagName, "p"),
+				Usage: "specify the name of a project to get its status",
+			},
+		},
+		Before: mergeBeforeFuncs(requireConfig(), setAllTailArguements(projectFlagName)),
+		Action: func(c *cli.Context) error {
+			env := sardis.GetEnvironment()
+			ctx, cancel := env.Context()
+			defer cancel()
+
+			projs := getProjects(c.StringSlice(projectFlagName), env.Configuration())
+			if len(projs) == 0 {
+				return errors.New("no configured matching projects")
+			}
+
+			for _, proj := range projs {
+				if err := amboy.RunJob(ctx, units.NewProjectFetchJob(proj)); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		},
+	}
+}
+
+func projectClone() cli.Command {
+	const projectFlagName = "project"
+	return cli.Command{
+		Name:  "clone",
+		Usage: "clones all repositories in a project",
+		Flags: []cli.Flag{
+			cli.StringSliceFlag{
+				Name:  joinFlagNames(projectFlagName, "p"),
+				Usage: "specify the name of a project to get its status",
+			},
+		},
+		Before: mergeBeforeFuncs(requireConfig(), setAllTailArguements(projectFlagName)),
+		Action: func(c *cli.Context) error {
+			env := sardis.GetEnvironment()
+			ctx, cancel := env.Context()
+			defer cancel()
+
+			projs := getProjects(c.StringSlice(projectFlagName), env.Configuration())
+			if len(projs) == 0 {
+				return errors.New("no configured matching projects")
+			}
+
+			for _, proj := range projs {
+				if err := amboy.RunJob(ctx, units.NewProjectCloneJob(proj)); err != nil {
 					return err
 				}
 			}

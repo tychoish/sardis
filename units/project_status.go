@@ -13,6 +13,7 @@ import (
 	"github.com/deciduosity/grip"
 	"github.com/deciduosity/grip/level"
 	"github.com/deciduosity/grip/message"
+	"github.com/deciduosity/grip/send"
 	"github.com/tychoish/sardis"
 )
 
@@ -63,15 +64,21 @@ func (j *projectStatusJob) Run(ctx context.Context) {
 			})
 			continue
 		}
-		cmd := jpm.CreateCommand(ctx).ID(j.ID()).Directory(j.Conf.Options.Directory).
-			SetOutputSender(level.Info, grip.GetSender()).
-			Add(getStatusCommandArgs(path))
+
+		output := send.NewAnnotatingSender(grip.GetSender(), message.Fields{"repo": j.Conf.Name})
+
+		cmd := jpm.CreateCommand(ctx).ID(j.ID()).Directory(path).
+			SetOutputSender(level.Info, output).
+			SetErrorSender(level.Error, output).
+			Add(getStatusCommandArgs(path)).
+			AppendArgs("git", "status", "--short", "--branch")
 
 		grip.Notice(message.Fields{
 			"project": j.Conf.Name,
 			"path":    path,
 			"name":    r.Name,
 		})
+
 		j.AddError(cmd.Run(ctx))
 	}
 

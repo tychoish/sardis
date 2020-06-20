@@ -14,6 +14,7 @@ import (
 	"github.com/deciduosity/grip"
 	"github.com/deciduosity/grip/level"
 	"github.com/deciduosity/grip/message"
+	"github.com/deciduosity/grip/send"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 )
@@ -66,11 +67,12 @@ func (j *repoStatusJob) Run(ctx context.Context) {
 
 	startAt := time.Now()
 
+	output := send.NewAnnotatingSender(grip.GetSender(), message.Fields{"path": j.Path})
 	j.AddError(cmd.CreateCommand(ctx).Priority(level.Info).
 		ID(j.ID()).Directory(j.Path).
-		SetOutputSender(level.Info, grip.GetSender()).
-		AppendArgs("git", "status").
+		SetOutputSender(level.Info, output).
 		Add(getStatusCommandArgs(j.Path)).
+		AppendArgs("git", "status", "--short", "--branch").
 		Run(ctx))
 
 	grip.Debug(message.Fields{
@@ -84,7 +86,7 @@ func (j *repoStatusJob) Run(ctx context.Context) {
 func getStatusCommandArgs(path string) []string {
 	return []string{
 		"git", "log", "--date=relative", "--decorate", "-n", "1",
-		fmt.Sprintf("--format=%s:", filepath.Base(path)) + `%N (%cr) "%s"a`,
+		fmt.Sprintf("--format=%s:", filepath.Base(path)) + `%N (%cr) "%s"`,
 	}
 
 }

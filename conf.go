@@ -370,6 +370,7 @@ func (conf *Configuration) ExportCommands() map[string]CommandConf {
 	for idx := range conf.Commands {
 		cmd := conf.Commands[idx]
 		out[cmd.Name] = cmd
+
 	}
 	return out
 }

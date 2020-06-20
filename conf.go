@@ -141,8 +141,8 @@ type ProjectConf struct {
 }
 
 type ProjectOptions struct {
-	GithubOrgs string `bson:"github_org" json:"github_org" yaml:"github_org"`
-	Directory  string `bson:"directory" json:"directory" yaml:"directory"`
+	GithubOrg string `bson:"github_org" json:"github_org" yaml:"github_org"`
+	Directory string `bson:"directory" json:"directory" yaml:"directory"`
 }
 
 type ProjectRepositories struct {

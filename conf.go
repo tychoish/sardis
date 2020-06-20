@@ -19,6 +19,7 @@ type Configuration struct {
 	Hosts    []HostConf    `bson:"hosts" json:"hosts" yaml:"hosts"`
 	System   SystemConf    `bson:"system" json:"system" yaml:"system"`
 	Commands []CommandConf `bson:"commands" json:"commands" yaml:"commands"`
+	Projects []ProjectConf `bson:"projects" json:"projects" yaml:"projects"`
 }
 
 type MailConf struct {
@@ -131,6 +132,21 @@ type CommandConf struct {
 	Name      string `bson:"name" json:"name" yaml:"name"`
 	Directory string `bson:"directory" json:"directory" yaml:"directory"`
 	Command   string `bson:"command" json:"command" yaml:"command"`
+}
+
+type ProjectConf struct {
+	Name         string                `bson:"name" json:"name" yaml:"name"`
+	Options      ProjectOptions        `bson:"options" json:"options" yaml:"options"`
+	Repositories []ProjectRepositories `bson:"repos" json:"repos" yaml:"repos"`
+}
+
+type ProjectOptions struct {
+	GithubOrgs string `bson:"github_org" json:"github_org" yaml:"github_org"`
+	Directory  string `bson:"directory" json:"directory" yaml:"directory"`
+}
+
+type ProjectRepositories struct {
+	Name string `bson:"name" json:"name" yaml:"name"`
 }
 
 func LoadConfiguration(fn string) (*Configuration, error) {

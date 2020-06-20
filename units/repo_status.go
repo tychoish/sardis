@@ -70,8 +70,7 @@ func (j *repoStatusJob) Run(ctx context.Context) {
 		ID(j.ID()).Directory(j.Path).
 		SetOutputSender(level.Info, grip.GetSender()).
 		AppendArgs("git", "status").
-		AppendArgs("git", "log", "--date=relative", "--decorate", "-n", "1",
-			fmt.Sprintf("--format=%s:", filepath.Base(j.Path))+`%N (%cr) "%s"`).
+		Add(getStatusCommandArgs(j.Path)).
 		Run(ctx))
 
 	grip.Debug(message.Fields{
@@ -80,4 +79,12 @@ func (j *repoStatusJob) Run(ctx context.Context) {
 		"secs":   time.Since(startAt).Seconds(),
 		"errors": j.HasErrors(),
 	})
+}
+
+func getStatusCommandArgs(path string) []string {
+	return []string{
+		"git", "log", "--date=relative", "--decorate", "-n", "1",
+		fmt.Sprintf("--format=%s:", filepath.Base(path)) + `%N (%cr) "%s"a`,
+	}
+
 }

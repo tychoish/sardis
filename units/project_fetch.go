@@ -70,6 +70,13 @@ func (j *projectFetchJob) Run(ctx context.Context) {
 			SetOutputSender(level.Info, grip.GetSender()).
 			AppendArgs("git", "pull", "--rebase", "--autostash")
 
+		grip.Notice(message.Fields{
+			"project": j.Conf.Name,
+			"path":    path,
+			"name":    r.Name,
+			"op":      "fetch",
+		})
+
 		j.AddError(cmd.Run(ctx))
 	}
 }

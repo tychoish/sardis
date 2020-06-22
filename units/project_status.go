@@ -77,6 +77,7 @@ func (j *projectStatusJob) Run(ctx context.Context) {
 			"project": j.Conf.Name,
 			"path":    path,
 			"name":    r.Name,
+			"op":      "status",
 		})
 
 		j.AddError(cmd.Run(ctx))

@@ -51,10 +51,11 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 	dst := filepath.Join(j.Conf.Path, j.Conf.Name)
 
-	if _, err := os.Stat(j.Conf.Path); os.IsNotExist(err) {
+	if _, err := os.Stat(j.Conf.Path); !os.IsNotExist(err) {
 		if !j.Conf.Update {
 			return
 		}
+
 		target, err := filepath.EvalSymlinks(j.Conf.Path)
 		if err != nil {
 			j.AddError(err)
@@ -74,7 +75,7 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 		}
 	}
 
-	j.AddError(os.Symlink(j.Conf.Path, j.Conf.Target))
+	j.AddError(os.Symlink(j.Conf.Target, j.Conf.Path))
 
 	grip.Info(message.Fields{
 		"op":  "created new symbolic link",

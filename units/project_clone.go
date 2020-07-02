@@ -69,6 +69,7 @@ func (j *projectCloneJob) Run(ctx context.Context) {
 			SetErrorSender(level.Error, grip.GetSender()).
 			SetOutputSender(level.Info, grip.GetSender()).
 			AppendArgs("git", "clone", fmt.Sprintf("git@github.com:%s/%s.git", j.Conf.Options.GithubOrg, r.Name))
+
 		grip.Notice(message.Fields{
 			"project": j.Conf.Name,
 			"path":    path,

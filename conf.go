@@ -286,6 +286,10 @@ func (conf *RepoConf) Validate() error {
 		conf.RemoteName = "origin"
 	}
 
+	if conf.Remote == "" {
+		return errors.Errorf("'%s' does not specify a remote", conf.Name)
+	}
+
 	if conf.Fetch && conf.LocalSync {
 		return errors.New("cannot specify sync and fetch")
 	}

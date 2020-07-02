@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/deciduosity/amboy"
 	"github.com/deciduosity/amboy/dependency"
@@ -72,10 +73,10 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 
 	j.AddError(cmd.ID(j.ID()).
 		Priority(level.Info).
-		Directory(j.Conf.Path).
+		Directory(filepath.Dir(j.Conf.Path)).
 		SetOutputSender(level.Info, grip.GetSender()).
 		AppendArgs("git", "clone", j.Conf.Remote, j.Conf.Path).
-		Add(j.Conf.Post).
+		AddWhen(len(j.Conf.Post) > 0, j.Conf.Post).
 		Run(ctx))
 
 	grip.Notice(message.Fields{

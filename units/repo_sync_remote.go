@@ -61,8 +61,12 @@ func (j *repoSyncRemoteJob) Run(ctx context.Context) {
 		"op": "running",
 	})
 
-	err := sardis.GetEnvironment().Jasper().CreateCommand(ctx).
-		ID(j.ID()).Priority(level.Info).
+	env := sardis.GetEnvironment()
+	conf := env.Configuration()
+	cmd := env.Jasper().CreateCommand(ctx)
+
+	err := cmd.ID(j.ID()).Priority(level.Info).
+		AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
 		Directory(j.Path).Host(j.Host).
 		SetCombinedSender(level.Info, grip.GetSender()).
 		Append(j.PreHook...).

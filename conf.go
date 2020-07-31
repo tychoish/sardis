@@ -29,6 +29,8 @@ type MailConf struct {
 	Emacs   string   `bson:"emacs" json:"emacs" yaml:"emacs"`
 	MuPath  string   `bson:"mu_path" json:"mu_path" yaml:"mu_path"`
 	Mirrors []string `bson:"mirrors" json:"mirrors" yaml:"mirrors"`
+	Pre     []string `bson:"pre" json:"pre" yaml:"pre"`
+	Post    []string `bson:"post" json:"post" yaml:"post"`
 }
 
 type RepoConf struct {
@@ -80,9 +82,10 @@ type LinkConf struct {
 }
 
 type Settings struct {
-	Notification NotifyConf      `bson:"notify" json:"notify" yaml:"notify"`
-	Queue        AmboyConf       `bson:"amboy" json:"amboy" yaml:"amboy"`
-	Credentials  CredentialsConf `bson:"credentials" json:"credentials" yaml:"credentials"`
+	Notification       NotifyConf      `bson:"notify" json:"notify" yaml:"notify"`
+	Queue              AmboyConf       `bson:"amboy" json:"amboy" yaml:"amboy"`
+	Credentials        CredentialsConf `bson:"credentials" json:"credentials" yaml:"credentials"`
+	SSHAgentSocketPath string          `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
 }
 
 type CredentialsConf struct {
@@ -165,14 +168,9 @@ type validatable interface {
 
 func (conf *Configuration) Validate() error {
 	catcher := grip.NewBasicCatcher()
-	for _, c := range []validatable{
-		&conf.Settings.Notification,
-		&conf.Settings.Queue,
-		&conf.Settings.Credentials,
-		&conf.System.Arch,
-	} {
-		catcher.Wrapf(c.Validate(), "%T is not valid", c)
-	}
+
+	catcher.Add(conf.Settings.Validate())
+	catcher.Add(conf.System.Arch.Validate())
 
 	for idx, c := range conf.Repo {
 		catcher.Wrapf(c.Validate(), "%d of %T is not valid", idx, c)
@@ -188,6 +186,19 @@ func (conf *Configuration) Validate() error {
 
 	for idx, c := range conf.Commands {
 		catcher.Wrapf(c.Validate(), "%d of %T is not valid", idx, c)
+	}
+
+	return catcher.Resolve()
+}
+
+func (conf *Settings) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	for _, c := range []validatable{
+		&conf.Notification,
+		&conf.Queue,
+		&conf.Credentials,
+	} {
+		catcher.Wrapf(c.Validate(), "%T is not valid", c)
 	}
 
 	return catcher.Resolve()

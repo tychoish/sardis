@@ -57,7 +57,7 @@ func (j *mailSyncJob) Run(ctx context.Context) {
 		jobs = append(jobs, NewRepoSyncRemoteJob(m, j.Conf.Path, nil, nil))
 	}
 
-	jobs = append(jobs, NewRepoSyncJob(j.Conf.Remote, j.Conf.Path, nil, nil))
+	jobs = append(jobs, NewRepoSyncJob(j.Conf.Remote, j.Conf.Path, j.Conf.Pre, j.Conf.Post))
 
 	if j.Conf.MuPath == "" || j.Conf.Emacs == "" {
 		grip.Debug(message.Fields{

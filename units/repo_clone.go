@@ -69,10 +69,13 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 		return
 	}
 
-	cmd := sardis.GetEnvironment().Jasper().CreateCommand(ctx)
+	env := sardis.GetEnvironment()
+	conf := env.Configuration()
+	cmd := env.Jasper().CreateCommand(ctx)
 
 	j.AddError(cmd.ID(j.ID()).
 		Priority(level.Info).
+		AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
 		Directory(filepath.Dir(j.Conf.Path)).
 		SetOutputSender(level.Info, grip.GetSender()).
 		AppendArgs("git", "clone", j.Conf.Remote, j.Conf.Path).

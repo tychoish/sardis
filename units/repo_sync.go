@@ -92,7 +92,12 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 		"op": "running",
 	})
 
-	err := sardis.GetEnvironment().Jasper().CreateCommand(ctx).Priority(level.Info).
+	env := sardis.GetEnvironment()
+	conf := env.Configuration()
+	cmd := env.Jasper().CreateCommand(ctx)
+
+	err := cmd.Priority(level.Info).
+		AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
 		ID(j.ID()).Directory(j.Path).SetCombinedSender(level.Info, grip.GetSender()).
 		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && ", j.Path)+fmt.Sprintf(syncCmdTemplate, j.ID())).
 		Append(j.PreHook...).

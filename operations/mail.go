@@ -34,7 +34,8 @@ func updateDB() cli.Command {
 	}
 
 	return cli.Command{
-		Name: "mu",
+		Name:  "mu",
+		Usage: "updates the mu database",
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "mail",

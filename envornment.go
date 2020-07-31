@@ -1,5 +1,5 @@
 /*
-kage sardis holds a a number of application level constants and
+Package sardis holds a a number of application level constants and
 shared resources for the sardis application.
 
 Services Cache
@@ -17,7 +17,10 @@ package sardis
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,6 +40,8 @@ import (
 var BuildRevision = ""
 
 var servicesCache *appServicesCache
+
+const SSHAgentSocketEnvVar = "SSH_AUTH_SOCK"
 
 func init() {
 	servicesCache = &appServicesCache{}
@@ -107,6 +112,7 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 
 	catcher.Add(conf.Validate())
 	catcher.Add(c.initQueue())
+	catcher.Add(c.initSSHSetting(ctx))
 
 	c.appendCloser("close-jasper", c.jpm.Close)
 
@@ -158,6 +164,37 @@ func (c *appServicesCache) initSender() error {
 		return errors.Wrap(err, "problem creating sender")
 	}
 	loggers = append(loggers, desktop)
+
+	return nil
+}
+
+func (c *appServicesCache) initSSHSetting(ctx context.Context) error {
+	if c.conf.Settings.SSHAgentSocketPath != "" {
+		return nil
+	}
+
+	c.conf.Settings.SSHAgentSocketPath = os.Getenv(SSHAgentSocketEnvVar)
+
+	if c.conf.Settings.SSHAgentSocketPath != "" {
+		return nil
+	}
+
+	filepath.Walk("/tmp", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !strings.HasPrefix(path, "/tmp/ssh-") {
+			return nil
+		}
+
+		if c.jpm.CreateCommand(ctx).AddEnv(SSHAgentSocketEnvVar, path).AppendArgs("ssh-add", "-l").Run(ctx) == nil {
+			c.conf.Settings.SSHAgentSocketPath = path
+			return io.EOF // to abort early
+		}
+
+		return nil
+	})
 
 	return nil
 }

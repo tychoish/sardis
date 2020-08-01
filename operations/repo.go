@@ -47,11 +47,27 @@ func repoUpdate() cli.Command {
 			defer cancel()
 
 			notify := env.Logger()
-			queue := env.Queue()
 			conf := env.Configuration()
-			catcher := grip.NewBasicCatcher()
+			repo := conf.GetRepo(repoName)
+			if repo == nil {
+				return errors.Errorf("no repository named '%s' configured", repoName)
+			}
+			hasChanges, err := repo.HasChanges()
+			if err != nil {
+				return errors.Wrap(err, "problem checking repository status")
+			}
 
-			catcher.Add(units.SyncRepo(ctx, queue, conf, repoName))
+			if !hasChanges {
+				grip.Info(message.Fields{
+					"repo":   repoName,
+					"status": "no changes",
+				})
+				return nil
+			}
+
+			queue := env.Queue()
+			catcher := grip.NewBasicCatcher()
+			catcher.Add(units.SyncRepo(ctx, queue, repo))
 
 			for _, link := range conf.Links {
 				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(link)))
@@ -167,8 +183,26 @@ func repoSync() cli.Command {
 				}
 			}
 
+			repo := conf.GetRepo(name)
+			if repo == nil {
+				return errors.Errorf("no repository named '%s' configured", name)
+			}
+
+			hasChanges, err := repo.HasChanges()
+			if err != nil {
+				return errors.Wrap(err, "problem checking status of repository")
+			}
+
+			if !hasChanges {
+				grip.Info(message.Fields{
+					"message": "no changes detected",
+					"repo":    name,
+				})
+				return nil
+			}
+
 			queue := env.Queue()
-			if err := units.SyncRepo(ctx, queue, conf, name); err != nil {
+			if err := units.SyncRepo(ctx, queue, repo); err != nil {
 				return errors.Wrap(err, "problem queuing jobs")
 			}
 

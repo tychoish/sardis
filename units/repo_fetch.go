@@ -17,7 +17,7 @@ import (
 )
 
 type repoFetchJob struct {
-	Conf     sardis.RepoConf `bson:"conf" json:"conf" yaml:"conf"`
+	Conf     *sardis.RepoConf `bson:"conf" json:"conf" yaml:"conf"`
 	job.Base `bson:"metadata" json:"metadata" yaml:"metadata"`
 }
 
@@ -38,7 +38,7 @@ func repoFetchFactory() *repoFetchJob {
 	return j
 }
 
-func NewRepoFetchJob(conf sardis.RepoConf) amboy.Job {
+func NewRepoFetchJob(conf *sardis.RepoConf) amboy.Job {
 	j := repoFetchFactory()
 
 	j.Conf = conf

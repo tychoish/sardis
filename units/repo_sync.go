@@ -85,6 +85,7 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 
 	if stat, err := os.Stat(j.Path); os.IsNotExist(err) || !stat.IsDir() {
 		j.AddError(errors.Errorf("path '%s' does not exist", j.Path))
+		return
 	}
 
 	grip.Info(message.Fields{

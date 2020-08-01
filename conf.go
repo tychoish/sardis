@@ -7,6 +7,7 @@ import (
 
 	"github.com/deciduosity/grip"
 	"github.com/deciduosity/grip/send"
+	git "github.com/go-git/go-git/v5"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis/util"
 )
@@ -306,6 +307,34 @@ func (conf *RepoConf) Validate() error {
 	}
 
 	return nil
+}
+
+func (conf *Configuration) GetRepo(name string) *RepoConf {
+	for idx := range conf.Repo {
+		if conf.Repo[idx].Name == name {
+			return &conf.Repo[idx]
+
+		}
+	}
+	return nil
+}
+
+func (conf *RepoConf) HasChanges() (bool, error) {
+	repo, err := git.PlainOpen(conf.Path)
+	if err != nil {
+		return false, err
+	}
+	wt, err := repo.Worktree()
+	if err != nil {
+		return false, err
+	}
+
+	stat, err := wt.Status()
+	if err != nil {
+		return false, err
+	}
+
+	return !stat.IsClean(), nil
 }
 
 func (conf *LinkConf) Validate() error {

@@ -17,7 +17,7 @@ import (
 )
 
 type repoCloneJob struct {
-	Conf     sardis.RepoConf `bson:"conf" json:"conf" yaml:"conf"`
+	Conf     *sardis.RepoConf `bson:"conf" json:"conf" yaml:"conf"`
 	job.Base `bson:"metadata" json:"metadata" yaml:"metadata"`
 }
 
@@ -38,7 +38,7 @@ func repoCloneFactory() *repoCloneJob {
 	return j
 }
 
-func NewRepoCloneJob(conf sardis.RepoConf) amboy.Job {
+func NewRepoCloneJob(conf *sardis.RepoConf) amboy.Job {
 	j := repoCloneFactory()
 
 	j.Conf = conf

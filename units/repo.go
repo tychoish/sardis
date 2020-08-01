@@ -12,43 +12,35 @@ import (
 	"github.com/tychoish/sardis"
 )
 
-func SyncRepo(ctx context.Context, queue amboy.Queue, conf *sardis.Configuration, name string) error {
+func SyncRepo(ctx context.Context, queue amboy.Queue, repo *sardis.RepoConf) error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	seen := 0
 	catcher := grip.NewCatcher()
-	for _, repo := range conf.Repo {
-		if repo.Name != name {
+
+	for _, mirror := range repo.Mirrors {
+		if strings.Contains(mirror, hostname) {
+			grip.Infof("skipping mirror %s->%s because it's probably local (%s)",
+				repo.Path, mirror, hostname)
 			continue
 		}
-		seen++
-
-		for _, mirror := range repo.Mirrors {
-			if strings.Contains(mirror, hostname) {
-				grip.Infof("skipping mirror %s->%s because it's probably local (%s)",
-					repo.Path, mirror, hostname)
-				continue
-			}
-			catcher.Add(queue.Put(ctx, NewRepoSyncRemoteJob(mirror, repo.Path, repo.Pre, nil)))
-		}
-
-		// wait here to make sure that the remote job has
-		// completed syncing.
-		//
-		// When we do larger syncing here, we might want to
-		// have more dependency system.
-		amboy.WaitInterval(ctx, queue, time.Millisecond)
-
-		if repo.LocalSync {
-			catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path, repo.Pre, repo.Post)))
-		} else if repo.Fetch {
-			catcher.Add(queue.Put(ctx, NewRepoFetchJob(repo)))
-		}
+		catcher.Add(queue.Put(ctx, NewRepoSyncRemoteJob(mirror, repo.Path, repo.Pre, nil)))
 	}
 
-	catcher.NewWhen(seen == 0, "now matching repos found")
+	// wait here to make sure that the remote job has
+	// completed syncing.
+	//
+	// When we do larger syncing here, we might want to
+	// have more dependency system.
+	amboy.WaitInterval(ctx, queue, time.Millisecond)
+
+	if repo.LocalSync {
+		catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path, repo.Pre, repo.Post)))
+	} else if repo.Fetch {
+		catcher.Add(queue.Put(ctx, NewRepoFetchJob(repo)))
+	}
+
 	return catcher.Resolve()
 }

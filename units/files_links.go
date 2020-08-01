@@ -85,6 +85,11 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 		}
 	}
 
+	linkDir := filepath.Dir(j.Conf.Name)
+	if _, err := os.Stat(linkDir); os.IsNotExist(err) {
+		j.AddError(os.MkdirAll(linkDir, 0755))
+	}
+
 	j.AddError(os.Symlink(j.Conf.Target, j.Conf.Path))
 
 	grip.Info(message.Fields{

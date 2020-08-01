@@ -46,6 +46,7 @@ func repoUpdate() cli.Command {
 			ctx, cancel := env.Context()
 			defer cancel()
 
+			notify := env.Logger()
 			queue := env.Queue()
 			conf := env.Configuration()
 			catcher := grip.NewBasicCatcher()
@@ -61,6 +62,18 @@ func repoUpdate() cli.Command {
 			}
 
 			amboy.WaitInterval(ctx, queue, time.Millisecond)
+			if err := amboy.ResolveErrors(ctx, queue); err != nil {
+				notify.Error(message.Fields{
+					"repo": repoName,
+					"err":  err.Error(),
+				})
+				return errors.Wrap(err, "problem found executing jobs")
+			}
+
+			notify.Notice(message.Fields{
+				"message": "successfully synchronized repository",
+				"repo":    repoName,
+			})
 
 			return amboy.ResolveErrors(ctx, queue)
 		},
@@ -162,6 +175,10 @@ func repoSync() cli.Command {
 			amboy.WaitInterval(ctx, queue, time.Millisecond)
 
 			if err := amboy.ResolveErrors(ctx, queue); err != nil {
+				notify.Error(message.Fields{
+					"op":  name,
+					"err": err.Error(),
+				})
 				return errors.Wrap(err, "problem found executing jobs")
 			}
 

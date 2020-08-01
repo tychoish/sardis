@@ -51,6 +51,16 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 	dst := filepath.Join(j.Conf.Path, j.Conf.Name)
 
+	if _, err := os.Stat(j.Conf.Target); os.IsNotExist(err) {
+		grip.Notice(message.Fields{
+			"message": "missing target",
+			"name":    j.Conf.Name,
+			"target":  j.Conf.Target,
+			"id":      j.ID(),
+		})
+		return
+	}
+
 	if _, err := os.Stat(j.Conf.Path); !os.IsNotExist(err) {
 		if !j.Conf.Update {
 			return

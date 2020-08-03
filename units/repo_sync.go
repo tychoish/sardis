@@ -103,13 +103,13 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && ", j.Path)+fmt.Sprintf(syncCmdTemplate, j.ID())).
 		Append(j.PreHook...).
 		AppendArgs("git", "add", "-A").
-		AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", "origin", "master").
+		AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", "origin").
 		Bash("git ls-files -d | xargs -r git rm --ignore-unmatch --quiet -- ").
 		AppendArgs("git", "add", "-A").
 		Bash(fmt.Sprintf("git commit -a -m 'update: (%s)' || true", j.ID())).
 		AppendArgs("git", "push").
 		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, fmt.Sprintf(syncCmdTemplate, j.ID()))).
-		AppendArgsWhen(!j.isLocal(), "git", "pull", "--keep", "--rebase", "--autostash", "origin", "master").
+		AppendArgsWhen(!j.isLocal(), "git", "pull", "--keep", "--rebase", "--autostash", "origin").
 		Append(j.PostHook...).Run(ctx)
 
 	j.AddError(err)

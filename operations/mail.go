@@ -78,7 +78,6 @@ func syncMailRepo() cli.Command {
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  nameFlagName,
-				Value: "personal",
 				Usage: "specify the name of the repository",
 			},
 			cli.BoolFlag{
@@ -115,30 +114,34 @@ func syncMailRepo() cli.Command {
 			job := units.NewMailSyncJob(conf)
 			grip.Infof("starting: %s", job.ID())
 			job.Run(ctx)
+			catcher := grip.NewCatcher()
 
 			err := job.Error()
+			catcher.Add(err)
 			if err != nil {
 				notify.Error(message.WrapError(err, message.Fields{
 					"message": "encountered problem syncing repository",
 					"name":    conf.Name,
 					"path":    conf.Path,
 				}))
-				return err
 			}
 
 			if !skipUpdate {
 				job = units.NewMailUpdaterJob(conf.Path, conf.MuPath, conf.Emacs, false)
 				grip.Infof("updating mu db: %s", job.ID())
 				job.Run(ctx)
-				if err = job.Error(); err != nil {
-					notify.Error(message.WrapError(err, message.Fields{
-						"message": "problem updating mail database",
-						"emacs":   conf.Emacs,
-						"name":    conf.Name,
-						"path":    conf.Path,
-					}))
-					return err
-				}
+				err = job.Error()
+				notify.Error(message.WrapError(err, message.Fields{
+					"message": "problem updating mail database",
+					"emacs":   conf.Emacs,
+					"name":    conf.Name,
+					"path":    conf.Path,
+				}))
+				catcher.Add(err)
+			}
+
+			if catcher.HasErrors() {
+				return catcher.Resolve()
 			}
 
 			notify.Notice(message.Fields{

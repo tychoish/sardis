@@ -105,3 +105,27 @@ func setAllTailArguements(flagName string) cli.BeforeFunc {
 		return nil
 	}
 }
+
+func setMultiPositionalArgs(flags ...string) cli.BeforeFunc {
+	return func(c *cli.Context) error {
+		var lastUsed int
+		for _, f := range flags {
+			if c.IsSet(f) {
+				continue
+			}
+
+			tail := c.Args().Tail()
+			if len(tail) <= lastUsed {
+				return errors.New("insufficient number of arguments specified")
+			}
+
+			if err := c.Set(f, tail[lastUsed]); err != nil {
+				return err
+			}
+
+			lastUsed++
+		}
+
+		return nil
+	}
+}

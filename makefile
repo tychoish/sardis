@@ -76,33 +76,6 @@ $(buildDir)/cover.%.html:$(buildDir)/cover.%.out
 .PHONY:build test
 .FORCE:
 
-vendor-clean:
-	find vendor/ -name "*.gif" -o -name "*.jpg" -o -name "*.gz" -o -name "*.png" -o -name "*.ico" | xargs rm -rf
-	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/stretchr/
-	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/pkg/errors/
-	rm -rf vendor/gopkg.in/mgo.v2/harness/
-	rm -rf vendor/gopkg.in/mgo.v2/testdb/
-	rm -rf vendor/gopkg.in/mgo.v2/testserver/
-	rm -rf vendor/gopkg.in/mgo.v2/internal/json/testdata
-	rm -rf vendor/gopkg.in/mgo.v2/.git/
-	rm -rf vendor/gopkg.in/mgo.v2/txn/
-	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/pkg/
-	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/mongodb/grip/
-	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/stretchr/
-	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/stretchr/
-	rm -rf vendor/github.com/mongodb/jasper/vendor/github.com/mongodb/grip/
-	rm -rf vendor/github.com/mongodb/jasper/vendor/github.com/mongodb/amboy/
-	rm -rf vendor/github.com/mongodb/jasper/vendor/github.com/pkg/
-	rm -rf vendor/github.com/mongodb/jasper/vendor/github.com/stretchr/
-	rm -rf vendor/github.com/mongodb/jasper/vendor/github.com/urfave/cli
-	rm -rf vendor/github.com/mongodb/amboy/vendor/github.com/urfave/cli
-	rm -rf vendor/github.com/mongodb/jasper/vendor/gopkg.in/mgo.v2
-	rm -rf vendor/github.com/mongodb/jasper/vendor/go.mongodb.org/mongo-driver
-	rm -rf vendor/github.com/mongodb/amboy/vendor/go.mongodb.org/mongo-driver
-	rm -rf vendor/github.com/mongodb/jasper/vendor/golang.org/x/sys
-	rm -rf vendor/github.com/mongodb/grip/vendor/golang.org/x/sys
-	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/pkg/errors
-
 clean:
 	rm -rf $(name) $(buildDir)/$(name)
 

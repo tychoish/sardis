@@ -52,14 +52,33 @@ func buildApp() *cli.App {
 		jaspercli.Jasper(),
 	}
 
+	const (
+		levelFlag   = "level"
+		nameFlag    = "name"
+		disableFlag = "disableStdOutLogging"
+	)
+
 	// These are global options. Use this to configure logging or
 	// other options independent from specific sub commands.
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:  "level",
+			Name:  levelFlag,
 			Value: "info",
 			Usage: fmt.Sprintln("Specify lowest visible loglevel as string: ",
 				"'emergency|alert|critical|error|warning|notice|info|debug'"),
+		},
+		cli.StringFlag{
+			Name:   nameFlag,
+			EnvVar: "SARDIS_LOGGING_NAME",
+			Value:  app.Name,
+			Usage:  "use to set a different name to the logger",
+		},
+		cli.BoolFlag{
+			Name:   disableFlag,
+			EnvVar: "SARDIS_LOGGING_DISABLE_STD_OUT",
+			Usage: fmt.Sprintln("specify to disable output to standard output.",
+				"On non-linux systems this does nothing. ",
+			),
 		},
 		cli.StringFlag{
 			Name:  "conf, c",
@@ -73,7 +92,7 @@ func buildApp() *cli.App {
 	app.Before = func(c *cli.Context) error {
 		env := sardis.GetEnvironment()
 
-		loggingSetup(app.Name, c.String("level"))
+		loggingSetup(c.String(nameFlag), c.String(levelFlag), c.Bool(disableFlag))
 
 		path := c.String("conf")
 		conf, err := sardis.LoadConfiguration(path)
@@ -99,7 +118,7 @@ func buildApp() *cli.App {
 }
 
 // logging setup is separate to make it unit testable
-func loggingSetup(name, priority string) {
+func loggingSetup(name, priority string, disableDefault bool) {
 	grip.SetName(name)
 	sender := grip.GetSender()
 
@@ -115,7 +134,14 @@ func loggingSetup(name, priority string) {
 
 		err = sys.SetLevel(send.LevelInfo{Threshold: level.FromString(priority), Default: level.Info})
 		if err != nil {
-			grip.SetSender(send.NewConfiguredMultiSender(sys, sender))
+			return
 		}
+		if !disableDefault {
+			sender = send.NewConfiguredMultiSender(sys, sender)
+		} else {
+			sender = sys
+		}
+
+		grip.SetSender(sender)
 	}
 }

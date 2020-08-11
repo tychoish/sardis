@@ -3,6 +3,7 @@ package units
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/deciduosity/amboy"
@@ -51,6 +52,13 @@ func (j *projectFetchJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 
 	jpm := sardis.GetEnvironment().Jasper()
+
+	if _, err := os.Stat(j.Conf.Name.Options.Directory); os.IsNotExist(err) {
+		if err := os.MkdirAll(j.Conf.Options.Directory, 0755); err != nil {
+			j.AddError(err)
+			return
+		}
+	}
 
 	for _, r := range j.Conf.Repositories {
 		path := filepath.Join(j.Conf.Options.Directory, r.Name)

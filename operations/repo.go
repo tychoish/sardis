@@ -287,7 +287,7 @@ func repoFetch() cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			repos := c.StringSlice(repoFlagName)
+			names := c.StringSlice(repoFlagName)
 
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
@@ -299,7 +299,7 @@ func repoFetch() cli.Command {
 			repos := env.Configuration().Repo
 			for idx := range repos {
 				repo := &repos[idx]
-				if !utility.StringSliceContains(repos, repo.Name) {
+				if !utility.StringSliceContains(names, repo.Name) {
 					continue
 				}
 

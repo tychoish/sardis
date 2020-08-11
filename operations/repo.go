@@ -296,12 +296,14 @@ func repoFetch() cli.Command {
 			queue := env.Queue()
 
 			catcher := grip.NewBasicCatcher()
-			for _, repo := range env.Configuration().Repo {
+			repos := env.Configuration().Repo
+			for idx := range repos {
+				repo := &repos[idx]
 				if !utility.StringSliceContains(repos, repo.Name) {
 					continue
 				}
 
-				catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(&repo)))
+				catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(repo)))
 			}
 
 			amboy.WaitInterval(ctx, queue, 100*time.Millisecond)

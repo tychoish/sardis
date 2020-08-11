@@ -53,7 +53,7 @@ func (j *projectCloneJob) Run(ctx context.Context) {
 
 	jpm := sardis.GetEnvironment().Jasper()
 
-	if _, err := os.Stat(j.Conf.Name.Options.Directory); os.IsNotExist(err) {
+	if _, err := os.Stat(j.Conf.Options.Directory); os.IsNotExist(err) {
 		if err := os.MkdirAll(j.Conf.Options.Directory, 0755); err != nil {
 			j.AddError(err)
 			return

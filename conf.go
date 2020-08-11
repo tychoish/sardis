@@ -9,6 +9,7 @@ import (
 	"github.com/deciduosity/grip/send"
 	"github.com/deciduosity/utility"
 	git "github.com/go-git/go-git/v5"
+	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis/util"
 )
@@ -104,21 +105,12 @@ type CredentialsConf struct {
 		Password string `bson:"password" json:"password" yaml:"password"`
 		URL      string `bson:"url" json:"url" yaml:"url"`
 	} `bson:"jira" json:"jira" yaml:"jira"`
-	Corp struct {
-		Username string `bson:"username" json:"username" yaml:"username"`
-		Password string `bson:"password" json:"password" yaml:"password"`
-		Seed     string `bson:"seed" json:"seed" yaml:"seed"`
-	} `bson:"corp" json:"corp" yaml:"corp"`
 	GitHub struct {
 		Username string `bson:"username" json:"username" yaml:"username"`
 		Password string `bson:"password" json:"password" yaml:"password"`
 		Token    string `bson:"token" json:"token" yaml:"token"`
 	} `bson:"github" json:"github" yaml:"github"`
 	AWS []CredentialsAWS `bson:"aws" json:"aws" yaml:"aws"`
-	RHN struct {
-		Username string `bson:"username" json:"username" yaml:"username"`
-		Password string `bson:"password" json:"password" yaml:"password"`
-	} `bson:"rhn" json:"rhn" yaml:"rhn"`
 }
 
 type CredentialsAWS struct {
@@ -307,6 +299,12 @@ func (conf *RepoConf) Validate() error {
 		return errors.New("cannot specify sync and fetch")
 	}
 
+	var err error
+	conf.Path, err = homedir.Expand(conf.Path)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	return nil
 }
 
@@ -348,11 +346,9 @@ func (conf *LinkConf) Validate() error {
 	}
 
 	if conf.Name == "" {
-		base := filepath.Base(conf.Path)
 		fn := filepath.Dir(conf.Path)
 
-		if base != "" && fn != "" {
-			conf.Path = base
+		if fn != "" {
 			conf.Name = fn
 		} else {
 			return errors.New("must specify a name for the link")
@@ -370,6 +366,17 @@ func (conf *LinkConf) Validate() error {
 		} else {
 			return errors.New("must specify a location for the link")
 		}
+	}
+
+	var err error
+	conf.Target, err = homedir.Expand(conf.Target)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	conf.Path, err = homedir.Expand(conf.Path)
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -407,10 +414,21 @@ func (conf *Configuration) GetHost(name string) (*HostConf, error) {
 	return nil, errors.Errorf("could not find a host named '%s'", name)
 }
 
+func (conf *ProjectConf) Validate() error {
+	var err error
+	conf.Options.Directory, err = homedir.Expand(conf.Options.Directory)
+	return err
+}
+
 func (conf *CommandConf) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(conf.Name == "", "commands must have a name")
 	catcher.NewWhen(conf.Command == "", "commands must have specify commands")
+
+	var err error
+	conf.Directory, err = homedir.Expand(conf.Directory)
+	catcher.Add(err)
+
 	return catcher.Resolve()
 }
 

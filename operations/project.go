@@ -46,8 +46,8 @@ func projectStatus() cli.Command {
 				return errors.New("no configured matching projects")
 			}
 
-			for _, proj := range projs {
-				if err := amboy.RunJob(ctx, units.NewProjectStatusJob(proj)); err != nil {
+			for idx := range projs {
+				if err := amboy.RunJob(ctx, units.NewProjectStatusJob(projs[idx])); err != nil {
 					return err
 				}
 			}
@@ -79,8 +79,8 @@ func projectFetch() cli.Command {
 				return errors.New("no configured matching projects")
 			}
 
-			for _, proj := range projs {
-				if err := amboy.RunJob(ctx, units.NewProjectFetchJob(proj)); err != nil {
+			for idx := range projs {
+				if err := amboy.RunJob(ctx, units.NewProjectFetchJob(projs[idx])); err != nil {
 					return err
 				}
 			}
@@ -112,8 +112,8 @@ func projectClone() cli.Command {
 				return errors.New("no configured matching projects")
 			}
 
-			for _, proj := range projs {
-				if err := amboy.RunJob(ctx, units.NewProjectCloneJob(proj)); err != nil {
+			for idx := range projs {
+				if err := amboy.RunJob(ctx, units.NewProjectCloneJob(projs[idx])); err != nil {
 					return err
 				}
 			}

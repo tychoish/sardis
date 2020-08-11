@@ -174,6 +174,10 @@ func (conf *Configuration) Validate() error {
 		catcher.Wrapf(conf.Mail[idx].Validate(), "%d of %T is not valid", idx, conf.Mail[idx])
 	}
 
+	for idx := range conf.Projects {
+		catcher.Wrapf(conf.Projects[idx].Validate(), "%d of %T is not valid", idx, conf.Projects[idx])
+	}
+
 	for idx := range conf.Links {
 		catcher.Wrapf(conf.Links[idx].Validate(), "%d of %T is not valid", idx, conf.Links[idx])
 	}
@@ -257,6 +261,13 @@ func (conf *ArchLinuxConf) Validate() error {
 
 	if conf.BuildPath == "" {
 		conf.BuildPath = filepath.Join(util.GetHomeDir(), "abs")
+	} else {
+		var err error
+
+		conf.BuildPath, err = homedir.Expand(conf.BuildPath)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
 
 	catcher := grip.NewBasicCatcher()

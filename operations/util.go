@@ -9,7 +9,7 @@ import (
 func Utilities() cli.Command {
 	return cli.Command{
 		Name:    "util",
-		Aliases: []string{"utility", "utlitities", "utils"},
+		Aliases: []string{"utility"},
 		Usage:   "short utility commands",
 		Subcommands: []cli.Command{
 			diffTrees(),

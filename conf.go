@@ -7,6 +7,7 @@ import (
 
 	"github.com/deciduosity/grip"
 	"github.com/deciduosity/grip/send"
+	"github.com/deciduosity/utility"
 	git "github.com/go-git/go-git/v5"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis/util"
@@ -320,6 +321,10 @@ func (conf *Configuration) GetRepo(name string) *RepoConf {
 }
 
 func (conf *RepoConf) HasChanges() (bool, error) {
+	if !utility.FileExists(conf.Path) {
+		return true, nil
+	}
+
 	repo, err := git.PlainOpen(conf.Path)
 	if err != nil {
 		return false, err

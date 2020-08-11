@@ -23,6 +23,7 @@ func Repo() cli.Command {
 			repoSync(),
 			repoCleanup(),
 			repoStatus(),
+			repoFetch(),
 		},
 	}
 }
@@ -271,5 +272,43 @@ func repoStatus() cli.Command {
 			return catcher.Resolve()
 		},
 	}
+}
 
+func repoFetch() cli.Command {
+	const repoFlagName = "repo"
+	return cli.Command{
+		Name:   "fetch",
+		Usage:  "fetch one or more repos",
+		Before: setAllTailArguements(repoFlagName),
+		Flags: []cli.Flag{
+			cli.StringSliceFlag{
+				Name:  repoFlagName,
+				Usage: "specify a local repository to cleanup",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			repos := c.StringSlice(repoFlagName)
+
+			env := sardis.GetEnvironment()
+			ctx, cancel := env.Context()
+			defer cancel()
+
+			queue := env.Queue()
+
+			catcher := grip.NewBasicCatcher()
+			for _, repo := range env.Configuration().Repo {
+				if !utility.StringSliceContains(repos, repo.Name) {
+					continue
+				}
+
+				catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(&repo)))
+			}
+
+			amboy.WaitInterval(ctx, queue, 100*time.Millisecond)
+			catcher.Add(amboy.ResolveErrors(ctx, queue))
+
+			return catcher.Resolve()
+
+		},
+	}
 }

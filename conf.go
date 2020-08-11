@@ -170,6 +170,10 @@ func (conf *Configuration) Validate() error {
 		catcher.Wrapf(conf.Repo[idx].Validate(), "%d of %T is not valid", idx, conf.Repo[idx])
 	}
 
+	for idx := range conf.Mail {
+		catcher.Wrapf(conf.Mail[idx].Validate(), "%d of %T is not valid", idx, conf.Mail[idx])
+	}
+
 	for idx := range conf.Links {
 		catcher.Wrapf(conf.Links[idx].Validate(), "%d of %T is not valid", idx, conf.Links[idx])
 	}
@@ -375,6 +379,21 @@ func (conf *LinkConf) Validate() error {
 	}
 
 	conf.Path, err = homedir.Expand(conf.Path)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+func (conf *MailConf) Validate() error {
+	var err error
+	conf.Path, err = homedir.Expand(conf.Path)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	conf.MuPath, err = homedir.Expand(conf.MuPath)
 	if err != nil {
 		return errors.WithStack(err)
 	}

@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"os"
 	"time"
 
 	"github.com/deciduosity/amboy"
@@ -25,7 +26,8 @@ func Utilities() cli.Command {
 
 func diffTrees() cli.Command {
 	return cli.Command{
-		Name: "tree-diff",
+		Name:  "tree-diff",
+		Usage: "Compare two trees of files",
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "target",
@@ -35,22 +37,29 @@ func diffTrees() cli.Command {
 				Name:  "mirror",
 				Usage: "path of imutable upstream copy",
 			},
+			cli.BoolFlag{
+				Name:  "deleteMatching",
+				Usage: "when specified delete files from the target that are the same in the mirror",
+			},
 		},
 		Before: setMultiPositionalArgs("target", "mirror"),
 		Action: func(c *cli.Context) error {
+			shouldDelete := c.Bool("deleteMatching")
 			opts := dupe.Options{
-				Target:    c.String("target"),
-				Mirror:    c.String("mirror"),
-				Semantics: dupe.NameAndContent,
+				Target: c.String("target"),
+				Mirror: c.String("mirror"),
 			}
 
-			paths, err := dupe.ListDiffs(opts)
+			paths, err := dupe.Find(opts)
 			if err != nil {
 				return err
 			}
 
 			for _, p := range paths {
 				grip.Info(p)
+				if shouldDelete {
+					grip.Warning(os.Remove(p))
+				}
 			}
 			return nil
 		},

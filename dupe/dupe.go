@@ -11,22 +11,22 @@ import (
 	"github.com/deciduosity/grip/message"
 )
 
-type Semantics int
+type DiffMode int
 
 const (
-	NameAndContent Semantics = iota
-	NameOnly
+	DiffMissing DiffMode = iota
+	DiffSame
+	Diff
 )
 
 type Options struct {
-	Target    string
-	Mirror    string
-	Semantics Semantics
+	Target string
+	Mirror string
+	Mode   DiffMode
+	Header string
 }
 
 type state map[string]string
-
-// TODO: add results type
 
 func readTree(root string) (state, error) {
 	out := state{}
@@ -53,7 +53,7 @@ func readTree(root string) (state, error) {
 			return err
 		}
 
-		out[path] = strings.Trim(string(content), "\n\t ")
+		out[path[len(root)+1:]] = strings.Trim(string(content), "\n\t ")
 
 		return nil
 	})
@@ -65,7 +65,19 @@ func readTree(root string) (state, error) {
 	return out, nil
 }
 
-func ListDiffs(opts Options) ([]string, error) {
+type comparsioPayload struct {
+	targetName    string
+	targetContent string
+	targetExists  bool
+	mirrorName    string
+	mirrorContent string
+	mirrorExists  bool
+}
+
+// desired cases:
+//  find files in the target that are the same as targets in the mirror
+
+func Find(opts Options) ([]string, error) {
 	target, err := readTree(opts.Target)
 	if err != nil {
 		return nil, err
@@ -78,20 +90,19 @@ func ListDiffs(opts Options) ([]string, error) {
 
 	out := []string{}
 	for path, tc := range target {
-		if mc, ok := mirror[path]; ok {
-			if mc == tc {
-				continue
-			}
+		mc, ok := mirror[path]
+		if ok && mc == tc {
+			out = append(out, filepath.Join(opts.Target, path))
 		}
-
-		out = append(out, path)
 	}
 
 	sort.Strings(out)
 
 	grip.Info(message.Fields{
+		"target":  opts.Target,
+		"mirror":  opts.Mirror,
 		"targets": len(target),
-		"mirror":  len(mirror),
+		"mirrors": len(mirror),
 		"diffs":   len(out),
 	})
 

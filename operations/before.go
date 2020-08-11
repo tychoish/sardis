@@ -50,7 +50,7 @@ func requirePathExists(flagName string) cli.BeforeFunc {
 		path := c.String(flagName)
 		if path == "" {
 			if c.NArg() != 1 {
-				return errors.New("must specify the path to an evergreen configuration")
+				return errors.New("must specify the path to a configuration")
 			}
 			path = c.Args().Get(0)
 		}

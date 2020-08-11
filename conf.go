@@ -166,20 +166,20 @@ func (conf *Configuration) Validate() error {
 	catcher.Add(conf.Settings.Validate())
 	catcher.Add(conf.System.Arch.Validate())
 
-	for idx, c := range conf.Repo {
-		catcher.Wrapf(c.Validate(), "%d of %T is not valid", idx, c)
+	for idx := range conf.Repo {
+		catcher.Wrapf(conf.Repo[idx].Validate(), "%d of %T is not valid", idx, conf.Repo[idx])
 	}
 
-	for idx, c := range conf.Links {
-		catcher.Wrapf(c.Validate(), "%d of %T is not valid", idx, c)
+	for idx := range conf.Links {
+		catcher.Wrapf(conf.Links[idx].Validate(), "%d of %T is not valid", idx, conf.Links[idx])
 	}
 
-	for idx, c := range conf.Hosts {
-		catcher.Wrapf(c.Validate(), "%d of %T is not valid", idx, c)
+	for idx := range conf.Hosts {
+		catcher.Wrapf(conf.Hosts[idx].Validate(), "%d of %T is not valid", idx, conf.Hosts[idx])
 	}
 
-	for idx, c := range conf.Commands {
-		catcher.Wrapf(c.Validate(), "%d of %T is not valid", idx, c)
+	for idx := range conf.Commands {
+		catcher.Wrapf(conf.Commands[idx].Validate(), "%d of %T is not valid", idx, conf.Commands[idx])
 	}
 
 	return catcher.Resolve()

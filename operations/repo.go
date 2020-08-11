@@ -78,7 +78,7 @@ func repoUpdate() cli.Command {
 				return catcher.Resolve()
 			}
 
-			amboy.WaitInterval(ctx, queue, time.Millisecond)
+			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
 			if err := amboy.ResolveErrors(ctx, queue); err != nil {
 				notify.Error(message.Fields{
 					"repo": repoName,

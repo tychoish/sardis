@@ -1,8 +1,13 @@
 package operations
 
 import (
+	"time"
+
+	"github.com/deciduosity/amboy"
 	"github.com/deciduosity/grip"
+	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/dupe"
+	"github.com/tychoish/sardis/units"
 	"github.com/urfave/cli"
 )
 
@@ -12,6 +17,7 @@ func Utilities() cli.Command {
 		Aliases: []string{"utility"},
 		Usage:   "short utility commands",
 		Subcommands: []cli.Command{
+			setupLinks(),
 			diffTrees(),
 		},
 	}
@@ -49,4 +55,30 @@ func diffTrees() cli.Command {
 			return nil
 		},
 	}
+}
+
+func setupLinks() cli.Command {
+	return cli.Command{
+		Name:  "setup-links",
+		Usage: "setup all configured links",
+		Action: func(c *cli.Context) error {
+			env := sardis.GetEnvironment()
+			conf := env.Configuration()
+			ctx, cancel := env.Context()
+			defer cancel()
+
+			queue := env.Queue()
+			catcher := grip.NewBasicCatcher()
+
+			for _, link := range conf.Links {
+				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(link)))
+			}
+
+			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
+			catcher.Add(amboy.ResolveErrors(ctx, queue))
+
+			return catcher.Resolve()
+		},
+	}
+
 }

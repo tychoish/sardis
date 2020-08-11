@@ -386,6 +386,13 @@ func (conf *CredentialsConf) Validate() error {
 	if conf.Path == "" {
 		return nil
 	}
+
+	var err error
+	conf.Path, err = homedir.Expand(conf.Path)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	return errors.WithStack(util.UnmarshalFile(conf.Path, &conf))
 }
 

@@ -320,6 +320,9 @@ func (conf *RepoConf) Validate() error {
 		return errors.WithStack(err)
 	}
 
+	conf.Post = util.TryExpandHomeDirs(conf.Post)
+	conf.Pre = util.TryExpandHomeDirs(conf.Pre)
+
 	return nil
 }
 
@@ -408,6 +411,9 @@ func (conf *MailConf) Validate() error {
 	if err != nil {
 		return errors.WithStack(err)
 	}
+
+	conf.Post = util.TryExpandHomeDirs(conf.Post)
+	conf.Pre = util.TryExpandHomeDirs(conf.Pre)
 
 	return nil
 }

@@ -3,6 +3,7 @@ package util
 import (
 	"os"
 	"runtime"
+	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
 )
@@ -25,4 +26,23 @@ func GetHostname() string {
 		return "UNKNOWN_HOSTNAME"
 	}
 	return name
+}
+
+func TryExpandHomeDirs(in []string) []string {
+	out := make([]string, len(in))
+
+	for idx := range in {
+		str := in[idx]
+		if strings.HasPrefix(str, "~") {
+			expanded, err := homedir.Expand(str)
+			if err != nil {
+				expanded = str
+			}
+			str = expanded
+		}
+
+		out[idx] = str
+	}
+
+	return out
 }

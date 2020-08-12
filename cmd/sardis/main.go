@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 
 	"github.com/deciduosity/grip"
@@ -108,6 +109,7 @@ func buildApp() *cli.App {
 		return nil
 
 	}
+
 	app.After = func(c *cli.Context) error {
 		err := sardis.GetEnvironment().Close(ctx)
 		cancel()
@@ -130,12 +132,19 @@ func loggingSetup(name, priority string, disableDefault bool) {
 		if err != nil {
 			return
 		}
+
+		if reflect.TypeOf(sys) == reflect.TypeOf(sender) {
+			grip.Debug("skipping attempt to mirror logs to systemd/syslog")
+			return
+		}
+
 		sys.SetName(name)
 
 		err = sys.SetLevel(send.LevelInfo{Threshold: level.FromString(priority), Default: level.Info})
 		if err != nil {
 			return
 		}
+
 		if !disableDefault {
 			sender = send.NewConfiguredMultiSender(sys, sender)
 		} else {

@@ -54,9 +54,10 @@ func buildApp() *cli.App {
 	}
 
 	const (
-		levelFlag   = "level"
-		nameFlag    = "name"
-		disableFlag = "disableStdOutLogging"
+		levelFlag         = "level"
+		nameFlag          = "name"
+		disableFlag       = "disableStdOutLogging"
+		jsonFormatingFlag = "jsonFormatLogging"
 	)
 
 	// These are global options. Use this to configure logging or
@@ -81,19 +82,20 @@ func buildApp() *cli.App {
 				"On non-linux systems this does nothing. ",
 			),
 		},
+		cli.BoolFlag{
+			Name:   jsonFormatingFlag,
+			EnvVar: "SARDIS_LOGGING_ENABLE_JSON_FORMATTING",
+			Usage:  "specify to enable json formating for log messages",
+		},
 		cli.StringFlag{
 			Name:  "conf, c",
 			Value: filepath.Join(util.GetHomeDir(), ".sardis.yaml"),
 		},
-		// TODO log to file/service
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	app.Before = func(c *cli.Context) error {
 		env := sardis.GetEnvironment()
-
-		loggingSetup(c.String(nameFlag), c.String(levelFlag), c.Bool(disableFlag))
 
 		path := c.String("conf")
 		conf, err := sardis.LoadConfiguration(path)
@@ -102,12 +104,18 @@ func buildApp() *cli.App {
 			return nil
 		}
 
+		conf.Settings.Logging.Name = c.String(nameFlag)
+		conf.Settings.Logging.DisableStandardOutput = c.Bool(disableFlag)
+		conf.Settings.Logging.EnableJSONFormating = c.Bool(jsonFormatingFlag)
+		conf.Settings.Logging.Priority = level.FromString(c.String(levelFlag))
+
+		loggingSetup(conf.Settings.Logging)
+
 		if err := env.Configure(ctx, conf); err != nil {
 			return errors.Wrap(err, "problem configuring app")
 		}
 
 		return nil
-
 	}
 
 	app.After = func(c *cli.Context) error {
@@ -120,13 +128,18 @@ func buildApp() *cli.App {
 }
 
 // logging setup is separate to make it unit testable
-func loggingSetup(name, priority string, disableDefault bool) {
-	grip.SetName(name)
+func loggingSetup(conf sardis.LoggingConf) {
+	grip.SetName(conf.Name)
 	sender := grip.GetSender()
 
 	li := sender.Level()
-	li.Threshold = level.FromString(priority)
+	li.Threshold = conf.Priority
 	sender.SetLevel(li)
+
+	if conf.EnableJSONFormating {
+		sender.SetFormatter(send.MakeJSONFormatter())
+	}
+
 	if runtime.GOOS == "linux" {
 		sys, err := send.MakeDefaultSystem()
 		if err != nil {
@@ -138,14 +151,18 @@ func loggingSetup(name, priority string, disableDefault bool) {
 			return
 		}
 
-		sys.SetName(name)
+		sys.SetName(conf.Name)
 
-		err = sys.SetLevel(send.LevelInfo{Threshold: level.FromString(priority), Default: level.Info})
+		err = sys.SetLevel(send.LevelInfo{Threshold: conf.Priority, Default: level.Info})
 		if err != nil {
 			return
 		}
 
-		if !disableDefault {
+		if conf.EnableJSONFormating {
+			sys.SetFormatter(send.MakeJSONFormatter())
+		}
+
+		if !conf.DisableStandardOutput {
 			sender = send.NewConfiguredMultiSender(sys, sender)
 		} else {
 			sender = sys

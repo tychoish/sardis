@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/deciduosity/grip"
+	"github.com/deciduosity/grip/level"
 	"github.com/deciduosity/grip/send"
 	"github.com/deciduosity/utility"
 	git "github.com/go-git/go-git/v5"
@@ -89,6 +90,14 @@ type Settings struct {
 	Queue              AmboyConf       `bson:"amboy" json:"amboy" yaml:"amboy"`
 	Credentials        CredentialsConf `bson:"credentials" json:"credentials" yaml:"credentials"`
 	SSHAgentSocketPath string          `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
+	Logging            LoggingConf     `bson:"logging" json:"logging" yaml:"logging"`
+}
+
+type LoggingConf struct {
+	Name                  string         `bson:"name" json:"name" yaml:"name"`
+	DisableStandardOutput bool           `bson:"disable_standard_output" json:"disable_standard_output" yaml:"disable_standard_output"`
+	EnableJSONFormating   bool           `bson:"enable_json_formatting" json:"enable_json_formatting" yaml:"enable_json_formatting"`
+	Priority              level.Priority `bson:"priority" json:"priority" yaml:"priority"`
 }
 
 type CredentialsConf struct {
@@ -480,7 +489,7 @@ func (conf *Configuration) ExportCommands() map[string]CommandConf {
 	for idx := range conf.Commands {
 		cmd := conf.Commands[idx]
 		out[cmd.Name] = cmd
-
 	}
+
 	return out
 }

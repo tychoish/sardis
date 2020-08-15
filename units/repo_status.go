@@ -15,6 +15,7 @@ import (
 	"github.com/deciduosity/grip/level"
 	"github.com/deciduosity/grip/message"
 	"github.com/deciduosity/grip/send"
+	git "github.com/go-git/go-git/v5"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 )
@@ -75,12 +76,42 @@ func (j *repoStatusJob) Run(ctx context.Context) {
 		AppendArgs("git", "status", "--short", "--branch").
 		Run(ctx))
 
+	j.AddError(j.doOtherStat())
+
 	grip.Debug(message.Fields{
 		"op":     "git status",
 		"repo":   j.Path,
 		"secs":   time.Since(startAt).Seconds(),
 		"errors": j.HasErrors(),
 	})
+}
+
+func (j *repoStatusJob) doOtherStat() error {
+	repo, err := git.PlainOpen(j.Path)
+	if err != nil {
+		return err
+	}
+
+	wt, err := repo.Worktree()
+	if err != nil {
+		return err
+	}
+
+	stat, err := wt.Status()
+	if err != nil {
+		return err
+	}
+
+	for fn, status := range stat {
+		grip.Notice(message.Fields{
+			"file":     fn,
+			"repo":     j.Path,
+			"stat":     "golib",
+			"staging":  status.Staging,
+			"worktree": status.Worktree,
+		})
+	}
+	return nil
 }
 
 func getStatusCommandArgs(path string) []string {

@@ -1,6 +1,8 @@
 package sardis
 
 import (
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,10 +81,11 @@ type NotifyConf struct {
 }
 
 type LinkConf struct {
-	Name   string `bson:"name" json:"name" yaml:"name"`
-	Path   string `bson:"path" json:"path" yaml:"path"`
-	Target string `bson:"target" json:"target" yaml:"target"`
-	Update bool   `bson:"update" json:"update" yaml:"update"`
+	Name              string `bson:"name" json:"name" yaml:"name"`
+	Path              string `bson:"path" json:"path" yaml:"path"`
+	Target            string `bson:"target" json:"target" yaml:"target"`
+	Update            bool   `bson:"update" json:"update" yaml:"update"`
+	DirectoryContents bool   `bson:"directory_contents" json:"directory_contents" yaml:"directory_contents"`
 }
 
 type Settings struct {
@@ -187,6 +190,7 @@ func (conf *Configuration) Validate() error {
 		catcher.Wrapf(conf.Projects[idx].Validate(), "%d of %T is not valid", idx, conf.Projects[idx])
 	}
 
+	conf.Links = conf.expandLinks(catcher)
 	for idx := range conf.Links {
 		catcher.Wrapf(conf.Links[idx].Validate(), "%d of %T is not valid", idx, conf.Links[idx])
 	}
@@ -200,6 +204,46 @@ func (conf *Configuration) Validate() error {
 	}
 
 	return catcher.Resolve()
+}
+
+func (conf *Configuration) expandLinks(catcher grip.Catcher) []LinkConf {
+	var err error
+	links := make([]LinkConf, 0, len(conf.Links))
+	for idx := range conf.Links {
+		lnk := conf.Links[idx]
+		lnk.Target, err = homedir.Expand(lnk.Target)
+		if err != nil {
+			catcher.Add(err)
+			continue
+		}
+
+		lnk.Path, err = homedir.Expand(lnk.Path)
+		if err != nil {
+			catcher.Add(err)
+			continue
+		}
+
+		if lnk.DirectoryContents {
+			files, err := ioutil.ReadDir(lnk.Target)
+			if err != nil {
+				catcher.Add(err)
+				continue
+			}
+			for _, info := range files {
+				name := info.Name()
+				links = append(links, LinkConf{
+					Name:   fmt.Sprintf("%s:%s", lnk.Name, name),
+					Path:   filepath.Join(lnk.Path, name),
+					Target: filepath.Join(lnk.Target, name),
+					Update: lnk.Update,
+				})
+			}
+		} else {
+			links = append(links, lnk)
+		}
+	}
+
+	return links
 }
 
 func (conf *Settings) Validate() error {
@@ -393,17 +437,6 @@ func (conf *LinkConf) Validate() error {
 		} else {
 			return errors.New("must specify a location for the link")
 		}
-	}
-
-	var err error
-	conf.Target, err = homedir.Expand(conf.Target)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	conf.Path, err = homedir.Expand(conf.Path)
-	if err != nil {
-		return errors.WithStack(err)
 	}
 
 	return nil

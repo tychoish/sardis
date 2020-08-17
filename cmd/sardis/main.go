@@ -108,6 +108,7 @@ func buildApp() *cli.App {
 		conf.Settings.Logging.DisableStandardOutput = c.Bool(disableFlag)
 		conf.Settings.Logging.EnableJSONFormating = c.Bool(jsonFormatingFlag)
 		conf.Settings.Logging.Priority = level.FromString(c.String(levelFlag))
+		conf.Settings.Notification.Name = conf.Settings.Logging.Name
 
 		loggingSetup(conf.Settings.Logging)
 

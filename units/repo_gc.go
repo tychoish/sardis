@@ -68,6 +68,7 @@ func (j *repoCleanupJob) Run(ctx context.Context) {
 		ID(j.ID()).Directory(j.Path).
 		SetCombinedSender(level.Info, grip.GetSender()).
 		AppendArgs("git", "gc").
+		AppendArgs("git", "prune").
 		Run(ctx))
 
 	grip.Notice(message.Fields{

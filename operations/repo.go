@@ -82,14 +82,16 @@ func repoUpdate() cli.Command {
 			if err := amboy.ResolveErrors(ctx, queue); err != nil {
 				notify.Error(message.Fields{
 					"repo": repoName,
-					"err":  err.Error(),
+					"op":   "repo sync",
+					"code": err.Error(),
 				})
 				return errors.Wrap(err, "problem found executing jobs")
 			}
 
 			notify.Notice(message.Fields{
-				"message": "successfully synchronized repository",
-				"repo":    repoName,
+				"op":   "repo sync",
+				"code": "success",
+				"repo": repoName,
 			})
 
 			return amboy.ResolveErrors(ctx, queue)
@@ -196,8 +198,9 @@ func repoSync() cli.Command {
 
 			if !hasChanges {
 				grip.Info(message.Fields{
-					"message": "no changes detected",
-					"repo":    name,
+					"code": "noop",
+					"op":   "sync",
+					"repo": name,
 				})
 				return nil
 			}
@@ -211,16 +214,18 @@ func repoSync() cli.Command {
 
 			if err := amboy.ResolveErrors(ctx, queue); err != nil {
 				notify.Error(message.Fields{
-					"op":  name,
-					"err": err.Error(),
+					"repo": name,
+					"op":   "sync",
+					"code": err.Error(),
 				})
 				return errors.Wrap(err, "problem found executing jobs")
 			}
 
 			notify.Notice(message.Fields{
-				"message": "successfully synchronized repository",
-				"host":    host,
-				"repo":    name,
+				"op":   "sync",
+				"code": "success",
+				"host": host,
+				"repo": name,
 			})
 
 			return nil

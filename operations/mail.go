@@ -120,9 +120,9 @@ func syncMailRepo() cli.Command {
 			catcher.Add(err)
 			if err != nil {
 				notify.Error(message.WrapError(err, message.Fields{
-					"message": "encountered problem syncing repository",
-					"name":    conf.Name,
-					"path":    conf.Path,
+					"op":   "sync mail repo",
+					"name": conf.Name,
+					"path": conf.Path,
 				}))
 			}
 
@@ -132,10 +132,10 @@ func syncMailRepo() cli.Command {
 				job.Run(ctx)
 				err = job.Error()
 				notify.Error(message.WrapError(err, message.Fields{
-					"message": "problem updating mail database",
-					"emacs":   conf.Emacs,
-					"name":    conf.Name,
-					"path":    conf.Path,
+					"op":    "updating mail database",
+					"emacs": conf.Emacs,
+					"name":  conf.Name,
+					"path":  conf.Path,
 				}))
 				catcher.Add(err)
 			}
@@ -145,9 +145,9 @@ func syncMailRepo() cli.Command {
 			}
 
 			notify.Notice(message.Fields{
-				"message": "successfully synchronized repository",
-				"name":    conf.Name,
-				"path":    conf.Path,
+				"op":   "sync mail repo",
+				"name": conf.Name,
+				"path": conf.Path,
 			})
 
 			return nil
@@ -185,7 +185,7 @@ func syncAllMailRepos() cli.Command {
 				return err
 			}
 
-			notify.Notice("completed mail sync operation successfully")
+			notify.Notice("synced all mail repositories")
 			return nil
 		},
 	}

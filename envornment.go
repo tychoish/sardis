@@ -127,7 +127,6 @@ func (c *appServicesCache) initSender() error {
 		loggers = append(loggers, root)
 		c.logger = logging.MakeGrip(send.NewConfiguredMultiSender(loggers...))
 	}()
-
 	levels := send.LevelInfo{Default: level.Notice, Threshold: level.Info}
 	sender, err := send.NewXMPPLogger(
 		c.conf.Settings.Notification.Name,

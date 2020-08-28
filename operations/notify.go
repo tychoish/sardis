@@ -33,7 +33,7 @@ func notifyPipe() cli.Command {
 
 			scanner := bufio.NewScanner(os.Stdin)
 			for scanner.Scan() {
-				logger.Info(message.NewString(scanner.Text()))
+				logger.Notice(message.NewString(scanner.Text()))
 			}
 			return nil
 		},
@@ -47,8 +47,8 @@ func notifySend() cli.Command {
 		Before: requireConfig(),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
-
 			logger := env.Logger()
+
 			logger.Notice(strings.Join(c.Args(), " "))
 
 			return nil

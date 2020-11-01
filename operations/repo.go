@@ -7,6 +7,7 @@ import (
 	"github.com/deciduosity/amboy"
 	"github.com/deciduosity/grip"
 	"github.com/deciduosity/grip/message"
+	"github.com/deciduosity/grip/sometimes"
 	"github.com/deciduosity/utility"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
@@ -58,17 +59,18 @@ func repoUpdate() cli.Command {
 				return errors.Wrap(err, "problem checking repository status")
 			}
 
-			if !hasChanges {
+			queue := env.Queue()
+			catcher := grip.NewBasicCatcher()
+
+			if hasChanges {
+				catcher.Add(units.SyncRepo(ctx, queue, repo))
+			} else {
 				grip.Info(message.Fields{
 					"repo":   repoName,
 					"status": "no changes",
 				})
-				return nil
+				catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(repo)))
 			}
-
-			queue := env.Queue()
-			catcher := grip.NewBasicCatcher()
-			catcher.Add(units.SyncRepo(ctx, queue, repo))
 
 			for _, link := range conf.Links {
 				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(link)))
@@ -88,13 +90,16 @@ func repoUpdate() cli.Command {
 				return errors.Wrap(err, "problem found executing jobs")
 			}
 
-			notify.Notice(message.Fields{
+			shouldNotify := hasChanges || (sometimes.Fifth() && sometimes.Fifth())
+			msg := message.Fields{
 				"op":   "repo sync",
 				"code": "success",
 				"repo": repoName,
-			})
+			}
+			notify.NoticeWhen(shouldNotify, msg)
+			grip.InfoWhen(!shouldNotify, msg)
 
-			return amboy.ResolveErrors(ctx, queue)
+			return nil
 		},
 	}
 }

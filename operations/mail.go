@@ -7,6 +7,7 @@ import (
 	"github.com/deciduosity/amboy"
 	"github.com/deciduosity/grip"
 	"github.com/deciduosity/grip/message"
+	"github.com/deciduosity/grip/sometimes"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
@@ -118,13 +119,11 @@ func syncMailRepo() cli.Command {
 
 			err := job.Error()
 			catcher.Add(err)
-			if err != nil {
-				notify.Error(message.WrapError(err, message.Fields{
-					"op":   "sync mail repo",
-					"name": conf.Name,
-					"path": conf.Path,
-				}))
-			}
+			notify.Error(message.WrapError(err, message.Fields{
+				"op":   "sync mail repo",
+				"name": conf.Name,
+				"path": conf.Path,
+			}))
 
 			if !skipUpdate {
 				job = units.NewMailUpdaterJob(conf.Path, conf.MuPath, conf.Emacs, false)
@@ -144,11 +143,16 @@ func syncMailRepo() cli.Command {
 				return catcher.Resolve()
 			}
 
-			notify.Notice(message.Fields{
+			shouldNotify := sometimes.Half()
+
+			msg := message.Fields{
 				"op":   "sync mail repo",
 				"name": conf.Name,
 				"path": conf.Path,
-			})
+			}
+
+			notify.NoticeWhen(shouldNotify, msg)
+			grip.InfoWhen(!shouldNotify, msg)
 
 			return nil
 		},

@@ -1,8 +1,10 @@
 package operations
 
 import (
+	"bytes"
 	"fmt"
 
+	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
 	"github.com/cheynewallace/tabby"
 	"github.com/deciduosity/grip"
 	"github.com/deciduosity/grip/level"
@@ -25,6 +27,7 @@ func RunCommand() cli.Command {
 		},
 		Subcommands: []cli.Command{
 			listCommands(),
+			qrCode(),
 		},
 		Before: mergeBeforeFuncs(
 			requireConfig(),
@@ -81,6 +84,38 @@ func listCommands() cli.Command {
 			}
 
 			table.Print()
+
+			return nil
+		},
+	}
+}
+
+type bufCloser struct {
+	bytes.Buffer
+}
+
+func (b bufCloser) Close() error { return nil }
+
+func qrCode() cli.Command {
+	return cli.Command{
+		Name:   "qr",
+		Usage:  "gets qrcode from x11 clipboard and renders it on the terminal",
+		Before: requireConfig(),
+		Action: func(c *cli.Context) error {
+			env := sardis.GetEnvironment()
+			ctx, cancel := env.Context()
+			defer cancel()
+			buf := &bufCloser{}
+
+			err := env.Jasper().CreateCommand(ctx).
+				AppendArgs("xsel", "--clipboard", "--output").SetOutputWriter(buf).
+				Run(ctx)
+			if err != nil {
+				return errors.Wrap(err, "problem getting clipboard")
+			}
+
+			grip.Info(buf.String())
+			qrcodeTerminal.New().Get(buf.String()).Print()
 
 			return nil
 		},

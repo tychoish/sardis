@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/deciduosity/grip/message"
+	"github.com/cdr/grip/message"
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli"
 )
@@ -54,5 +54,4 @@ func notifySend() cli.Command {
 			return nil
 		},
 	}
-
 }

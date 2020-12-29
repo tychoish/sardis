@@ -3,7 +3,7 @@ package operations
 import (
 	"os"
 
-	"github.com/deciduosity/grip"
+	"github.com/cdr/grip"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli"

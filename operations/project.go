@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/deciduosity/amboy"
+	"github.com/cdr/amboy"
 	"github.com/deciduosity/utility"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"

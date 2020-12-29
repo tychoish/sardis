@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"runtime"
 
-	"github.com/deciduosity/grip"
-	"github.com/deciduosity/grip/level"
-	"github.com/deciduosity/grip/send"
+	"github.com/cdr/grip"
+	"github.com/cdr/grip/level"
+	"github.com/cdr/grip/send"
 	jaspercli "github.com/deciduosity/jasper/cli"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"

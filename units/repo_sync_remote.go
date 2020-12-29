@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/deciduosity/amboy"
-	"github.com/deciduosity/amboy/dependency"
-	"github.com/deciduosity/amboy/job"
-	"github.com/deciduosity/grip"
-	"github.com/deciduosity/grip/level"
-	"github.com/deciduosity/grip/message"
+	"github.com/cdr/amboy"
+	"github.com/cdr/amboy/dependency"
+	"github.com/cdr/amboy/job"
+	"github.com/cdr/grip"
+	"github.com/cdr/grip/level"
+	"github.com/cdr/grip/message"
 	"github.com/tychoish/sardis"
 )
 

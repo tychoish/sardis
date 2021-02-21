@@ -26,6 +26,7 @@ type Configuration struct {
 	System   SystemConf    `bson:"system" json:"system" yaml:"system"`
 	Commands []CommandConf `bson:"commands" json:"commands" yaml:"commands"`
 	Projects []ProjectConf `bson:"projects" json:"projects" yaml:"projects"`
+	Blog     []BlogConf    `bson:"blog" json:"blog" yaml:"blog"`
 }
 
 type MailConf struct {
@@ -147,6 +148,13 @@ type ProjectConf struct {
 	Name         string                `bson:"name" json:"name" yaml:"name"`
 	Options      ProjectOptions        `bson:"options" json:"options" yaml:"options"`
 	Repositories []ProjectRepositories `bson:"repos" json:"repos" yaml:"repos"`
+}
+
+type BlogConf struct {
+	RepoName       string   `bson:"repo" json:"repo" yaml:"repo"`
+	Notify         bool     `bson:"notifyt" json:"notifyt" yaml:"notifyt"`
+	Enabled        bool     `bson:"enabled" json:"enabled" yaml:"enabled"`
+	DeployCommands []string `bson:"deploy_commands" json:"deploy_commands" yaml:"deploy_commands"`
 }
 
 type ProjectOptions struct {

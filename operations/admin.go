@@ -1,7 +1,7 @@
 package operations
 
 import (
-	"github.com/cdr/grip"
+	"github.com/tychoish/grip"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli"

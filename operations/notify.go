@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cdr/grip/message"
+	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli"
 )

@@ -24,15 +24,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cdr/amboy"
-	"github.com/cdr/amboy/queue"
-	"github.com/cdr/grip"
-	"github.com/cdr/grip/level"
-	"github.com/cdr/grip/logging"
-	"github.com/cdr/grip/message"
-	"github.com/cdr/grip/send"
-	"github.com/deciduosity/jasper"
+	"github.com/tychoish/jasper"
 	"github.com/pkg/errors"
+	"github.com/tychoish/amboy"
+	"github.com/tychoish/amboy/queue"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/level"
+	"github.com/tychoish/grip/logging"
+	"github.com/tychoish/grip/message"
+	"github.com/tychoish/grip/send"
 )
 
 // BuildRevision stores the commit in the git repository at build time
@@ -262,7 +262,10 @@ func (c *appServicesCache) initTwitter() error {
 }
 
 func (c *appServicesCache) initQueue() error {
-	c.queue = queue.NewLocalLimitedSize(c.conf.Settings.Queue.Workers, c.conf.Settings.Queue.Size)
+	c.queue = queue.NewLocalLimitedSize(&queue.FixedSizeQueueOptions{
+		Workers:  c.conf.Settings.Queue.Workers,
+		Capacity: c.conf.Settings.Queue.Size,
+	})
 
 	grip.Debug(message.Fields{
 		"op":      "configured local queue",

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cdr/amboy"
-	"github.com/cdr/grip"
+	"github.com/tychoish/amboy"
+	"github.com/tychoish/grip"
 	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 )

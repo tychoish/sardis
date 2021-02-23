@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cdr/grip"
-	"github.com/cdr/grip/level"
-	"github.com/cdr/grip/send"
 	"github.com/deciduosity/utility"
 	git "github.com/go-git/go-git/v5"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/level"
+	"github.com/tychoish/grip/send"
 	"github.com/tychoish/sardis/util"
 )
 

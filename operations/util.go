@@ -4,8 +4,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/cdr/amboy"
-	"github.com/cdr/grip"
+	"github.com/tychoish/amboy"
+	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/dupe"
 	"github.com/tychoish/sardis/units"

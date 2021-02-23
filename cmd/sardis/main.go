@@ -8,11 +8,11 @@ import (
 	"reflect"
 	"runtime"
 
-	"github.com/cdr/grip"
-	"github.com/cdr/grip/level"
-	"github.com/cdr/grip/send"
-	jaspercli "github.com/deciduosity/jasper/cli"
+	jaspercli "github.com/tychoish/jasper/cli"
 	"github.com/pkg/errors"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/level"
+	"github.com/tychoish/grip/send"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/operations"
 	"github.com/tychoish/sardis/util"
@@ -49,6 +49,7 @@ func buildApp() *cli.App {
 		operations.Jira(),
 		operations.RunCommand(),
 		operations.Project(),
+		operations.Blog(),
 		operations.Utilities(),
 		jaspercli.Jasper(),
 	}

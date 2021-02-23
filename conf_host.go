@@ -6,10 +6,10 @@ import (
 	"net"
 	"time"
 
-	"github.com/deciduosity/jasper"
-	jaspercli "github.com/deciduosity/jasper/cli"
-	"github.com/deciduosity/jasper/options"
-	"github.com/deciduosity/jasper/remote"
+	"github.com/tychoish/jasper"
+	jaspercli "github.com/tychoish/jasper/cli"
+	"github.com/tychoish/jasper/options"
+	"github.com/tychoish/jasper/remote"
 	"github.com/pkg/errors"
 )
 

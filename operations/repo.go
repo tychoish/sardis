@@ -66,9 +66,11 @@ func repoUpdate() cli.Command {
 			}
 
 			started := time.Now()
+			stat := queue.Stats(ctx)
 			grip.Info(message.Fields{
 				"op":      "repo sync",
 				"message": "waiting for jobs to complete",
+				"jobs":    stat.Total,
 				"tag":     tagName,
 			})
 			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
@@ -76,12 +78,14 @@ func repoUpdate() cli.Command {
 
 			// QUESTION: should we send notification here
 			grip.Notice(message.Fields{
-				"op":      "repo sync",
-				"code":    "success",
-				"repo":    tagName,
-				"changed": hadChanges,
-				"dur_sec": time.Since(started).Seconds(),
-				"err":     catcher.HasErrors(),
+				"op":       "repo sync",
+				"code":     "success",
+				"repo":     tagName,
+				"changed":  hadChanges,
+				"dur_sec":  time.Since(started).Seconds(),
+				"err":      catcher.HasErrors(),
+				"num_errs": catcher.Len(),
+				"jobs":     stat.Total,
 			})
 
 			return catcher.Resolve()

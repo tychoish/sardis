@@ -41,10 +41,13 @@ type RepoConf struct {
 	Branch     string   `bson:"branch" json:"branch" yaml:"branch"`
 	LocalSync  bool     `bson:"sync" json:"sync" yaml:"sync"`
 	Fetch      bool     `bson:"fetch" json:"fetch" yaml:"fetch"`
+	Notify     bool     `bson:"notify" json:"notify" yaml:"notify"`
+	Disabled   bool     `bson:"disabled" json:"disabled" yaml:"disabled"`
 	Pre        []string `bson:"pre" json:"pre" yaml:"pre"`
 	Post       []string `bson:"post" json:"post" yaml:"post"`
 	Mirrors    []string `bson:"mirrors" json:"mirrors" yaml:"mirrors"`
 	Tags       []string `bson:"tags" json:"tags" yaml:"tags"`
+	Deploy     []string `bson:"deploy" json:"deploy" yaml:"deploy"`
 }
 
 type ArchLinuxConf struct {

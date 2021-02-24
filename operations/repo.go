@@ -45,6 +45,7 @@ func repoUpdate() cli.Command {
 			ctx, cancel := env.Context()
 			defer cancel()
 
+			notify := env.Logger()
 			conf := env.Configuration()
 
 			repos := conf.GetTaggedRepos(tagName)
@@ -55,10 +56,16 @@ func repoUpdate() cli.Command {
 			queue := env.Queue()
 			catcher := grip.NewBasicCatcher()
 
-			hadChanges := []string{}
-
+			shouldNotify := false
 			for idx := range repos {
-				catcher.Add(units.SyncRepo(ctx, queue, &repos[idx]))
+				repo := &repos[idx]
+				if repo.Disabled {
+					continue
+				}
+				if repo.Notify {
+					shouldNotify = true
+				}
+				catcher.Add(units.SyncRepo(ctx, queue, repo))
 			}
 
 			if catcher.HasErrors() {
@@ -73,15 +80,27 @@ func repoUpdate() cli.Command {
 				"jobs":    stat.Total,
 				"tag":     tagName,
 			})
-			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
+			if stat.Total > 0 || !stat.IsComplete() {
+				amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
+			}
 			catcher.Wrap(amboy.ResolveErrors(ctx, queue), "jobs encountered error")
+
+			if shouldNotify {
+				notify.Notice(message.Fields{
+					"tag":     tagName,
+					"errors":  catcher.Len(),
+					"jobs":    stat.Total,
+					"repos":   len(repos),
+					"op":      "repo sync",
+					"dur_sec": time.Since(started).Seconds(),
+				})
+			}
 
 			// QUESTION: should we send notification here
 			grip.Notice(message.Fields{
 				"op":       "repo sync",
 				"code":     "success",
-				"repo":     tagName,
-				"changed":  hadChanges,
+				"tag":      tagName,
 				"dur_sec":  time.Since(started).Seconds(),
 				"err":      catcher.HasErrors(),
 				"num_errs": catcher.Len(),

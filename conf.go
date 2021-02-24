@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/deciduosity/utility"
 	git "github.com/go-git/go-git/v5"
@@ -213,11 +214,25 @@ func (conf *Configuration) expandLinkedFiles(catcher grip.Catcher) {
 	}
 	defer func() { conf.linkedFilesRead = true }()
 
-	confs := make([]*Configuration, len(conf.Settings.ConfigPaths))
-	var err error
+	pipe := make(chan *Configuration, len(conf.Settings.ConfigPaths))
+
+	wg := &sync.WaitGroup{}
 	for idx, fn := range conf.Settings.ConfigPaths {
-		confs[idx], err = LoadConfiguration(fn)
-		catcher.Wrapf(err, "problem reading linked config file %q", fn)
+		wg.Add(1)
+		go func(idx int, fn string) {
+			defer wg.Done()
+			conf, err := LoadConfiguration(fn)
+			catcher.Wrapf(err, "problem reading linked config file %q", fn)
+			pipe <- conf
+		}(idx, fn)
+	}
+
+	wg.Wait()
+	close(pipe)
+
+	confs := make([]*Configuration, 0, len(conf.Settings.ConfigPaths))
+	for c := range pipe {
+		confs = append(confs, c)
 	}
 
 	conf.Merge(confs...)

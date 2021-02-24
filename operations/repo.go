@@ -19,6 +19,7 @@ func Repo() cli.Command {
 		Name:  "repo",
 		Usage: "a collections of commands to manage repositories",
 		Subcommands: []cli.Command{
+			repoClone(),
 			repoUpdate(),
 			repoSync(),
 			repoCleanup(),
@@ -67,7 +68,7 @@ func repoUpdate() cli.Command {
 				} else if changes {
 					hadChanges = append(hadChanges, repo.Name)
 					catcher.Add(units.SyncRepo(ctx, queue, &repo))
-				} else {
+				} else if repo.Fetch {
 					catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(&repo)))
 				}
 			}
@@ -144,6 +145,47 @@ func repoCleanup() cli.Command {
 			return amboy.ResolveErrors(ctx, queue)
 		},
 	}
+}
+
+func repoClone() cli.Command {
+	const nameFlagName = "name"
+	return cli.Command{
+		Name:  "clone",
+		Usage: "clone a repository or all matching repositories",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name: nameFlagName,
+			},
+		},
+		Before: requireStringOrFirstArgSet(nameFlagName),
+		Action: func(c *cli.Context) error {
+			name := c.String(nameFlagName)
+
+			env := sardis.GetEnvironment()
+			ctx, cancel := env.Context()
+			defer cancel()
+
+			conf := env.Configuration()
+
+			catcher := grip.NewBasicCatcher()
+			queue := env.Queue()
+
+			repos := conf.GetTaggedRepos(name)
+
+			for idx := range repos {
+				catcher.Add(queue.Put(ctx, units.NewRepoCloneJob(&repos[idx])))
+			}
+
+			if catcher.HasErrors() {
+				return errors.Wrap(catcher.Resolve(), "problem queuing jobs")
+			}
+
+			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
+			catcher.Add(amboy.ResolveErrors(ctx, queue))
+			return catcher.Resolve()
+		},
+	}
+
 }
 
 func repoSync() cli.Command {
@@ -306,7 +348,9 @@ func repoFetch() cli.Command {
 			for idx := range repos {
 				repo := &repos[idx]
 
-				catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(repo)))
+				if repo.Fetch {
+					catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(repo)))
+				}
 			}
 
 			amboy.WaitInterval(ctx, queue, 100*time.Millisecond)

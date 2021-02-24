@@ -92,7 +92,10 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 				"target":     j.Conf.Target,
 				"err":        j.HasErrors(),
 			})
+		} else {
+			return
 		}
+
 	}
 
 	linkDir := filepath.Dir(j.Conf.Target)

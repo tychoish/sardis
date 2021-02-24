@@ -1,9 +1,14 @@
 package operations
 
 import (
-	"github.com/tychoish/grip"
+	"time"
+
 	"github.com/pkg/errors"
+	"github.com/tychoish/amboy"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/units"
 	"github.com/urfave/cli"
 )
 
@@ -12,6 +17,7 @@ func Admin() cli.Command {
 		Name: "admin",
 		Subcommands: []cli.Command{
 			configCheck(),
+			nightly(),
 		},
 	}
 }
@@ -28,6 +34,50 @@ func configCheck() cli.Command {
 				grip.Info("configuration is valid")
 			}
 			return errors.Wrap(err, "configuration validation error")
+		},
+	}
+}
+
+func nightly() cli.Command {
+	return cli.Command{
+		Name:   "nightly",
+		Usage:  "run nightly config operation",
+		Before: requireConfig(),
+		Action: func(c *cli.Context) error {
+			env := sardis.GetEnvironment()
+			conf := env.Configuration()
+			queue := env.Queue()
+			catcher := grip.NewBasicCatcher()
+			notify := env.Logger()
+			ctx, cancel := env.Context()
+			defer cancel()
+			startAt := time.Now()
+
+			for _, link := range conf.Links {
+				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(link)))
+			}
+
+			for _, repo := range conf.Repo {
+				catcher.Add(queue.Put(ctx, units.NewRepoCleanupJob(repo.Path)))
+			}
+
+			stat := queue.Stats(ctx)
+			grip.Debug(stat)
+
+			if stat.Total > 0 {
+				amboy.WaitInterval(ctx, queue, 20*time.Millisecond)
+			}
+			catcher.Add(amboy.ResolveErrors(ctx, queue))
+
+			notify.WarningWhen(catcher.HasErrors() || time.Since(startAt) > time.Hour,
+				message.Fields{
+					"errs":    catcher.Len(),
+					"jobs":    stat.Total,
+					"msg":     "problem running nightly tasks",
+					"dur_sec": time.Since(startAt).Seconds(),
+				})
+
+			return catcher.Resolve()
 		},
 	}
 }

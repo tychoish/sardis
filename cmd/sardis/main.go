@@ -8,11 +8,11 @@ import (
 	"reflect"
 	"runtime"
 
-	jaspercli "github.com/tychoish/jasper/cli"
 	"github.com/pkg/errors"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/send"
+	jaspercli "github.com/tychoish/jasper/cli"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/operations"
 	"github.com/tychoish/sardis/util"
@@ -43,7 +43,6 @@ func buildApp() *cli.App {
 		operations.Tweet(),
 		operations.Version(),
 		operations.Admin(),
-		operations.Mail(),
 		operations.ArchLinux(),
 		operations.Repo(),
 		operations.Jira(),

@@ -21,7 +21,6 @@ import (
 
 type Configuration struct {
 	Settings Settings      `bson:"settings" json:"settings" yaml:"settings"`
-	Mail     []MailConf    `bson:"mail" json:"mail" yaml:"mail"`
 	Repo     []RepoConf    `bson:"repo" json:"repo" yaml:"repo"`
 	Links    []LinkConf    `bson:"links" json:"links" yaml:"links"`
 	Hosts    []HostConf    `bson:"hosts" json:"hosts" yaml:"hosts"`
@@ -32,17 +31,6 @@ type Configuration struct {
 	repoTags         map[string][]*RepoConf
 	indexedRepoCount int
 	linkedFilesRead  bool
-}
-
-type MailConf struct {
-	Name    string   `bson:"name" json:"name" yaml:"name"`
-	Path    string   `bson:"path" json:"path" yaml:"path"`
-	Remote  string   `bson:"remote" json:"remote" yaml:"remote"`
-	Emacs   string   `bson:"emacs" json:"emacs" yaml:"emacs"`
-	MuPath  string   `bson:"mu_path" json:"mu_path" yaml:"mu_path"`
-	Mirrors []string `bson:"mirrors" json:"mirrors" yaml:"mirrors"`
-	Pre     []string `bson:"pre" json:"pre" yaml:"pre"`
-	Post    []string `bson:"post" json:"post" yaml:"post"`
 }
 
 type RepoConf struct {
@@ -184,10 +172,6 @@ func (conf *Configuration) Validate() error {
 		catcher.Wrapf(conf.Repo[idx].Validate(), "%d of %T is not valid", idx, conf.Repo[idx])
 	}
 
-	for idx := range conf.Mail {
-		catcher.Wrapf(conf.Mail[idx].Validate(), "%d of %T is not valid", idx, conf.Mail[idx])
-	}
-
 	conf.Links = conf.expandLinks(catcher)
 	for idx := range conf.Links {
 		catcher.Wrapf(conf.Links[idx].Validate(), "%d of %T is not valid", idx, conf.Links[idx])
@@ -219,6 +203,10 @@ func (conf *Configuration) expandLinkedFiles(catcher grip.Catcher) {
 	wg := &sync.WaitGroup{}
 	for idx, fn := range conf.Settings.ConfigPaths {
 		if !utility.FileExists(fn) {
+			grip.Warning(message.Fields{
+				"file": fn,
+				"msg":  "config file does not exist",
+			})
 			continue
 		}
 
@@ -249,7 +237,6 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) {
 			continue
 		}
 
-		conf.Mail = append(conf.Mail, mcf.Mail...)
 		conf.Repo = append(conf.Repo, mcf.Repo...)
 		conf.Links = append(conf.Links, mcf.Links...)
 		conf.Hosts = append(conf.Hosts, mcf.Hosts...)
@@ -535,24 +522,6 @@ func (conf *LinkConf) Validate() error {
 			return errors.New("must specify a location for the link")
 		}
 	}
-
-	return nil
-}
-
-func (conf *MailConf) Validate() error {
-	var err error
-	conf.Path, err = homedir.Expand(conf.Path)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	conf.MuPath, err = homedir.Expand(conf.MuPath)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	conf.Post = util.TryExpandHomeDirs(conf.Post)
-	conf.Pre = util.TryExpandHomeDirs(conf.Pre)
 
 	return nil
 }

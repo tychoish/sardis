@@ -55,9 +55,16 @@ func SyncRepo(ctx context.Context, queue amboy.Queue, repo *sardis.RepoConf) err
 		}
 	}
 
+	changes, err := repo.HasChanges()
+	catcher.Add(err)
+
 	if repo.LocalSync {
-		catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path, repo.Pre, repo.Post)))
-	} else if repo.Fetch {
+		if changes {
+			catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path, repo.Pre, repo.Post)))
+		} else {
+			catcher.Add(queue.Put(ctx, NewRepoFetchJob(repo)))
+		}
+	} else if repo.Fetch || hasMirrors {
 		catcher.Add(queue.Put(ctx, NewRepoFetchJob(repo)))
 	}
 

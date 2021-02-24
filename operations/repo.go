@@ -1,10 +1,8 @@
 package operations
 
 import (
-	"os"
 	"time"
 
-	"github.com/deciduosity/utility"
 	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/grip"
@@ -21,7 +19,6 @@ func Repo() cli.Command {
 		Subcommands: []cli.Command{
 			repoClone(),
 			repoUpdate(),
-			repoSync(),
 			repoCleanup(),
 			repoStatus(),
 			repoFetch(),
@@ -61,20 +58,7 @@ func repoUpdate() cli.Command {
 			hadChanges := []string{}
 
 			for idx := range repos {
-				repo := repos[idx]
-
-				if changes, err := repo.HasChanges(); err != nil {
-					catcher.Wrapf(err, "detecting changes for %s", repo.Name)
-				} else if changes {
-					hadChanges = append(hadChanges, repo.Name)
-					catcher.Add(units.SyncRepo(ctx, queue, &repo))
-				} else if repo.Fetch {
-					catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(&repo)))
-				}
-			}
-
-			for _, link := range conf.Links {
-				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(link)))
+				catcher.Add(units.SyncRepo(ctx, queue, &repos[idx]))
 			}
 
 			if catcher.HasErrors() {
@@ -186,94 +170,6 @@ func repoClone() cli.Command {
 		},
 	}
 
-}
-
-func repoSync() cli.Command {
-	host, err := os.Hostname()
-	grip.Warning(err)
-	const nameFlagName = "name"
-	return cli.Command{
-		Name:  "sync",
-		Usage: "sync a local and remote git repository",
-		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name: nameFlagName,
-			},
-			cli.StringFlag{
-				Name:  "host",
-				Value: host,
-			},
-		},
-		Before: requireStringOrFirstArgSet(nameFlagName),
-		Action: func(c *cli.Context) error {
-			host := c.String("host")
-			name := c.String(nameFlagName)
-
-			env := sardis.GetEnvironment()
-			ctx, cancel := env.Context()
-			defer cancel()
-
-			notify := env.Logger()
-			conf := env.Configuration()
-
-			catcher := grip.NewBasicCatcher()
-			queue := env.Queue()
-
-			for _, repo := range conf.Mail {
-				if name == repo.Name {
-					catcher.Add(queue.Put(ctx, units.NewMailSyncJob(repo)))
-				}
-			}
-
-			repos := conf.GetTaggedRepos(name)
-
-			for idx := range repos {
-				repo := repos[idx]
-				if utility.StringSliceContains(repo.Tags, "mail") {
-					continue
-				}
-
-				hasChanges, err := repo.HasChanges()
-				catcher.Wrapf(err, "change check for %q", repo.Name)
-				if !hasChanges {
-					grip.Info(message.Fields{
-						"code": "noop",
-						"op":   "sync",
-						"repo": repo.Name,
-					})
-
-					continue
-				}
-
-				catcher.Add(units.SyncRepo(ctx, queue, &repo))
-			}
-
-			if catcher.HasErrors() {
-				return errors.Wrap(catcher.Resolve(), "problem queuing jobs")
-			}
-
-			amboy.WaitInterval(ctx, queue, time.Millisecond)
-
-			if catcher.Add(amboy.ResolveErrors(ctx, queue)); catcher.HasErrors() {
-				err := catcher.Resolve()
-				notify.Error(message.Fields{
-					"repo": name,
-					"op":   "sync",
-					"code": err,
-				})
-				return errors.Wrap(err, "problem found executing jobs")
-			}
-
-			notify.Notice(message.Fields{
-				"op":   "sync",
-				"code": "success",
-				"host": host,
-				"tag":  name,
-			})
-
-			return nil
-		},
-	}
 }
 
 func repoStatus() cli.Command {

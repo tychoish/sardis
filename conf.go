@@ -218,6 +218,10 @@ func (conf *Configuration) expandLinkedFiles(catcher grip.Catcher) {
 
 	wg := &sync.WaitGroup{}
 	for idx, fn := range conf.Settings.ConfigPaths {
+		if !utility.FileExists(fn) {
+			continue
+		}
+
 		wg.Add(1)
 		go func(idx int, fn string) {
 			defer wg.Done()

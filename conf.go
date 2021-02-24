@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
+	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/sardis/util"
 )
@@ -25,8 +26,11 @@ type Configuration struct {
 	Hosts    []HostConf    `bson:"hosts" json:"hosts" yaml:"hosts"`
 	System   SystemConf    `bson:"system" json:"system" yaml:"system"`
 	Commands []CommandConf `bson:"commands" json:"commands" yaml:"commands"`
-	Projects []ProjectConf `bson:"projects" json:"projects" yaml:"projects"`
 	Blog     []BlogConf    `bson:"blog" json:"blog" yaml:"blog"`
+
+	repoTags         map[string][]*RepoConf
+	indexedRepoCount int
+	linkedFilesRead  bool
 }
 
 type MailConf struct {
@@ -51,6 +55,7 @@ type RepoConf struct {
 	Pre        []string `bson:"pre" json:"pre" yaml:"pre"`
 	Post       []string `bson:"post" json:"post" yaml:"post"`
 	Mirrors    []string `bson:"mirrors" json:"mirrors" yaml:"mirrors"`
+	Tags       []string `bson:"tags" json:"tags" yaml:"tags"`
 }
 
 type ArchLinuxConf struct {
@@ -87,6 +92,7 @@ type LinkConf struct {
 	Target            string `bson:"target" json:"target" yaml:"target"`
 	Update            bool   `bson:"update" json:"update" yaml:"update"`
 	DirectoryContents bool   `bson:"directory_contents" json:"directory_contents" yaml:"directory_contents"`
+	RequireSudo       bool   `bson:"sudo" json:"sudo" yaml:"sudo"`
 }
 
 type Settings struct {
@@ -95,6 +101,7 @@ type Settings struct {
 	Credentials        CredentialsConf `bson:"credentials" json:"credentials" yaml:"credentials"`
 	SSHAgentSocketPath string          `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
 	Logging            LoggingConf     `bson:"logging" json:"logging" yaml:"logging"`
+	ConfigPaths        []string        `bson:"config_files" json:"config_files" yaml:"config_files"`
 }
 
 type LoggingConf struct {
@@ -144,26 +151,11 @@ type CommandConf struct {
 	Command   string `bson:"command" json:"command" yaml:"command"`
 }
 
-type ProjectConf struct {
-	Name         string                `bson:"name" json:"name" yaml:"name"`
-	Options      ProjectOptions        `bson:"options" json:"options" yaml:"options"`
-	Repositories []ProjectRepositories `bson:"repos" json:"repos" yaml:"repos"`
-}
-
 type BlogConf struct {
 	RepoName       string   `bson:"repo" json:"repo" yaml:"repo"`
 	Notify         bool     `bson:"notifyt" json:"notifyt" yaml:"notifyt"`
 	Enabled        bool     `bson:"enabled" json:"enabled" yaml:"enabled"`
 	DeployCommands []string `bson:"deploy_commands" json:"deploy_commands" yaml:"deploy_commands"`
-}
-
-type ProjectOptions struct {
-	GithubOrg string `bson:"github_org" json:"github_org" yaml:"github_org"`
-	Directory string `bson:"directory" json:"directory" yaml:"directory"`
-}
-
-type ProjectRepositories struct {
-	Name string `bson:"name" json:"name" yaml:"name"`
 }
 
 func LoadConfiguration(fn string) (*Configuration, error) {
@@ -185,6 +177,7 @@ func (conf *Configuration) Validate() error {
 
 	catcher.Add(conf.Settings.Validate())
 	catcher.Add(conf.System.Arch.Validate())
+	conf.expandLinkedFiles(catcher)
 
 	for idx := range conf.Repo {
 		catcher.Wrapf(conf.Repo[idx].Validate(), "%d of %T is not valid", idx, conf.Repo[idx])
@@ -192,10 +185,6 @@ func (conf *Configuration) Validate() error {
 
 	for idx := range conf.Mail {
 		catcher.Wrapf(conf.Mail[idx].Validate(), "%d of %T is not valid", idx, conf.Mail[idx])
-	}
-
-	for idx := range conf.Projects {
-		catcher.Wrapf(conf.Projects[idx].Validate(), "%d of %T is not valid", idx, conf.Projects[idx])
 	}
 
 	conf.Links = conf.expandLinks(catcher)
@@ -211,7 +200,47 @@ func (conf *Configuration) Validate() error {
 		catcher.Wrapf(conf.Commands[idx].Validate(), "%d of %T is not valid", idx, conf.Commands[idx])
 	}
 
+	if conf.shouldIndexRepos() {
+		conf.mapReposByTags()
+	}
+
 	return catcher.Resolve()
+}
+
+func (conf *Configuration) expandLinkedFiles(catcher grip.Catcher) {
+	if conf.linkedFilesRead {
+		return
+	}
+	defer func() { conf.linkedFilesRead = true }()
+
+	confs := make([]*Configuration, len(conf.Settings.ConfigPaths))
+	var err error
+	for idx, fn := range conf.Settings.ConfigPaths {
+		confs[idx], err = LoadConfiguration(fn)
+		catcher.Wrapf(err, "problem reading linked config file %q", fn)
+	}
+
+	conf.Merge(confs...)
+}
+
+func (conf *Configuration) Merge(mcfs ...*Configuration) {
+	for idx := range mcfs {
+		mcf := mcfs[idx]
+		if mcf == nil {
+			continue
+		}
+
+		conf.Mail = append(conf.Mail, mcf.Mail...)
+		conf.Repo = append(conf.Repo, mcf.Repo...)
+		conf.Links = append(conf.Links, mcf.Links...)
+		conf.Hosts = append(conf.Hosts, mcf.Hosts...)
+		conf.Commands = append(conf.Commands, mcf.Commands...)
+		conf.Blog = append(conf.Blog, mcf.Blog...)
+	}
+
+	if conf.shouldIndexRepos() {
+		conf.mapReposByTags()
+	}
 }
 
 func (conf *Configuration) expandLinks(catcher grip.Catcher) []LinkConf {
@@ -252,6 +281,47 @@ func (conf *Configuration) expandLinks(catcher grip.Catcher) []LinkConf {
 	}
 
 	return links
+}
+
+func (conf *Configuration) GetTaggedRepos(tag string) []RepoConf {
+	rs, ok := conf.repoTags[tag]
+	if !ok {
+		return []RepoConf{}
+	}
+
+	out := make([]RepoConf, len(rs))
+	for idx := range rs {
+		out[idx] = *rs[idx]
+	}
+
+	return out
+}
+
+func (conf *Configuration) shouldIndexRepos() bool { return len(conf.Repo) != conf.indexedRepoCount }
+
+func (conf *Configuration) mapReposByTags() {
+	defer func() { conf.indexedRepoCount = len(conf.Repo) }()
+
+	conf.repoTags = make(map[string][]*RepoConf)
+
+	for idx := range conf.Repo {
+		for _, tag := range conf.Repo[idx].Tags {
+			rted := conf.repoTags[tag]
+			rted = append(rted, &conf.Repo[idx])
+			conf.repoTags[tag] = rted
+		}
+
+		name := conf.Repo[idx].Name
+		rned, ok := conf.repoTags[name]
+
+		grip.WarningWhen(ok, message.Fields{
+			"name":    name,
+			"message": "repo name collides with a configured tag",
+		})
+
+		rned = append(rned, &conf.Repo[idx])
+		conf.repoTags[name] = rned
+	}
 }
 
 func (conf *Settings) Validate() error {
@@ -505,12 +575,6 @@ func (conf *Configuration) GetHost(name string) (*HostConf, error) {
 	}
 
 	return nil, errors.Errorf("could not find a host named '%s'", name)
-}
-
-func (conf *ProjectConf) Validate() error {
-	var err error
-	conf.Options.Directory, err = homedir.Expand(conf.Options.Directory)
-	return err
 }
 
 func (conf *CommandConf) Validate() error {

@@ -48,7 +48,6 @@ func buildApp() *cli.App {
 		operations.Repo(),
 		operations.Jira(),
 		operations.RunCommand(),
-		operations.Project(),
 		operations.Blog(),
 		operations.Utilities(),
 		jaspercli.Jasper(),

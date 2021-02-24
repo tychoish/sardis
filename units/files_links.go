@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/amboy/job"
 	"github.com/tychoish/amboy/registry"
 	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 )
@@ -61,6 +62,8 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 		return
 	}
 
+	jpm := sardis.GetEnvironment().Jasper()
+
 	if _, err := os.Stat(j.Conf.Path); !os.IsNotExist(err) {
 		if !j.Conf.Update {
 			return
@@ -73,7 +76,14 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 		}
 
 		if target != j.Conf.Target {
-			j.AddError(os.Remove(dst))
+			if j.Conf.RequireSudo {
+				j.AddError(jpm.CreateCommand(ctx).Sudo(true).
+					SetCombinedSender(level.Info, grip.GetSender()).
+					AppendArgs("rm", dst).Run(ctx))
+			} else {
+				j.AddError(os.Remove(dst))
+			}
+
 			grip.Info(message.Fields{
 				"id":         j.ID(),
 				"op":         "removed incorrect link target",
@@ -86,11 +96,25 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 	}
 
 	linkDir := filepath.Dir(j.Conf.Target)
-	if _, err := os.Stat(linkDir); os.IsNotExist(err) {
-		j.AddError(os.MkdirAll(linkDir, 0755))
-	}
+	if j.Conf.RequireSudo {
+		cmd := jpm.CreateCommand(ctx).Sudo(true).
+			SetCombinedSender(level.Info, grip.GetSender())
 
-	j.AddError(os.Symlink(j.Conf.Target, j.Conf.Path))
+		if _, err := os.Stat(linkDir); os.IsNotExist(err) {
+			cmd.AppendArgs("mkdir", "-p", linkDir)
+		}
+
+		cmd.AppendArgs("ln", "-s", j.Conf.Target, j.Conf.Path)
+
+		j.AddError(cmd.Run(ctx))
+
+	} else {
+		if _, err := os.Stat(linkDir); os.IsNotExist(err) {
+			j.AddError(os.MkdirAll(linkDir, 0755))
+		}
+
+		j.AddError(os.Symlink(j.Conf.Target, j.Conf.Path))
+	}
 
 	grip.Info(message.Fields{
 		"op":  "created new symbolic link",

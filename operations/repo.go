@@ -9,7 +9,6 @@ import (
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
-	"github.com/tychoish/grip/sometimes"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
 	"github.com/urfave/cli"
@@ -30,46 +29,47 @@ func Repo() cli.Command {
 }
 
 func repoUpdate() cli.Command {
-	const repoFlagName = "repo"
+	const repoTagFlagName = "repo"
 	return cli.Command{
 		Name:  "update",
 		Usage: "update a local and remote git repository according to the config",
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  repoFlagName,
-				Usage: "specify a local repository to updpate",
+				Name:  repoTagFlagName,
+				Usage: "specify tag of repos to update",
 			},
 		},
-		Before: mergeBeforeFuncs(requireConfig(), requireStringOrFirstArgSet(repoFlagName)),
+		Before: mergeBeforeFuncs(requireConfig(), requireStringOrFirstArgSet(repoTagFlagName)),
 		Action: func(c *cli.Context) error {
-			repoName := c.String(repoFlagName)
+			tagName := c.String(repoTagFlagName)
 
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
 
-			notify := env.Logger()
 			conf := env.Configuration()
-			repo := conf.GetRepo(repoName)
-			if repo == nil {
-				return errors.Errorf("no repository named '%s' configured", repoName)
-			}
-			hasChanges, err := repo.HasChanges()
-			if err != nil {
-				return errors.Wrap(err, "problem checking repository status")
+
+			repos := conf.GetTaggedRepos(tagName)
+			if len(repos) == 0 {
+				return errors.Errorf("no tagged repository named '%s' configured", tagName)
 			}
 
 			queue := env.Queue()
 			catcher := grip.NewBasicCatcher()
 
-			if hasChanges {
-				catcher.Add(units.SyncRepo(ctx, queue, repo))
-			} else {
-				grip.Info(message.Fields{
-					"repo":   repoName,
-					"status": "no changes",
-				})
-				catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(repo)))
+			hadChanges := []string{}
+
+			for idx := range repos {
+				repo := repos[idx]
+
+				if changes, err := repo.HasChanges(); err != nil {
+					catcher.Wrapf(err, "detecting changes for %s", repo.Name)
+				} else if changes {
+					hadChanges = append(hadChanges, repo.Name)
+					catcher.Add(units.SyncRepo(ctx, queue, &repo))
+				} else {
+					catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(&repo)))
+				}
 			}
 
 			for _, link := range conf.Links {
@@ -80,26 +80,26 @@ func repoUpdate() cli.Command {
 				return catcher.Resolve()
 			}
 
+			started := time.Now()
+			grip.Info(message.Fields{
+				"op":      "repo sync",
+				"message": "waiting for jobs to complete",
+				"tag":     tagName,
+			})
 			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
-			if err := amboy.ResolveErrors(ctx, queue); err != nil {
-				notify.Error(message.Fields{
-					"repo": repoName,
-					"op":   "repo sync",
-					"code": err.Error(),
-				})
-				return errors.Wrap(err, "problem found executing jobs")
-			}
+			catcher.Wrap(amboy.ResolveErrors(ctx, queue), "jobs encountered error")
 
-			shouldNotify := hasChanges || (sometimes.Fifth() && sometimes.Fifth())
-			msg := message.Fields{
-				"op":   "repo sync",
-				"code": "success",
-				"repo": repoName,
-			}
-			notify.NoticeWhen(shouldNotify, msg)
-			grip.InfoWhen(!shouldNotify, msg)
+			// QUESTION: should we send notification here
+			grip.Notice(message.Fields{
+				"op":      "repo sync",
+				"code":    "success",
+				"repo":    tagName,
+				"changed": hadChanges,
+				"dur_sec": time.Since(started).Seconds(),
+				"err":     catcher.HasErrors(),
+			})
 
-			return nil
+			return catcher.Resolve()
 		},
 	}
 }
@@ -117,31 +117,25 @@ func repoCleanup() cli.Command {
 		},
 		Before: setAllTailArguements(repoFlagName),
 		Action: func(c *cli.Context) error {
-			repos := c.StringSlice(repoFlagName)
+			tags := c.StringSlice(repoFlagName)
 
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
 
-			var allRepos bool
-			if len(repos) == 0 {
-				allRepos = true
+			var repos []sardis.RepoConf
+			if len(tags) == 0 {
+				// all repos
+				repos = env.Configuration().Repo
+			} else {
+				for _, tag := range tags {
+					repos = append(repos, env.Configuration().GetTaggedRepos(tag)...)
+				}
 			}
 
 			queue := env.Queue()
 			catcher := grip.NewBasicCatcher()
-			for _, repo := range env.Configuration().Repo {
-				if !allRepos && !utility.StringSliceContains(repos, repo.Name) {
-					continue
-				}
-
-				catcher.Add(queue.Put(ctx, units.NewRepoCleanupJob(repo.Path)))
-			}
-			for _, repo := range env.Configuration().Mail {
-				if !allRepos && !utility.StringSliceContains(repos, repo.Name) {
-					continue
-				}
-
+			for _, repo := range repos {
 				catcher.Add(queue.Put(ctx, units.NewRepoCleanupJob(repo.Path)))
 			}
 
@@ -180,48 +174,50 @@ func repoSync() cli.Command {
 			notify := env.Logger()
 			conf := env.Configuration()
 
+			catcher := grip.NewBasicCatcher()
+			queue := env.Queue()
+
 			for _, repo := range conf.Mail {
 				if name == repo.Name {
-					j := units.NewMailSyncJob(repo)
-					j.Run(ctx)
-					if err := j.Error(); err != nil {
-						return errors.Wrap(j.Error(), "problem syncing mail repo")
-					}
-					return nil
+					catcher.Add(queue.Put(ctx, units.NewMailSyncJob(repo)))
 				}
 			}
 
-			repo := conf.GetRepo(name)
-			if repo == nil {
-				return errors.Errorf("no repository named '%s' configured", name)
+			repos := conf.GetTaggedRepos(name)
+
+			for idx := range repos {
+				repo := repos[idx]
+				if utility.StringSliceContains(repo.Tags, "mail") {
+					continue
+				}
+
+				hasChanges, err := repo.HasChanges()
+				catcher.Wrapf(err, "change check for %q", repo.Name)
+				if !hasChanges {
+					grip.Info(message.Fields{
+						"code": "noop",
+						"op":   "sync",
+						"repo": repo.Name,
+					})
+
+					continue
+				}
+
+				catcher.Add(units.SyncRepo(ctx, queue, &repo))
 			}
 
-			hasChanges, err := repo.HasChanges()
-			if err != nil {
-				return errors.Wrap(err, "problem checking status of repository")
-			}
-
-			if !hasChanges {
-				grip.Info(message.Fields{
-					"code": "noop",
-					"op":   "sync",
-					"repo": name,
-				})
-				return nil
-			}
-
-			queue := env.Queue()
-			if err := units.SyncRepo(ctx, queue, repo); err != nil {
-				return errors.Wrap(err, "problem queuing jobs")
+			if catcher.HasErrors() {
+				return errors.Wrap(catcher.Resolve(), "problem queuing jobs")
 			}
 
 			amboy.WaitInterval(ctx, queue, time.Millisecond)
 
-			if err := amboy.ResolveErrors(ctx, queue); err != nil {
+			if catcher.Add(amboy.ResolveErrors(ctx, queue)); catcher.HasErrors() {
+				err := catcher.Resolve()
 				notify.Error(message.Fields{
 					"repo": name,
 					"op":   "sync",
-					"code": err.Error(),
+					"code": err,
 				})
 				return errors.Wrap(err, "problem found executing jobs")
 			}
@@ -230,7 +226,7 @@ func repoSync() cli.Command {
 				"op":   "sync",
 				"code": "success",
 				"host": host,
-				"repo": name,
+				"tag":  name,
 			})
 
 			return nil
@@ -246,39 +242,34 @@ func repoStatus() cli.Command {
 		Flags: []cli.Flag{
 			cli.StringSliceFlag{
 				Name:  repoFlagName,
-				Usage: "specify a local repository to cleanup",
+				Usage: "specify a local repository, or tag to report the status of",
 			},
 		},
 		Before: setAllTailArguements(repoFlagName),
 		Action: func(c *cli.Context) error {
-			repos := c.StringSlice(repoFlagName)
-			var allRepos bool
-			if len(repos) == 0 {
-				allRepos = true
-			}
+			tags := c.StringSlice(repoFlagName)
 
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
 
+			var repos []sardis.RepoConf
+			if len(tags) == 0 {
+				// all repos
+				repos = env.Configuration().Repo
+			} else {
+				for _, tag := range tags {
+					repos = append(repos, env.Configuration().GetTaggedRepos(tag)...)
+				}
+			}
 			catcher := grip.NewBasicCatcher()
-			for _, repo := range env.Configuration().Repo {
-				if !allRepos && !utility.StringSliceContains(repos, repo.Name) {
-					continue
-				}
-				j := units.NewRepoStatusJob(repo.Path)
-				j.Run(ctx)
-				catcher.Add(j.Error())
-			}
-			for _, repo := range env.Configuration().Mail {
-				if !allRepos && !utility.StringSliceContains(repos, repo.Name) {
-					continue
-				}
 
+			for _, repo := range repos {
 				j := units.NewRepoStatusJob(repo.Path)
 				j.Run(ctx)
 				catcher.Add(j.Error())
 			}
+
 			return catcher.Resolve()
 		},
 	}
@@ -293,7 +284,7 @@ func repoFetch() cli.Command {
 		Flags: []cli.Flag{
 			cli.StringSliceFlag{
 				Name:  repoFlagName,
-				Usage: "specify a local repository to cleanup",
+				Usage: "specify a local repository, or tag, to cleanup",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -303,20 +294,23 @@ func repoFetch() cli.Command {
 			ctx, cancel := env.Context()
 			defer cancel()
 
+			var repos []sardis.RepoConf
+			for _, tag := range names {
+				repos = append(repos, env.Configuration().GetTaggedRepos(tag)...)
+			}
+
 			queue := env.Queue()
 
 			catcher := grip.NewBasicCatcher()
-			repos := env.Configuration().Repo
+
 			for idx := range repos {
 				repo := &repos[idx]
-				if !utility.StringSliceContains(names, repo.Name) {
-					continue
-				}
 
 				catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(repo)))
 			}
 
 			amboy.WaitInterval(ctx, queue, 100*time.Millisecond)
+
 			catcher.Add(amboy.ResolveErrors(ctx, queue))
 
 			return catcher.Resolve()

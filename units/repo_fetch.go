@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
+	"github.com/tychoish/grip/send"
 	"github.com/tychoish/sardis"
 )
 
@@ -70,10 +71,15 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 	conf := env.Configuration()
 	cmd := env.Jasper().CreateCommand(ctx)
 
+	sender := send.NewAnnotatingSender(grip.GetSender(), map[string]interface{}{
+		"job":  j.ID(),
+		"repo": j.Conf.Name,
+	})
+
 	j.AddError(cmd.ID(j.ID()).Directory(j.Conf.Path).
 		AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
-		SetOutputSender(level.Info, grip.GetSender()).
-		SetErrorSender(level.Warning, grip.GetSender()).
+		SetOutputSender(level.Info, sender).
+		SetErrorSender(level.Warning, sender).
 		Append(j.Conf.Pre...).
 		AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", j.Conf.RemoteName, j.Conf.Branch).
 		Append(j.Conf.Post...).

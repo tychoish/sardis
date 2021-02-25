@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
+	"github.com/tychoish/grip/send"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/util"
 )
@@ -102,9 +103,16 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 	conf := env.Configuration()
 	cmd := env.Jasper().CreateCommand(ctx)
 
+	sender := send.NewAnnotatingSender(grip.GetSender(), map[string]interface{}{
+		"job":  j.ID(),
+		"host": j.Host,
+	})
+
 	err := cmd.Priority(level.Info).
 		AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
-		ID(j.ID()).Directory(j.Path).SetCombinedSender(level.Info, grip.GetSender()).
+		ID(j.ID()).Directory(j.Path).
+		SetOutputSender(level.Info, sender).
+		SetErrorSender(level.Warning, sender).
 		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && ", j.Path)+fmt.Sprintf(syncCmdTemplate, j.ID())).
 		Append(j.PreHook...).
 		AppendArgs("git", "add", "-A").

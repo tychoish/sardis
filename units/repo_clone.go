@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
+	"github.com/tychoish/grip/send"
 	"github.com/tychoish/sardis"
 )
 
@@ -73,12 +74,17 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 	conf := env.Configuration()
 	cmd := env.Jasper().CreateCommand(ctx)
 
+	sender := send.NewAnnotatingSender(grip.GetSender(), map[string]interface{}{
+		"job":  j.ID(),
+		"repo": j.Conf.Name,
+	})
+
 	j.AddError(cmd.ID(j.ID()).
 		Priority(level.Info).
 		AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
 		Directory(filepath.Dir(j.Conf.Path)).
-		SetOutputSender(level.Info, grip.GetSender()).
-		SetErrorSender(level.Warning, grip.GetSender()).
+		SetOutputSender(level.Info, sender).
+		SetErrorSender(level.Warning, sender).
 		AppendArgs("git", "clone", j.Conf.Remote, j.Conf.Path).
 		AddWhen(len(j.Conf.Post) > 0, j.Conf.Post).
 		Run(ctx))

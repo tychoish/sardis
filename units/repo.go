@@ -7,21 +7,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 )
 
-func SyncRepo(ctx context.Context, queue amboy.Queue, repo *sardis.RepoConf) error {
+func SyncRepo(ctx context.Context, catcher grip.Catcher, wg *sync.WaitGroup, queue amboy.Queue, repo *sardis.RepoConf) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		return errors.WithStack(err)
+		catcher.Add(err)
+		return
 	}
 
-	catcher := grip.NewCatcher()
 	hasMirrors := false
-	wg := &sync.WaitGroup{}
+	iwg := &sync.WaitGroup{}
 	for _, mirror := range repo.Mirrors {
 		if strings.Contains(mirror, hostname) {
 			grip.Infof("skipping mirror %s->%s because it's probably local (%s)",
@@ -32,39 +31,37 @@ func SyncRepo(ctx context.Context, queue amboy.Queue, repo *sardis.RepoConf) err
 		hasMirrors = true
 		job := NewRepoSyncJob(mirror, repo.Path, repo.Pre, nil)
 		catcher.Add(queue.Put(ctx, job))
-		wg.Add(1)
+		iwg.Add(1)
 		go func() {
-			defer wg.Done()
+			defer iwg.Done()
 			amboy.WaitJobInterval(ctx, job, queue, 25*time.Millisecond)
 		}()
 	}
 
-	if hasMirrors {
-		wait := make(chan struct{})
-		go func() {
-			defer close(wait)
-			wg.Wait()
-		}()
+	startLocal := func() {
+		if repo.LocalSync {
+			changes, err := repo.HasChanges()
+			catcher.Add(err)
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-wait:
-		}
-	}
-
-	changes, err := repo.HasChanges()
-	catcher.Add(err)
-
-	if repo.LocalSync {
-		if changes {
-			catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path, repo.Pre, repo.Post)))
-		} else {
+			if changes {
+				catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path, repo.Pre, repo.Post)))
+			} else {
+				catcher.Add(queue.Put(ctx, NewRepoFetchJob(repo)))
+			}
+		} else if repo.Fetch || hasMirrors {
 			catcher.Add(queue.Put(ctx, NewRepoFetchJob(repo)))
 		}
-	} else if repo.Fetch || hasMirrors {
-		catcher.Add(queue.Put(ctx, NewRepoFetchJob(repo)))
 	}
 
-	return catcher.Resolve()
+	if hasMirrors {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			iwg.Wait()
+			startLocal()
+		}()
+	} else {
+		startLocal()
+	}
+
 }

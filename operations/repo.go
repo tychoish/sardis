@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -55,8 +56,10 @@ func repoUpdate() cli.Command {
 
 			queue := env.Queue()
 			catcher := grip.NewBasicCatcher()
+			wg := &sync.WaitGroup{}
 
 			shouldNotify := false
+
 			for idx := range repos {
 				repo := &repos[idx]
 				if repo.Disabled {
@@ -65,12 +68,10 @@ func repoUpdate() cli.Command {
 				if repo.Notify {
 					shouldNotify = true
 				}
-				catcher.Add(units.SyncRepo(ctx, queue, repo))
+				units.SyncRepo(ctx, catcher, wg, queue, repo)
 			}
 
-			if catcher.HasErrors() {
-				return catcher.Resolve()
-			}
+			wg.Wait()
 
 			started := time.Now()
 			stat := queue.Stats(ctx)

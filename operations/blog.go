@@ -1,8 +1,6 @@
 package operations
 
 import (
-	"time"
-
 	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/grip"
@@ -86,7 +84,6 @@ func blogPublish() cli.Command {
 
 			jpm := env.Jasper()
 
-			startAt := time.Now()
 			err := jpm.CreateCommand(ctx).
 				AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
 				Append(blog.DeployCommands...).
@@ -101,12 +98,6 @@ func blogPublish() cli.Command {
 				}))
 				return errors.Wrap(err, "problem running deploy command")
 			}
-
-			notify.Notice(message.Fields{
-				"op":   "blog publish",
-				"repo": repo.Name,
-				"dur":  int(time.Since(startAt).Round(time.Second).Seconds()),
-			})
 
 			return nil
 		},

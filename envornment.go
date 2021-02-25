@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tychoish/jasper"
 	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/queue"
@@ -33,6 +32,7 @@ import (
 	"github.com/tychoish/grip/logging"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
+	"github.com/tychoish/jasper"
 )
 
 // BuildRevision stores the commit in the git repository at build time
@@ -178,7 +178,7 @@ func (c *appServicesCache) initSSHSetting(ctx context.Context) error {
 		return nil
 	}
 
-	filepath.Walk("/tmp", func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk("/tmp", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -195,7 +195,11 @@ func (c *appServicesCache) initSSHSetting(ctx context.Context) error {
 		return nil
 	})
 
-	return nil
+	if err == io.EOF || err == nil {
+		return nil
+	}
+
+	return err
 }
 
 func (c *appServicesCache) initJira() error {

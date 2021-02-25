@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/dependency"
 	"github.com/tychoish/amboy/job"
@@ -12,7 +13,6 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
-	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 )
 
@@ -73,6 +73,7 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 	j.AddError(cmd.ID(j.ID()).Directory(j.Conf.Path).
 		AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
 		SetOutputSender(level.Info, grip.GetSender()).
+		SetErrorSender(level.Warning, grip.GetSender()).
 		Append(j.Conf.Pre...).
 		AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", j.Conf.RemoteName, j.Conf.Branch).
 		Append(j.Conf.Post...).

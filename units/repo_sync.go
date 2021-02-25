@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/dependency"
 	"github.com/tychoish/amboy/job"
@@ -13,7 +14,6 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
-	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/util"
 )
@@ -26,7 +26,12 @@ type repoSyncJob struct {
 	job.Base `bson:"metadata" json:"metadata" yaml:"metadata"`
 }
 
-const repoSyncJobName = "repo-sync"
+const (
+	repoSyncJobName = "repo-sync"
+
+	remoteUpdateCmdTemplate = "git add -A && git pull --rebase --autostash --keep origin master"
+	syncCmdTemplate         = remoteUpdateCmdTemplate + " && git commit -a -m 'auto-update: (%s)'; git push"
+)
 
 func init() { registry.AddJobType(repoSyncJobName, func() amboy.Job { return repoSyncFactory() }) }
 

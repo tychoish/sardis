@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 )
 
@@ -31,12 +30,11 @@ func SyncRepo(ctx context.Context, queue amboy.Queue, repo *sardis.RepoConf) err
 		}
 
 		hasMirrors = true
-		job := NewRepoSyncRemoteJob(mirror, repo.Path, repo.Pre, nil)
+		job := NewRepoSyncJob(mirror, repo.Path, repo.Pre, nil)
 		catcher.Add(queue.Put(ctx, job))
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			grip.Info(message.Fields{"id": job.ID(), "op": "waiting"})
 			amboy.WaitJobInterval(ctx, job, queue, 25*time.Millisecond)
 		}()
 	}

@@ -108,7 +108,7 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 		"host": j.Host,
 	})
 
-	err := cmd.Priority(level.Info).
+	err := cmd.Priority(level.Debug).
 		AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
 		ID(j.ID()).Directory(j.Path).
 		SetOutputSender(level.Info, sender).

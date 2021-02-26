@@ -69,7 +69,7 @@ func (j *repoCleanupJob) Run(ctx context.Context) {
 		"path": j.Path,
 	})
 
-	j.AddError(cmd.CreateCommand(ctx).Priority(level.Info).
+	j.AddError(cmd.CreateCommand(ctx).Priority(level.Debug).
 		ID(j.ID()).Directory(j.Path).
 		SetOutputSender(level.Info, sender).
 		SetErrorSender(level.Warning, sender).

@@ -7,16 +7,17 @@ import (
 	"path/filepath"
 	"time"
 
+	git "github.com/go-git/go-git/v5"
+	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/dependency"
 	"github.com/tychoish/amboy/job"
 	"github.com/tychoish/amboy/registry"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
+	"github.com/tychoish/grip/logging"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
-	git "github.com/go-git/go-git/v5"
-	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 )
 
@@ -58,35 +59,33 @@ func (j *repoStatusJob) Run(ctx context.Context) {
 		return
 	}
 
-	grip.Info(message.Fields{
-		"id":   j.ID(),
-		"op":   "running",
-		"path": j.Path,
-	})
-
 	cmd := sardis.GetEnvironment().Jasper()
 
 	startAt := time.Now()
+	sender := send.NewAnnotatingSender(grip.GetSender(), map[string]interface{}{
+		"repo": j.Path,
+	})
+	j.AddError(sender.SetFormatter(send.MakeJSONFormatter()))
+	logger := logging.MakeGrip(sender)
 
-	output := send.NewAnnotatingSender(grip.GetSender(), message.Fields{"path": j.Path})
-	j.AddError(cmd.CreateCommand(ctx).Priority(level.Info).
+	j.AddError(cmd.CreateCommand(ctx).Priority(level.Debug).
 		ID(j.ID()).Directory(j.Path).
-		SetOutputSender(level.Info, output).
+		SetOutputSender(level.Debug, sender).
+		SetErrorSender(level.Debug, sender).
 		Add(getStatusCommandArgs(j.Path)).
 		AppendArgs("git", "status", "--short", "--branch").
 		Run(ctx))
 
-	j.AddError(j.doOtherStat())
+	j.AddError(j.doOtherStat(logger))
 
-	grip.Debug(message.Fields{
+	logger.Debug(message.Fields{
 		"op":     "git status",
-		"repo":   j.Path,
 		"secs":   time.Since(startAt).Seconds(),
 		"errors": j.HasErrors(),
 	})
 }
 
-func (j *repoStatusJob) doOtherStat() error {
+func (j *repoStatusJob) doOtherStat(logger grip.Journaler) error {
 	repo, err := git.PlainOpen(j.Path)
 	if err != nil {
 		return err
@@ -103,9 +102,8 @@ func (j *repoStatusJob) doOtherStat() error {
 	}
 
 	for fn, status := range stat {
-		grip.Notice(message.Fields{
+		logger.Notice(message.Fields{
 			"file":     fn,
-			"repo":     j.Path,
 			"stat":     "golib",
 			"staging":  status.Staging,
 			"worktree": status.Worktree,

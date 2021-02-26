@@ -6,11 +6,11 @@ import (
 	"net"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/tychoish/jasper"
 	jaspercli "github.com/tychoish/jasper/cli"
 	"github.com/tychoish/jasper/options"
 	"github.com/tychoish/jasper/remote"
-	"github.com/pkg/errors"
 )
 
 type HostConf struct {

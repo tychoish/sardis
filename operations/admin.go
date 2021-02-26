@@ -53,12 +53,16 @@ func nightly() cli.Command {
 			defer cancel()
 			startAt := time.Now()
 
-			for _, link := range conf.Links {
-				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(link)))
+			for idx := range conf.Links {
+				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(conf.Links[idx])))
 			}
 
-			for _, repo := range conf.Repo {
-				catcher.Add(queue.Put(ctx, units.NewRepoCleanupJob(repo.Path)))
+			for idx := range conf.Repo {
+				catcher.Add(queue.Put(ctx, units.NewRepoCleanupJob(conf.Repo[idx].Path)))
+			}
+
+			for idx := range conf.System.Services {
+				catcher.Add(queue.Put(ctx, units.NewSystemServiceSetupJob(conf.System.Services[idx])))
 			}
 
 			stat := queue.Stats(ctx)

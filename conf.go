@@ -67,7 +67,27 @@ type SystemConf struct {
 		Update  bool   `bson:"update" json:"update" yaml:"update"`
 		Version string `bson:"version" json:"version" yaml:"version"`
 	} `bson:"golang" json:"golang" yaml:"golang"`
-	Arch ArchLinuxConf `bson:"arch" json:"arch" yaml:"arch"`
+	Arch     ArchLinuxConf        `bson:"arch" json:"arch" yaml:"arch"`
+	Services []SystemdServiceConf `bson:"services" json:"services" yaml:"services"`
+}
+
+type SystemdServiceConf struct {
+	Name     string `bson:"name" json:"name" yaml:"name"`
+	Unit     string `bson:"unit" json:"unit" yaml:"unit"`
+	User     bool   `bson:"user" json:"user" yaml:"user"`
+	System   bool   `bson:"system" json:"system" yaml:"system"`
+	Enabled  bool   `bson:"enabled" json:"enabled" yaml:"enabled"`
+	Disabled bool   `bson:"disabled" json:"disabled" yaml:"disabled"`
+	Start    bool   `bson:"start" json:"start" yaml:"start"`
+}
+
+func (c *SystemdServiceConf) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(c.Name == "", "must specify service name")
+	catcher.ErrorfWhen(c.Unit == "", "cannot specify empty unit for %q", c.Name)
+	catcher.ErrorfWhen(c.User && c.System, "cannot specify user and service for %q", c.Name)
+	catcher.ErrorfWhen(c.Disabled && c.Enabled, "must specify either disabled or enabled for %q", c.Name)
+	return catcher.Resolve()
 }
 
 type NotifyConf struct {
@@ -169,7 +189,12 @@ func (conf *Configuration) Validate() error {
 
 	catcher.Add(conf.Settings.Validate())
 	catcher.Add(conf.System.Arch.Validate())
+
 	conf.expandLinkedFiles(catcher)
+
+	for idx := range conf.System.Services {
+		catcher.Wrapf(conf.System.Services[idx].Validate(), "%d of %T is not valid", idx, conf.System.Services[idx])
+	}
 
 	for idx := range conf.Repo {
 		catcher.Wrapf(conf.Repo[idx].Validate(), "%d of %T is not valid", idx, conf.Repo[idx])

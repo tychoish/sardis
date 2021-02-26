@@ -16,7 +16,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
-	github.com/tychoish/amboy v0.0.0-20210220045934-f0d4b14a2824
+	github.com/tychoish/amboy v0.0.0-20210226171617-6e5503223150
 	github.com/tychoish/grip v0.0.0-20210220033944-241f1175222f
 	github.com/tychoish/jasper v0.0.0-20210223210624-8826ed0f82fd
 	github.com/urfave/cli v1.22.4

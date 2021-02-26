@@ -80,7 +80,6 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 		AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
 		SetOutputSender(level.Info, sender).
 		SetErrorSender(level.Warning, sender).
-		Append(j.Conf.Pre...).
 		AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", j.Conf.RemoteName, j.Conf.Branch).
 		Append(j.Conf.Post...).
 		Run(ctx))

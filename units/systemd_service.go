@@ -63,12 +63,20 @@ func (j *setupServiceJob) Run(ctx context.Context) {
 		Sudo(j.Conf.System)
 
 	switch {
-	case j.Conf.Enabled:
+	case j.Conf.User && j.Conf.Enabled:
+		cmd.AppendArgs("systemctl", "--user", "enable", j.Conf.Unit)
+		if j.Conf.Start {
+			cmd.AppendArgs("systemctl", "--user", "start", j.Conf.Unit)
+		}
+	case j.Conf.User && j.Conf.Disabled:
+		cmd.AppendArgs("systemctl", "--user", "disable", j.Conf.Unit)
+		cmd.AppendArgs("systemctl", "--user", "stop", j.Conf.Unit)
+	case j.Conf.System && j.Conf.Enabled:
 		cmd.AppendArgs("systemctl", "enable", j.Conf.Unit)
 		if j.Conf.Start {
 			cmd.AppendArgs("systemctl", "start", j.Conf.Unit)
 		}
-	case j.Conf.Disabled:
+	case j.Conf.System && j.Conf.Disabled:
 		cmd.AppendArgs("systemctl", "disable", j.Conf.Unit)
 		cmd.AppendArgs("systemctl", "stop", j.Conf.Unit)
 	default:
@@ -78,10 +86,11 @@ func (j *setupServiceJob) Run(ctx context.Context) {
 
 	j.AddError(cmd.Run(ctx))
 
-	grip.NoticeWhen(!j.HasErrors(), message.Fields{
+	grip.Notice(message.Fields{
 		"job":    j.ID(),
 		"name":   j.Conf.Name,
 		"unit":   j.Conf.Unit,
 		"system": j.Conf.System,
+		"err":    j.Error(),
 	})
 }

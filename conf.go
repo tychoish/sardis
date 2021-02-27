@@ -85,8 +85,10 @@ func (c *SystemdServiceConf) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(c.Name == "", "must specify service name")
 	catcher.ErrorfWhen(c.Unit == "", "cannot specify empty unit for %q", c.Name)
-	catcher.ErrorfWhen(c.User && c.System, "cannot specify user and service for %q", c.Name)
-	catcher.ErrorfWhen(c.Disabled && c.Enabled, "must specify either disabled or enabled for %q", c.Name)
+	catcher.ErrorfWhen((c.User && c.System) || (!c.User && !c.System),
+		"must specify either user or service for %q", c.Name)
+	catcher.ErrorfWhen((c.Disabled && c.Enabled) || (!c.Disabled && !c.Enabled),
+		"must specify either disabled or enabled for %q", c.Name)
 	return catcher.Resolve()
 }
 
@@ -243,6 +245,9 @@ func (conf *Configuration) expandLinkedFiles(catcher grip.Catcher) {
 			defer wg.Done()
 			conf, err := LoadConfiguration(fn)
 			catcher.Wrapf(err, "problem reading linked config file %q", fn)
+			catcher.ErrorfWhen(len(conf.Settings.ConfigPaths) != 0,
+				"nested file %q specified additional files %v, which is invalid",
+				fn, conf.Settings.ConfigPaths)
 			pipe <- conf
 		}(idx, fn)
 	}
@@ -270,6 +275,10 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) {
 		conf.Hosts = append(conf.Hosts, mcf.Hosts...)
 		conf.Commands = append(conf.Commands, mcf.Commands...)
 		conf.Blog = append(conf.Blog, mcf.Blog...)
+		conf.System.Services = append(conf.System.Services, mcf.System.Services...)
+		conf.System.GoPackages = append(conf.System.GoPackages, mcf.System.GoPackages...)
+		conf.System.Arch.AurPackages = append(conf.System.Arch.AurPackages, mcf.System.Arch.AurPackages...)
+		conf.System.Arch.Packages = append(conf.System.Arch.Packages, mcf.System.Arch.Packages...)
 	}
 
 	if conf.shouldIndexRepos() {

@@ -62,6 +62,7 @@ func nightly() cli.Command {
 			}
 
 			for idx := range conf.System.Services {
+				grip.Info(conf.System.Services[idx])
 				catcher.Add(queue.Put(ctx, units.NewSystemServiceSetupJob(conf.System.Services[idx])))
 			}
 

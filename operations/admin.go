@@ -18,6 +18,7 @@ func Admin() cli.Command {
 		Subcommands: []cli.Command{
 			configCheck(),
 			nightly(),
+			setupLinks(),
 		},
 	}
 }

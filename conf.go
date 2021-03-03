@@ -326,15 +326,18 @@ func (conf *Configuration) expandLinks(catcher grip.Catcher) []LinkConf {
 	return links
 }
 
-func (conf *Configuration) GetTaggedRepos(tag string) []RepoConf {
-	rs, ok := conf.repoTags[tag]
-	if !ok {
-		return []RepoConf{}
-	}
+func (conf *Configuration) GetTaggedRepos(tags ...string) []RepoConf {
+	var out []RepoConf
 
-	out := make([]RepoConf, len(rs))
-	for idx := range rs {
-		out[idx] = *rs[idx]
+	for _, t := range tags {
+		rs, ok := conf.repoTags[t]
+		if !ok {
+			continue
+		}
+
+		for idx := range rs {
+			out = append(out, *rs[idx])
+		}
 	}
 
 	return out

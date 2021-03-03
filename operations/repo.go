@@ -1,9 +1,13 @@
 package operations
 
 import (
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/cheynewallace/tabby"
+	"github.com/deciduosity/utility"
+	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/grip"
@@ -23,6 +27,35 @@ func Repo() cli.Command {
 			repoCleanup(),
 			repoStatus(),
 			repoFetch(),
+			repoList(),
+		},
+	}
+}
+
+func repoList() cli.Command {
+	return cli.Command{
+		Name:   "list",
+		Usage:  "return a list of configured repos",
+		Before: requireConfig(),
+		Action: func(c *cli.Context) error {
+			env := sardis.GetEnvironment()
+
+			homedir, _ := homedir.Expand("~/")
+
+			table := tabby.New()
+			table.AddHeader("Name", "Path", "Local", "Enabled", "Tags")
+			for _, repo := range env.Configuration().Repo {
+				table.AddLine(
+					repo.Name,
+					strings.Replace(repo.Path, homedir, "~", 1),
+					utility.FileExists(repo.Path),
+					repo.LocalSync || repo.Fetch,
+					repo.Tags)
+			}
+
+			table.Print()
+
+			return nil
 		},
 	}
 }
@@ -30,17 +63,18 @@ func Repo() cli.Command {
 func repoUpdate() cli.Command {
 	const repoTagFlagName = "repo"
 	return cli.Command{
-		Name:  "update",
-		Usage: "update a local and remote git repository according to the config",
+		Name:    "update",
+		Aliases: []string{"sync"},
+		Usage:   "update a local and remote git repository according to the config",
 		Flags: []cli.Flag{
-			cli.StringFlag{
+			cli.StringSliceFlag{
 				Name:  repoTagFlagName,
 				Usage: "specify tag of repos to update",
 			},
 		},
-		Before: mergeBeforeFuncs(requireConfig(), requireStringOrFirstArgSet(repoTagFlagName)),
+		Before: mergeBeforeFuncs(requireConfig(), setAllTailArguements(repoTagFlagName)),
 		Action: func(c *cli.Context) error {
-			tagName := c.String(repoTagFlagName)
+			tags := c.StringSlice(repoTagFlagName)
 
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
@@ -49,9 +83,9 @@ func repoUpdate() cli.Command {
 			notify := env.Logger()
 			conf := env.Configuration()
 
-			repos := conf.GetTaggedRepos(tagName)
+			repos := conf.GetTaggedRepos(tags...)
 			if len(repos) == 0 {
-				return errors.Errorf("no tagged repository named '%s' configured", tagName)
+				return errors.Errorf("no tagged repository named '%v' configured", tags)
 			}
 
 			queue := env.Queue()
@@ -79,7 +113,7 @@ func repoUpdate() cli.Command {
 				"op":      "repo sync",
 				"message": "waiting for jobs to complete",
 				"jobs":    stat.Total,
-				"tag":     tagName,
+				"tags":    tags,
 			})
 			if stat.Total > 0 || !stat.IsComplete() {
 				amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
@@ -88,7 +122,7 @@ func repoUpdate() cli.Command {
 
 			if shouldNotify {
 				notify.Notice(message.Fields{
-					"tag":     tagName,
+					"tag":     tags,
 					"errors":  catcher.Len(),
 					"jobs":    stat.Total,
 					"repos":   len(repos),
@@ -101,7 +135,7 @@ func repoUpdate() cli.Command {
 			grip.Notice(message.Fields{
 				"op":       "repo sync",
 				"code":     "success",
-				"tag":      tagName,
+				"tag":      tags,
 				"dur_sec":  time.Since(started).Seconds(),
 				"err":      catcher.HasErrors(),
 				"num_errs": catcher.Len(),

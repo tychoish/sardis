@@ -215,6 +215,15 @@ func repoClone() cli.Command {
 			repos := conf.GetTaggedRepos(name)
 
 			for idx := range repos {
+				if utility.FileExists(repos[idx].Path) {
+					grip.Warning(message.Fields{
+						"path":    repos[idx].Path,
+						"op":      "clone",
+						"outcome": "skipping",
+					})
+					continue
+				}
+
 				catcher.Add(queue.Put(ctx, units.NewRepoCloneJob(&repos[idx])))
 			}
 

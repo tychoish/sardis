@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/deciduosity/utility"
 	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/dependency"
@@ -76,13 +77,19 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 		"repo": j.Conf.Name,
 	})
 
-	j.AddError(cmd.ID(j.ID()).Directory(j.Conf.Path).
+	cmd.ID(j.ID()).Directory(j.Conf.Path).
 		AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
 		SetOutputSender(level.Info, sender).
-		SetErrorSender(level.Warning, sender).
-		AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", j.Conf.RemoteName, j.Conf.Branch).
-		Append(j.Conf.Post...).
-		Run(ctx))
+		SetErrorSender(level.Warning, sender)
+
+	if j.Conf.LocalSync && utility.StringSliceContains(j.Conf.Tags, "mail") {
+		cmd.Append(j.Conf.Pre...)
+	}
+
+	cmd.AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", j.Conf.RemoteName, j.Conf.Branch)
+	cmd.Append(j.Conf.Post...)
+
+	j.AddError(cmd.Run(ctx))
 
 	grip.Notice(message.Fields{
 		"path":   j.Conf.Path,

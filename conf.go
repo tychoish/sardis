@@ -245,6 +245,14 @@ func (conf *Configuration) expandLinkedFiles(catcher grip.Catcher) {
 			defer wg.Done()
 			conf, err := LoadConfiguration(fn)
 			catcher.Wrapf(err, "problem reading linked config file %q", fn)
+			if err != nil {
+				return
+			}
+			if conf == nil {
+				catcher.Errorf("nil configuration for %q", fn)
+				return
+			}
+
 			catcher.ErrorfWhen(len(conf.Settings.ConfigPaths) != 0,
 				"nested file %q specified additional files %v, which is invalid",
 				fn, conf.Settings.ConfigPaths)

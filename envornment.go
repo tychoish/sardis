@@ -180,7 +180,7 @@ func (c *appServicesCache) initSSHSetting(ctx context.Context) error {
 
 	err := filepath.Walk("/tmp", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return nil
 		}
 
 		if !strings.HasPrefix(path, "/tmp/ssh-") {

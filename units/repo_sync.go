@@ -30,7 +30,7 @@ type repoSyncJob struct {
 const (
 	repoSyncJobName = "repo-sync"
 
-	remoteUpdateCmdTemplate = "git add -A && git pull --rebase --autostash --keep origin master"
+	remoteUpdateCmdTemplate = "git add -A && git pull --rebase --autostash --keep origin $(git rev-parse --abbrev-ref HEAD)"
 	syncCmdTemplate         = remoteUpdateCmdTemplate + " && git commit -a -m 'auto-update: (%s)'; git push"
 )
 

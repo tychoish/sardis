@@ -145,7 +145,12 @@ func (c *appServicesCache) initSender() error {
 		return errors.Wrap(err, "problem creating sender")
 	}
 	loggers = append(loggers, sender)
-	c.appendCloser("sender-notify", func(_ context.Context) error { return sender.Close() })
+	c.appendCloser("sender-notify", func(ctx context.Context) error {
+		catcher := emt.NewCatcher()
+		catcher.Add(sender.Flush(ctx))
+		catcher.Add(sender.Close())
+		return catcher.Resolve()
+	})
 
 	host, err := os.Hostname()
 	if err != nil {

@@ -46,11 +46,7 @@ func notifySend() cli.Command {
 		Usage:  "send the remaining arguments over xmpp",
 		Before: requireConfig(),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
-			logger := env.Logger()
-
-			logger.Notice(strings.Join(c.Args(), " "))
-
+			sardis.GetEnvironment().Logger().Notice(strings.Join(c.Args(), " "))
 			return nil
 		},
 	}

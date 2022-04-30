@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/tychoish/amboy"
+	"github.com/tychoish/emt"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/dupe"
@@ -77,7 +78,7 @@ func setupLinks() cli.Command {
 			defer cancel()
 
 			queue := env.Queue()
-			catcher := grip.NewBasicCatcher()
+			catcher := emt.NewBasicCatcher()
 
 			for _, link := range conf.Links {
 				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(link)))

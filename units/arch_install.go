@@ -53,5 +53,5 @@ func (j *archInstallPackagesJob) Run(ctx context.Context) {
 	env := sardis.GetEnvironment()
 	j.AddError(env.Jasper().CreateCommand(ctx).ID(j.ID()).
 		Priority(level.Info).Add(args).
-		SetOutputSender(level.Info, grip.GetSender()).Run(ctx))
+		SetOutputSender(level.Info, grip.Sender()).Run(ctx))
 }

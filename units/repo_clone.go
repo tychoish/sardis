@@ -74,7 +74,7 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 	conf := env.Configuration()
 	cmd := env.Jasper().CreateCommand(ctx)
 
-	sender := send.NewAnnotatingSender(grip.GetSender(), map[string]interface{}{
+	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
 		"job":  j.ID(),
 		"repo": j.Conf.Name,
 	})

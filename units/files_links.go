@@ -78,7 +78,7 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 		if target != j.Conf.Target {
 			if j.Conf.RequireSudo {
 				j.AddError(jpm.CreateCommand(ctx).Sudo(true).
-					SetCombinedSender(level.Info, grip.GetSender()).
+					SetCombinedSender(level.Info, grip.Sender()).
 					AppendArgs("rm", dst).Run(ctx))
 			} else {
 				j.AddError(os.Remove(dst))
@@ -101,7 +101,7 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 	linkDir := filepath.Dir(j.Conf.Target)
 	if j.Conf.RequireSudo {
 		cmd := jpm.CreateCommand(ctx).Sudo(true).
-			SetCombinedSender(level.Info, grip.GetSender())
+			SetCombinedSender(level.Info, grip.Sender())
 
 		if _, err := os.Stat(linkDir); os.IsNotExist(err) {
 			cmd.AppendArgs("mkdir", "-p", linkDir)

@@ -1,15 +1,16 @@
 package operations
 
 import (
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/cheynewallace/tabby"
-	"github.com/deciduosity/utility"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
+	"github.com/tychoish/emt"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
@@ -45,10 +46,12 @@ func repoList() cli.Command {
 			table := tabby.New()
 			table.AddHeader("Name", "Path", "Local", "Enabled", "Tags")
 			for _, repo := range env.Configuration().Repo {
+				_, err := os.Stat(repo.Path)
+				fileExists := !os.IsNotExist(err)
 				table.AddLine(
 					repo.Name,
 					strings.Replace(repo.Path, homedir, "~", 1),
-					utility.FileExists(repo.Path),
+					fileExists,
 					repo.LocalSync || repo.Fetch,
 					repo.Tags)
 			}
@@ -89,7 +92,7 @@ func repoUpdate() cli.Command {
 			}
 
 			queue := env.Queue()
-			catcher := grip.NewBasicCatcher()
+			catcher := emt.NewBasicCatcher()
 			wg := &sync.WaitGroup{}
 
 			shouldNotify := false
@@ -118,7 +121,9 @@ func repoUpdate() cli.Command {
 			if stat.Total > 0 || !stat.IsComplete() {
 				amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
 			}
-			catcher.Wrap(amboy.ResolveErrors(ctx, queue), "jobs encountered error")
+			if err := amboy.ResolveErrors(ctx, queue); err != nil {
+				catcher.Errorf("jobs encountered error: %w", err)
+			}
 
 			if shouldNotify {
 				notify.Notice(message.Fields{
@@ -177,7 +182,7 @@ func repoCleanup() cli.Command {
 			}
 
 			queue := env.Queue()
-			catcher := grip.NewBasicCatcher()
+			catcher := emt.NewBasicCatcher()
 			for _, repo := range repos {
 				catcher.Add(queue.Put(ctx, units.NewRepoCleanupJob(repo.Path)))
 			}
@@ -209,13 +214,13 @@ func repoClone() cli.Command {
 
 			conf := env.Configuration()
 
-			catcher := grip.NewBasicCatcher()
+			catcher := emt.NewBasicCatcher()
 			queue := env.Queue()
 
 			repos := conf.GetTaggedRepos(name)
 
 			for idx := range repos {
-				if utility.FileExists(repos[idx].Path) {
+				if _, err := os.Stat(repos[idx].Path); !os.IsNotExist(err) {
 					grip.Warning(message.Fields{
 						"path":    repos[idx].Path,
 						"op":      "clone",
@@ -267,7 +272,7 @@ func repoStatus() cli.Command {
 					repos = append(repos, env.Configuration().GetTaggedRepos(tag)...)
 				}
 			}
-			catcher := grip.NewBasicCatcher()
+			catcher := emt.NewBasicCatcher()
 
 			for _, repo := range repos {
 				j := units.NewRepoStatusJob(repo.Path)
@@ -306,7 +311,7 @@ func repoFetch() cli.Command {
 
 			queue := env.Queue()
 
-			catcher := grip.NewBasicCatcher()
+			catcher := emt.NewBasicCatcher()
 
 			for idx := range repos {
 				repo := &repos[idx]

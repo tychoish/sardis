@@ -15,7 +15,6 @@ import (
 	"github.com/tychoish/amboy/registry"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
-	"github.com/tychoish/grip/logging"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/sardis"
@@ -62,11 +61,11 @@ func (j *repoStatusJob) Run(ctx context.Context) {
 	cmd := sardis.GetEnvironment().Jasper()
 
 	startAt := time.Now()
-	sender := send.NewAnnotatingSender(grip.GetSender(), map[string]interface{}{
+	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
 		"repo": j.Path,
 	})
-	j.AddError(sender.SetFormatter(send.MakeJSONFormatter()))
-	logger := logging.MakeGrip(sender)
+	sender.SetFormatter(send.MakeJSONFormatter())
+	logger := grip.NewLogger(sender)
 
 	j.AddError(cmd.CreateCommand(ctx).Priority(level.Debug).
 		ID(j.ID()).Directory(j.Path).
@@ -85,7 +84,7 @@ func (j *repoStatusJob) Run(ctx context.Context) {
 	})
 }
 
-func (j *repoStatusJob) doOtherStat(logger grip.Journaler) error {
+func (j *repoStatusJob) doOtherStat(logger grip.Logger) error {
 	repo, err := git.PlainOpen(j.Path)
 	if err != nil {
 		return err

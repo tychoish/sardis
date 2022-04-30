@@ -6,12 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/job"
 	"github.com/tychoish/amboy/registry"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
-	"github.com/pkg/errors"
 	"github.com/tychoish/sardis"
 )
 
@@ -74,6 +74,6 @@ func (j *archAurFetchJob) Run(ctx context.Context) {
 	}
 
 	j.AddError(env.Jasper().CreateCommand(ctx).ID(j.ID()).Directory(dir).
-		Priority(level.Info).SetOutputSender(level.Debug, grip.GetSender()).
+		Priority(level.Info).SetOutputSender(level.Debug, grip.Sender()).
 		AppendArgs(args...).Run(ctx))
 }

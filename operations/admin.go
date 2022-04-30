@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
+	"github.com/tychoish/emt"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
@@ -48,7 +49,7 @@ func nightly() cli.Command {
 			env := sardis.GetEnvironment()
 			conf := env.Configuration()
 			queue := env.Queue()
-			catcher := grip.NewBasicCatcher()
+			catcher := emt.NewBasicCatcher()
 			notify := env.Logger()
 			ctx, cancel := env.Context()
 			defer cancel()

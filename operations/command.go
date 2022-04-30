@@ -48,7 +48,7 @@ func RunCommand() cli.Command {
 					return errors.Errorf("command '%s' [%d/%d] does not exist", name, idx+1, len(ops))
 				}
 				err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
-					Append(cmd.Command).SetCombinedSender(level.Info, grip.GetSender()).
+					Append(cmd.Command).SetCombinedSender(level.Info, grip.Sender()).
 					Prerequisite(func() bool {
 						grip.Info(message.Fields{
 							"cmd":  name,

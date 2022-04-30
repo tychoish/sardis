@@ -8,14 +8,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/deciduosity/utility"
 	git "github.com/go-git/go-git/v5"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+	"github.com/tychoish/emt"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
-	"github.com/tychoish/grip/send"
+	xmpp "github.com/tychoish/grip/x/xmpp"
 	"github.com/tychoish/sardis/util"
 )
 
@@ -82,7 +82,7 @@ type SystemdServiceConf struct {
 }
 
 func (c *SystemdServiceConf) Validate() error {
-	catcher := grip.NewBasicCatcher()
+	catcher := emt.NewBasicCatcher()
 	catcher.NewWhen(c.Name == "", "must specify service name")
 	catcher.ErrorfWhen(c.Unit == "", "cannot specify empty unit for %q", c.Name)
 	catcher.ErrorfWhen((c.User && c.System) || (!c.User && !c.System),
@@ -187,7 +187,7 @@ type validatable interface {
 }
 
 func (conf *Configuration) Validate() error {
-	catcher := grip.NewBasicCatcher()
+	catcher := emt.NewBasicCatcher()
 
 	catcher.Add(conf.Settings.Validate())
 	catcher.Add(conf.System.Arch.Validate())
@@ -195,24 +195,34 @@ func (conf *Configuration) Validate() error {
 	conf.expandLinkedFiles(catcher)
 
 	for idx := range conf.System.Services {
-		catcher.Wrapf(conf.System.Services[idx].Validate(), "%d of %T is not valid", idx, conf.System.Services[idx])
+		if err := conf.System.Services[idx].Validate(); err != nil {
+			catcher.Errorf("%d of %T is not valid: %w", err, idx, conf.System.Services[idx])
+		}
 	}
 
 	for idx := range conf.Repo {
-		catcher.Wrapf(conf.Repo[idx].Validate(), "%d of %T is not valid", idx, conf.Repo[idx])
+		if err := conf.Repo[idx].Validate(); err != nil {
+			catcher.Errorf("%d of %T is not valid: %w", err, idx, conf.Repo[idx])
+		}
 	}
 
 	conf.Links = conf.expandLinks(catcher)
 	for idx := range conf.Links {
-		catcher.Wrapf(conf.Links[idx].Validate(), "%d of %T is not valid", idx, conf.Links[idx])
+		if err := conf.Links[idx].Validate(); err != nil {
+			catcher.Errorf("%d of %T is not valid: %w", err, idx, conf.Links[idx])
+		}
 	}
 
 	for idx := range conf.Hosts {
-		catcher.Wrapf(conf.Hosts[idx].Validate(), "%d of %T is not valid", idx, conf.Hosts[idx])
+		if err := conf.Hosts[idx].Validate(); err != nil {
+			catcher.Errorf("%d of %T is not valid: %w", err, idx, conf.Hosts[idx])
+		}
 	}
 
 	for idx := range conf.Commands {
-		catcher.Wrapf(conf.Commands[idx].Validate(), "%d of %T is not valid", idx, conf.Commands[idx])
+		if err := conf.Commands[idx].Validate(); err != nil {
+			catcher.Errorf("%d of %T is not valid: %w", err, idx, conf.Commands[idx])
+		}
 	}
 
 	if conf.shouldIndexRepos() {
@@ -222,7 +232,9 @@ func (conf *Configuration) Validate() error {
 	return catcher.Resolve()
 }
 
-func (conf *Configuration) expandLinkedFiles(catcher grip.Catcher) {
+func fileExists(fn string) bool { _, err := os.Stat(fn); return !os.IsNotExist(err) }
+
+func (conf *Configuration) expandLinkedFiles(catcher emt.Catcher) {
 	if conf.linkedFilesRead {
 		return
 	}
@@ -232,7 +244,7 @@ func (conf *Configuration) expandLinkedFiles(catcher grip.Catcher) {
 
 	wg := &sync.WaitGroup{}
 	for idx, fn := range conf.Settings.ConfigPaths {
-		if !utility.FileExists(fn) {
+		if _, err := os.Stat(fn); os.IsNotExist(err) {
 			grip.Warning(message.Fields{
 				"file": fn,
 				"msg":  "config file does not exist",
@@ -244,7 +256,9 @@ func (conf *Configuration) expandLinkedFiles(catcher grip.Catcher) {
 		go func(idx int, fn string) {
 			defer wg.Done()
 			conf, err := LoadConfiguration(fn)
-			catcher.Wrapf(err, "problem reading linked config file %q", fn)
+			if err := err; err != nil {
+				catcher.Errorf("problem reading linked config file %q: %w", err, fn)
+			}
 			if err != nil {
 				return
 			}
@@ -294,7 +308,7 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) {
 	}
 }
 
-func (conf *Configuration) expandLinks(catcher grip.Catcher) []LinkConf {
+func (conf *Configuration) expandLinks(catcher emt.Catcher) []LinkConf {
 	var err error
 	links := make([]LinkConf, 0, len(conf.Links))
 	for idx := range conf.Links {
@@ -379,13 +393,15 @@ func (conf *Configuration) mapReposByTags() {
 }
 
 func (conf *Settings) Validate() error {
-	catcher := grip.NewBasicCatcher()
+	catcher := emt.NewBasicCatcher()
 	for _, c := range []validatable{
 		&conf.Notification,
 		&conf.Queue,
 		&conf.Credentials,
 	} {
-		catcher.Wrapf(c.Validate(), "%T is not valid", c)
+		if err := c.Validate(); err != nil {
+			catcher.Errorf("%T is not valid: %w", err, c)
+		}
 	}
 
 	return catcher.Resolve()
@@ -399,7 +415,7 @@ func (conf *NotifyConf) Validate() error {
 	if conf.Target == "" {
 		conf.Target = os.Getenv("SARDIS_NOTIFY_TARGET")
 	}
-	defaults := send.GetXMPPConnectionInfo()
+	defaults := xmpp.GetConnectionInfo()
 	if conf.Host == "" {
 		conf.Host = defaults.Hostname
 	}
@@ -410,7 +426,7 @@ func (conf *NotifyConf) Validate() error {
 		conf.Password = defaults.Password
 	}
 
-	catcher := grip.NewBasicCatcher()
+	catcher := emt.NewBasicCatcher()
 	for k, v := range map[string]string{
 		"host": conf.Host,
 		"user": conf.User,
@@ -425,7 +441,7 @@ func (conf *NotifyConf) Validate() error {
 }
 
 func (conf *AmboyConf) Validate() error {
-	catcher := grip.NewBasicCatcher()
+	catcher := emt.NewBasicCatcher()
 
 	if conf.Workers < 1 {
 		catcher.Add(errors.New("must specify one or more workers"))
@@ -455,7 +471,7 @@ func (conf *ArchLinuxConf) Validate() error {
 		}
 	}
 
-	catcher := grip.NewBasicCatcher()
+	catcher := emt.NewBasicCatcher()
 	if stat, err := os.Stat(conf.BuildPath); os.IsNotExist(err) {
 		catcher.Add(errors.Wrap(os.MkdirAll(conf.BuildPath, 0755), "problem making build directory"))
 	} else if !stat.IsDir() {
@@ -522,7 +538,7 @@ func (conf *Configuration) GetRepo(name string) *RepoConf {
 }
 
 func (conf *RepoConf) HasChanges() (bool, error) {
-	if !utility.FileExists(conf.Path) {
+	if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
 		return true, nil
 	}
 
@@ -589,7 +605,7 @@ func (conf *CredentialsConf) Validate() error {
 }
 
 func (h *HostConf) Validate() error {
-	catcher := grip.NewBasicCatcher()
+	catcher := emt.NewBasicCatcher()
 
 	catcher.NewWhen(h.Name == "", "cannot have an empty name for a host")
 	catcher.NewWhen(h.Hostname == "", "cannot have an empty host name")
@@ -614,7 +630,7 @@ func (conf *Configuration) GetHost(name string) (*HostConf, error) {
 }
 
 func (conf *CommandConf) Validate() error {
-	catcher := grip.NewBasicCatcher()
+	catcher := emt.NewBasicCatcher()
 	catcher.NewWhen(conf.Name == "", "commands must have a name")
 	catcher.NewWhen(conf.Command == "", "commands must have specify commands")
 

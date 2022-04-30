@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/dependency"
 	"github.com/tychoish/amboy/job"
@@ -11,7 +12,7 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
-	"github.com/pkg/errors"
+	"github.com/tychoish/grip/x/jira"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/util"
 )
@@ -48,8 +49,8 @@ func NewBulkCreateJiraTicketJob(path string) amboy.Job {
 
 func (j *jiraBulkCreateJob) Run(ctx context.Context) {
 	data := struct {
-		Priority level.Priority      `bson:"priority" json:"priority" yaml:"priority"`
-		Tickets  []message.JiraIssue `bson:"tickets" json:"tickets" yaml:"tickets"`
+		Priority level.Priority `bson:"priority" json:"priority" yaml:"priority"`
+		Tickets  []jira.Issue   `bson:"tickets" json:"tickets" yaml:"tickets"`
 	}{}
 
 	err := util.UnmarshalFile(j.Path, &data)
@@ -63,11 +64,11 @@ func (j *jiraBulkCreateJob) Run(ctx context.Context) {
 	}
 
 	env := sardis.GetEnvironment()
-	jira := env.JiraIssue()
+	logger := env.JiraIssue()
 
 	msgs := make([]message.Composer, len(data.Tickets))
 	for idx := range data.Tickets {
-		msg := message.MakeJiraMessage(&data.Tickets[idx])
+		msg := jira.MakeIssue(&data.Tickets[idx])
 		j.AddError(msg.SetPriority(data.Priority))
 		msgs[idx] = msg
 		if !msg.Loggable() {
@@ -89,7 +90,7 @@ func (j *jiraBulkCreateJob) Run(ctx context.Context) {
 			})
 		}
 
-		jira.Log(data.Priority, msg)
+		logger.Log(data.Priority, msg)
 
 		grip.Info(message.Fields{
 			"op":  "created jira issue",

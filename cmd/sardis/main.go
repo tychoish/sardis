@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/send"
+	"github.com/tychoish/grip/x/system"
 	jaspercli "github.com/tychoish/jasper/cli"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/operations"
@@ -130,21 +131,21 @@ func buildApp() *cli.App {
 
 // logging setup is separate to make it unit testable
 func loggingSetup(conf sardis.LoggingConf) {
-	grip.SetName(conf.Name)
-	sender := grip.GetSender()
+	grip.Sender().SetName(conf.Name)
+	sender := grip.Sender()
 
 	li := sender.Level()
 	li.Threshold = conf.Priority
 	li.Default = level.Debug
 	grip.Critical(sender.SetLevel(li))
-	grip.Critical(grip.SetSender(sender))
+	grip.SetGlobalLogger(grip.NewLogger(sender))
 
 	if conf.EnableJSONFormating {
 		sender.SetFormatter(send.MakeJSONFormatter())
 	}
 
 	if runtime.GOOS == "linux" {
-		sys, err := send.MakeDefaultSystem()
+		sys, err := system.MakeDefaultSystem()
 		if err != nil {
 			return
 		}
@@ -166,11 +167,11 @@ func loggingSetup(conf sardis.LoggingConf) {
 		}
 
 		if !conf.DisableStandardOutput {
-			sender = send.NewConfiguredMultiSender(sys, sender)
+			sender = send.MakeMulti(sys, sender)
 		} else {
 			sender = sys
 		}
 
-		grip.SetSender(sender)
+		grip.SetGlobalLogger(grip.NewLogger(sender))
 	}
 }

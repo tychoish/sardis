@@ -88,8 +88,8 @@ func blogPublish() cli.Command {
 				AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
 				Append(blog.DeployCommands...).
 				Directory(repo.Path).
-				SetOutputSender(level.Info, grip.GetSender()).
-				SetErrorSender(level.Error, grip.GetSender()).
+				SetOutputSender(level.Info, grip.Sender()).
+				SetErrorSender(level.Error, grip.Sender()).
 				Run(ctx)
 			if err != nil {
 				notify.Error(message.WrapError(err, message.Fields{

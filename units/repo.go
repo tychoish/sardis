@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/tychoish/amboy"
+	"github.com/tychoish/emt"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 )
 
-func SyncRepo(ctx context.Context, catcher grip.Catcher, wg *sync.WaitGroup, queue amboy.Queue, repo *sardis.RepoConf) {
+func SyncRepo(ctx context.Context, catcher emt.Catcher, wg *sync.WaitGroup, queue amboy.Queue, repo *sardis.RepoConf) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		catcher.Add(err)

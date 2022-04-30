@@ -33,7 +33,7 @@ func notifyPipe() cli.Command {
 
 			scanner := bufio.NewScanner(os.Stdin)
 			for scanner.Scan() {
-				logger.Notice(message.NewString(scanner.Text()))
+				logger.Notice(message.MakeString(scanner.Text()))
 			}
 			return nil
 		},

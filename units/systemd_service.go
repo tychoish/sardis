@@ -53,7 +53,7 @@ func (j *setupServiceJob) Run(ctx context.Context) {
 	jasper := env.Jasper()
 	cmd := jasper.CreateCommand(ctx)
 
-	sender := send.NewAnnotatingSender(grip.GetSender(), map[string]interface{}{
+	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
 		"job": j.ID(),
 	})
 

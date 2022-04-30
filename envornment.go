@@ -27,11 +27,15 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/queue"
+	"github.com/tychoish/emt"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
-	"github.com/tychoish/grip/logging"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
+	"github.com/tychoish/grip/x/desktop"
+	"github.com/tychoish/grip/x/jira"
+	"github.com/tychoish/grip/x/twitter"
+	"github.com/tychoish/grip/x/xmpp"
 	"github.com/tychoish/jasper"
 )
 
@@ -57,11 +61,11 @@ type Environment interface {
 	Context() (context.Context, context.CancelFunc)
 	Configuration() *Configuration
 	Queue() amboy.Queue
-	Logger() grip.Journaler
+	Logger() grip.Logger
 	Jasper() jasper.Manager
 
-	Twitter() grip.Journaler
-	JiraIssue() grip.Journaler
+	Twitter() grip.Logger
+	JiraIssue() grip.Logger
 
 	AddCloseError(string, error)
 	RegisterCloser(string, CloserFunc)
@@ -79,9 +83,9 @@ type CloserFunc func(context.Context) error
 type appServicesCache struct {
 	queue      amboy.Queue
 	conf       *Configuration
-	logger     grip.Journaler
-	jiraIssue  grip.Journaler
-	twitter    grip.Journaler
+	logger     grip.Logger
+	jiraIssue  grip.Logger
+	twitter    grip.Logger
 	jpm        jasper.Manager
 	ctx        context.Context
 	rootCancel context.CancelFunc
@@ -102,7 +106,7 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 		return errors.New("cannot reconfigure the environment")
 	}
 
-	catcher := grip.NewBasicCatcher()
+	catcher := emt.NewBasicCatcher()
 	var err error
 
 	c.conf = conf
@@ -120,18 +124,18 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 }
 
 func (c *appServicesCache) initSender() error {
-	root := grip.GetSender()
+	root := grip.Sender()
 
 	var loggers []send.Sender
 	defer func() {
 		loggers = append(loggers, root)
-		c.logger = logging.MakeGrip(send.NewConfiguredMultiSender(loggers...))
+		c.logger = grip.NewLogger(send.MakeMulti(loggers...))
 	}()
 	levels := send.LevelInfo{Default: level.Notice, Threshold: level.Info}
-	sender, err := send.NewXMPPLogger(
+	sender, err := xmpp.NewSender(
 		c.conf.Settings.Notification.Name,
 		c.conf.Settings.Notification.Target,
-		send.XMPPConnectionInfo{
+		xmpp.ConnectionInfo{
 			Hostname: c.conf.Settings.Notification.Host,
 			Username: c.conf.Settings.Notification.User,
 			Password: c.conf.Settings.Notification.Password,
@@ -148,17 +152,12 @@ func (c *appServicesCache) initSender() error {
 		return errors.Wrap(err, "problem finding hostname")
 	}
 
-	if err = sender.SetErrorHandler(send.ErrorHandlerFromSender(root)); err != nil {
-		return errors.Wrap(err, "problem setting error handler")
-	}
-
-	if err = sender.SetFormatter(func(m message.Composer) (string, error) {
+	sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
+	sender.SetFormatter(func(m message.Composer) (string, error) {
 		return fmt.Sprintf("[%s:%s] %s", c.conf.Settings.Notification.Name, host, m.String()), nil
-	}); err != nil {
-		return errors.Wrap(err, "problem setting formatter")
-	}
+	})
 
-	desktop, err := send.NewDesktopNotify(c.conf.Settings.Notification.Name, levels)
+	desktop, err := desktop.NewSender(c.conf.Settings.Notification.Name, levels)
 	if err != nil {
 		return errors.Wrap(err, "problem creating sender")
 	}
@@ -203,11 +202,11 @@ func (c *appServicesCache) initSSHSetting(ctx context.Context) error {
 }
 
 func (c *appServicesCache) initJira() error {
-	root := grip.GetSender()
+	root := grip.Sender()
 	loggers := []send.Sender{}
 	defer func() {
 		loggers = append(loggers, root)
-		c.jiraIssue = logging.MakeGrip(send.NewConfiguredMultiSender(loggers...))
+		c.jiraIssue = grip.NewLogger(send.MakeMulti(loggers...))
 	}()
 
 	if c.conf.Settings.Credentials.Jira.URL == "" {
@@ -215,10 +214,10 @@ func (c *appServicesCache) initJira() error {
 		return nil
 	}
 
-	sender, err := send.MakeJiraLogger(c.ctx, &send.JiraOptions{
+	sender, err := jira.MakeIssueSender(c.ctx, &jira.Options{
 		Name:    c.conf.Settings.Notification.Name,
 		BaseURL: c.conf.Settings.Credentials.Jira.URL,
-		BasicAuthOpts: send.JiraBasicAuth{
+		BasicAuthOpts: jira.BasicAuth{
 			UseBasicAuth: true,
 			Username:     c.conf.Settings.Credentials.Jira.Username,
 			Password:     c.conf.Settings.Credentials.Jira.Password,
@@ -230,23 +229,21 @@ func (c *appServicesCache) initJira() error {
 	loggers = append(loggers, sender)
 	c.appendCloser("sender-jira-issue", func(_ context.Context) error { return sender.Close() })
 
-	if err := sender.SetErrorHandler(send.ErrorHandlerFromSender(root)); err != nil {
-		return errors.Wrap(err, "problem setting error handler")
-	}
+	sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
 
 	return nil
 }
 
 func (c *appServicesCache) initTwitter() error {
-	root := grip.GetSender()
+	root := grip.Sender()
 	loggers := []send.Sender{}
 	defer func() {
 		loggers = append(loggers, root)
-		c.twitter = logging.MakeGrip(send.NewConfiguredMultiSender(loggers...))
+		c.twitter = grip.NewLogger(send.MakeMulti(loggers...))
 	}()
 
 	conf := c.conf.Settings.Credentials.Twitter
-	twitter, err := send.MakeTwitterLogger(c.ctx, &send.TwitterOptions{
+	twitter, err := twitter.MakeSender(c.ctx, &twitter.Options{
 		Name:           conf.Username + ".sardis",
 		ConsumerKey:    conf.ConsumerKey,
 		ConsumerSecret: conf.ConsumerSecret,
@@ -258,9 +255,7 @@ func (c *appServicesCache) initTwitter() error {
 		return errors.Wrap(err, "problem constructing twitter sender.")
 	}
 
-	if err = twitter.SetErrorHandler(send.ErrorHandlerFromSender(root)); err != nil {
-		return errors.Wrap(err, "problem error handler for twitter sender.")
-	}
+	twitter.SetErrorHandler(send.ErrorHandlerFromSender(root))
 
 	return nil
 }
@@ -329,7 +324,7 @@ func (c *appServicesCache) Close(ctx context.Context) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	catcher := grip.NewBasicCatcher()
+	catcher := emt.NewBasicCatcher()
 
 	for idx, op := range c.closers {
 		startAt := time.Now()
@@ -377,9 +372,9 @@ func (c *appServicesCache) Configuration() *Configuration {
 	return &out
 }
 
-func (c *appServicesCache) Logger() grip.Journaler {
+func (c *appServicesCache) Logger() grip.Logger {
 	c.mutex.RLock()
-	if c.logger != nil {
+	if c.logger.Sender() != nil {
 		c.mutex.RUnlock()
 		return c.logger
 	}
@@ -396,9 +391,9 @@ func (c *appServicesCache) Logger() grip.Journaler {
 	return c.logger
 }
 
-func (c *appServicesCache) JiraIssue() grip.Journaler {
+func (c *appServicesCache) JiraIssue() grip.Logger {
 	c.mutex.RLock()
-	if c.jiraIssue != nil {
+	if c.jiraIssue.Sender() != nil {
 		c.mutex.RUnlock()
 		return c.logger
 	}
@@ -415,9 +410,9 @@ func (c *appServicesCache) JiraIssue() grip.Journaler {
 	return c.jiraIssue
 }
 
-func (c *appServicesCache) Twitter() grip.Journaler {
+func (c *appServicesCache) Twitter() grip.Logger {
 	c.mutex.RLock()
-	if c.twitter != nil {
+	if c.twitter.Sender() != nil {
 		c.mutex.RUnlock()
 		return c.twitter
 	}

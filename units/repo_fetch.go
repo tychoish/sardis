@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/deciduosity/utility"
 	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/dependency"
@@ -48,6 +47,16 @@ func NewRepoFetchJob(conf *sardis.RepoConf) amboy.Job {
 	return j
 }
 
+func stringSliceContains(str string, slice []string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+
+	}
+	return false
+}
+
 func (j *repoFetchJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 
@@ -72,7 +81,7 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 	conf := env.Configuration()
 	cmd := env.Jasper().CreateCommand(ctx)
 
-	sender := send.NewAnnotatingSender(grip.GetSender(), map[string]interface{}{
+	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
 		"job":  j.ID(),
 		"repo": j.Conf.Name,
 	})
@@ -82,7 +91,7 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 		SetOutputSender(level.Info, sender).
 		SetErrorSender(level.Warning, sender)
 
-	if j.Conf.LocalSync && utility.StringSliceContains(j.Conf.Tags, "mail") {
+	if j.Conf.LocalSync && stringSliceContains("mail", j.Conf.Tags) {
 		cmd.Append(j.Conf.Pre...)
 	}
 

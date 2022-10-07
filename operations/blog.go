@@ -78,7 +78,7 @@ func blogPublish() cli.Command {
 				return nil
 			}
 
-			if err := amboy.RunJob(ctx, units.NewLocalRepoSyncJob(repo.Path, repo.Pre, repo.Post)); err != nil {
+			if err := amboy.RunJob(ctx, units.NewLocalRepoSyncJob(repo.Path, repo.Branch, repo.Pre, repo.Post)); err != nil {
 				return errors.Wrap(err, "problem syncing blog repo")
 			}
 

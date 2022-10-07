@@ -30,7 +30,7 @@ func SyncRepo(ctx context.Context, catcher emt.Catcher, wg *sync.WaitGroup, queu
 		}
 
 		hasMirrors = true
-		job := NewRepoSyncJob(mirror, repo.Path, repo.Pre, nil)
+		job := NewRepoSyncJob(mirror, repo.Path, repo.Branch, repo.Pre, nil)
 		catcher.Add(queue.Put(ctx, job))
 		iwg.Add(1)
 		go func() {
@@ -45,7 +45,7 @@ func SyncRepo(ctx context.Context, catcher emt.Catcher, wg *sync.WaitGroup, queu
 			catcher.Add(err)
 
 			if changes {
-				catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path, repo.Pre, repo.Post)))
+				catcher.Add(queue.Put(ctx, NewLocalRepoSyncJob(repo.Path, repo.Branch, repo.Pre, repo.Post)))
 			} else {
 				catcher.Add(queue.Put(ctx, NewRepoFetchJob(repo)))
 			}

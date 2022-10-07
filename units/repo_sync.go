@@ -22,6 +22,7 @@ import (
 type repoSyncJob struct {
 	Host     string   `bson:"host" json:"host" yaml:"host"`
 	Path     string   `bson:"path" json:"path" yaml:"path"`
+	Branch   string   `bson:"branch" json:"branch" yaml:"branch"`
 	PostHook []string `bson:"post" json:"post" yaml:"post"`
 	PreHook  []string `bson:"pre" json:"pre" yaml:"pre"`
 	job.Base `bson:"metadata" json:"metadata" yaml:"metadata"`
@@ -49,21 +50,23 @@ func repoSyncFactory() *repoSyncJob {
 	return j
 }
 
-func NewLocalRepoSyncJob(path string, pre, post []string) amboy.Job {
+func NewLocalRepoSyncJob(path, branch string, pre, post []string) amboy.Job {
 	j := repoSyncFactory()
 	j.Host = "LOCAL"
 	j.Path = path
+	j.Branch = branch
 	j.PreHook = pre
 	j.PostHook = post
 	j.SetID(j.buildID())
 	return j
 }
 
-func NewRepoSyncJob(host, path string, pre, post []string) amboy.Job {
+func NewRepoSyncJob(host, path, branch string, pre, post []string) amboy.Job {
 	j := repoSyncFactory()
 
 	j.Host = host
 	j.Path = path
+	j.Branch = branch
 	j.PreHook = pre
 	j.PostHook = post
 	j.SetID(j.buildID())

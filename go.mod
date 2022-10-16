@@ -7,7 +7,7 @@ require (
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/tychoish/amboy v0.0.0-20221016162606-d408d958ac3b
+	github.com/tychoish/amboy v0.0.0-20221016175349-a562b519f3f8
 	github.com/tychoish/emt v0.1.0
 	github.com/tychoish/grip v0.1.0
 	github.com/tychoish/grip/x/desktop v0.0.0-20221015161242-1426883e127d

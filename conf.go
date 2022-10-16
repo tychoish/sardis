@@ -1,6 +1,7 @@
 package sardis
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,7 +11,6 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
 	"github.com/tychoish/emt"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -176,7 +176,7 @@ func LoadConfiguration(fn string) (*Configuration, error) {
 	out := &Configuration{}
 
 	if err := util.UnmarshalFile(fn, out); err != nil {
-		return nil, errors.Wrap(err, "problem unmarshaling config data")
+		return nil, fmt.Errorf("problem unmarshaling config data: %w", err)
 	}
 
 	return out, nil
@@ -473,7 +473,9 @@ func (conf *ArchLinuxConf) Validate() error {
 
 	catcher := emt.NewBasicCatcher()
 	if stat, err := os.Stat(conf.BuildPath); os.IsNotExist(err) {
-		catcher.Add(errors.Wrap(os.MkdirAll(conf.BuildPath, 0755), "problem making build directory"))
+		if err := os.MkdirAll(conf.BuildPath, 0755); err != nil {
+			catcher.Errorf("making %q: %w", conf.BuildPath, err)
+		}
 	} else if !stat.IsDir() {
 		catcher.Add(fmt.Errorf("arch build path '%s' is a file not a directory", conf.BuildPath))
 	}

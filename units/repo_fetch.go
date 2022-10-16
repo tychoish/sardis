@@ -2,10 +2,10 @@ package units
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/dependency"
 	"github.com/tychoish/amboy/job"

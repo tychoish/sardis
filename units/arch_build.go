@@ -2,11 +2,11 @@ package units
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/job"
 	"github.com/tychoish/amboy/registry"

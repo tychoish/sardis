@@ -16,6 +16,7 @@ package sardis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -24,7 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/queue"
 	"github.com/tychoish/emt"
@@ -142,7 +142,7 @@ func (c *appServicesCache) initSender() error {
 		},
 		levels)
 	if err != nil {
-		return errors.Wrap(err, "problem creating sender")
+		return fmt.Errorf("problem creating sender: %w", err)
 	}
 	loggers = append(loggers, sender)
 	c.appendCloser("sender-notify", func(ctx context.Context) error {
@@ -154,7 +154,7 @@ func (c *appServicesCache) initSender() error {
 
 	host, err := os.Hostname()
 	if err != nil {
-		return errors.Wrap(err, "problem finding hostname")
+		return fmt.Errorf("problem finding hostname: %w", err)
 	}
 
 	sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
@@ -164,7 +164,7 @@ func (c *appServicesCache) initSender() error {
 
 	desktop, err := desktop.NewSender(c.conf.Settings.Notification.Name, levels)
 	if err != nil {
-		return errors.Wrap(err, "problem creating sender")
+		return fmt.Errorf("problem creating sender: %w", err)
 	}
 	loggers = append(loggers, desktop)
 
@@ -229,7 +229,7 @@ func (c *appServicesCache) initJira() error {
 		},
 	})
 	if err != nil {
-		return errors.Wrap(err, "problem setting up jira logger")
+		return fmt.Errorf("problem setting up jira logger: %w", err)
 	}
 	loggers = append(loggers, sender)
 	c.appendCloser("sender-jira-issue", func(_ context.Context) error { return sender.Close() })
@@ -257,7 +257,7 @@ func (c *appServicesCache) initTwitter() error {
 	})
 
 	if err != nil {
-		return errors.Wrap(err, "problem constructing twitter sender.")
+		return fmt.Errorf("problem constructing twitter sender.: %w", err)
 	}
 
 	twitter.SetErrorHandler(send.ErrorHandlerFromSender(root))
@@ -290,7 +290,7 @@ func (c *appServicesCache) Queue() amboy.Queue {
 	defer c.mutex.RUnlock()
 
 	if !c.queue.Info().Started {
-		grip.Alert(errors.Wrap(c.queue.Start(c.ctx), "problem starting queue"))
+		grip.Alert(message.WrapError(c.queue.Start(c.ctx), "problem starting queue"))
 	}
 
 	return c.queue

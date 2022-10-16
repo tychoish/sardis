@@ -1,7 +1,9 @@
 package operations
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
+
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
 	"github.com/urfave/cli"
@@ -47,7 +49,7 @@ func bulkCreateTickets() cli.Command {
 			job := units.NewBulkCreateJiraTicketJob(path)
 			job.Run(ctx)
 
-			return errors.Wrap(job.Error(), "problem running job")
+			return fmt.Errorf("problem running job: %w", job.Error())
 		},
 	}
 }

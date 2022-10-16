@@ -2,11 +2,11 @@ package sardis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/tychoish/jasper"
 	jaspercli "github.com/tychoish/jasper/cli"
 	"github.com/tychoish/jasper/options"
@@ -41,7 +41,7 @@ func (h *HostConf) Jasper(ctx context.Context) (jasper.Manager, error) {
 
 		serviceAddr, err := net.ResolveTCPAddr("tcp", addrStr)
 		if err != nil {
-			return nil, errors.Wrapf(err, "could not resolve Jasper service address at '%s'", addrStr)
+			return nil, fmt.Errorf("could not resolve Jasper service address at '%s': %w", addrStr, err)
 		}
 
 		dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)

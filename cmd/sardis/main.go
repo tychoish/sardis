@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"runtime"
 
-	"github.com/pkg/errors"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/send"
@@ -100,7 +99,7 @@ func buildApp() *cli.App {
 		path := c.String("conf")
 		conf, err := sardis.LoadConfiguration(path)
 		if err != nil {
-			grip.Warning(errors.Wrap(err, "problem loading config"))
+			grip.Warning(fmt.Errorf("problem loading config: %w", err))
 			return nil
 		}
 
@@ -114,7 +113,7 @@ func buildApp() *cli.App {
 		loggingSetup(conf.Settings.Logging)
 
 		if err := env.Configure(ctx, conf); err != nil {
-			return errors.Wrap(err, "problem configuring app")
+			return fmt.Errorf("problem configuring app: %w", err)
 		}
 
 		return nil

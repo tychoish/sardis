@@ -2,13 +2,13 @@ package util
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 )
 
 type Unmarshaler func([]byte, interface{}) error
@@ -42,14 +42,17 @@ func UnmarshalFile(fn string, out interface{}) error {
 
 	file, err := os.Open(fn)
 	if err != nil {
-		return errors.Wrapf(err, "problem opening file %s to unmarshal", fn)
+		return fmt.Errorf("problem opening file %s to unmarshal: %w", fn, err)
 	}
 	defer file.Close()
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
-		return errors.Wrapf(err, "problem reading data from %s", fn)
+		return fmt.Errorf("problem reading data from %s: %w", fn, err)
 	}
 
-	return errors.Wrapf(unmarshal(data, out), "problem reading data from '%s'", fn)
+	if err := unmarshal(data, out); err != nil {
+		return fmt.Errorf("problem reading data from '%s': %w", fn, err)
+	}
+	return nil
 }

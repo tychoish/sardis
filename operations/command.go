@@ -6,7 +6,6 @@ import (
 
 	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
 	"github.com/cheynewallace/tabby"
-	"github.com/pkg/errors"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -111,7 +110,7 @@ func qrCode() cli.Command {
 				AppendArgs("xsel", "--clipboard", "--output").SetOutputWriter(buf).
 				Run(ctx)
 			if err != nil {
-				return errors.Wrap(err, "problem getting clipboard")
+				return fmt.Errorf("problem getting clipboard: %w", err)
 			}
 
 			grip.Info(buf.String())

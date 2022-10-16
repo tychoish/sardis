@@ -9,7 +9,6 @@ import (
 
 	"github.com/cheynewallace/tabby"
 	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/emt"
 	"github.com/tychoish/grip"
@@ -234,7 +233,7 @@ func repoClone() cli.Command {
 			}
 
 			if catcher.HasErrors() {
-				return errors.Wrap(catcher.Resolve(), "problem queuing jobs")
+				return fmt.Errorf("problem queuing jobs: %w", catcher.Resolve())
 			}
 
 			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)

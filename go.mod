@@ -7,7 +7,6 @@ require (
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/pkg/errors v0.9.1
 	github.com/tychoish/amboy v0.0.0-20221016162606-d408d958ac3b
 	github.com/tychoish/emt v0.1.0
 	github.com/tychoish/grip v0.1.0
@@ -76,6 +75,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
 	github.com/phyber/negroni-gzip v1.0.0 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rs/cors v1.8.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect

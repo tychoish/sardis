@@ -1,9 +1,9 @@
 package operations
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -81,7 +81,7 @@ func blogPublish() cli.Command {
 			}
 
 			if err := amboy.RunJob(ctx, units.NewLocalRepoSyncJob(repo.Path, repo.Branch, repo.Pre, repo.Post)); err != nil {
-				return errors.Wrap(err, "problem syncing blog repo")
+				return fmt.Errorf("problem syncing blog repo: %w", err)
 			}
 
 			jpm := env.Jasper()
@@ -98,7 +98,7 @@ func blogPublish() cli.Command {
 					"op":   "blog publish",
 					"repo": repo.Name,
 				}))
-				return errors.Wrap(err, "problem running deploy command")
+				return fmt.Errorf("problem running deploy command: %w", err)
 			}
 
 			return nil

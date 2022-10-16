@@ -8,7 +8,6 @@ import (
 	"time"
 
 	git "github.com/go-git/go-git/v5"
-	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/dependency"
 	"github.com/tychoish/amboy/job"
@@ -54,7 +53,7 @@ func NewRepoStatusJob(path string) amboy.Job {
 func (j *repoStatusJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 	if _, err := os.Stat(j.Path); os.IsNotExist(err) {
-		j.AddError(errors.Errorf("cannot check status %s, no repository exists", j.Path))
+		j.AddError(fmt.Errorf("cannot check status %s, no repository exists", j.Path))
 		return
 	}
 

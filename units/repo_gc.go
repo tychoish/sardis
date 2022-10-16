@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/dependency"
 	"github.com/tychoish/amboy/job"
@@ -52,7 +51,7 @@ func NewRepoCleanupJob(path string) amboy.Job {
 func (j *repoCleanupJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 	if _, err := os.Stat(j.Path); os.IsNotExist(err) {
-		j.AddError(errors.Errorf("cannot cleanup %s, no repository exists", j.Path))
+		j.AddError(fmt.Errorf("cannot cleanup %s, no repository exists", j.Path))
 		return
 	}
 

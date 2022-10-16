@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -31,12 +32,12 @@ func UnmarshalFile(fn string, out interface{}) error {
 	}
 
 	if _, err := os.Stat(fn); os.IsNotExist(err) {
-		return errors.Errorf("file '%s' does not exist", fn)
+		return fmt.Errorf("file '%s' does not exist", fn)
 	}
 
 	unmarshal := GetUnmarshaler(fn)
 	if unmarshal == nil {
-		return errors.Errorf("could not find supported unmarshaller for '%s'", fn)
+		return fmt.Errorf("could not find supported unmarshaller for '%s'", fn)
 	}
 
 	file, err := os.Open(fn)

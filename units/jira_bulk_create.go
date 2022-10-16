@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/dependency"
 	"github.com/tychoish/amboy/job"
@@ -72,7 +71,7 @@ func (j *jiraBulkCreateJob) Run(ctx context.Context) {
 		j.AddError(msg.SetPriority(data.Priority))
 		msgs[idx] = msg
 		if !msg.Loggable() {
-			j.AddError(errors.Errorf("invalid/unlogable message at index %d, '%s'", idx, msg.String()))
+			j.AddError(fmt.Errorf("invalid/unlogable message at index %d, '%s'", idx, msg.String()))
 		}
 	}
 

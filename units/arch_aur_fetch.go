@@ -64,7 +64,7 @@ func (j *archAurFetchJob) Run(ctx context.Context) {
 		args = append(args, "git", "clone", fmt.Sprintf("https://aur.archlinux.org/%s.git", j.Name))
 		dir = filepath.Dir(dir)
 	} else if !stat.IsDir() {
-		j.AddError(errors.Errorf("%s exists and is not a directory", dir))
+		j.AddError(fmt.Errorf("%s exists and is not a directory", dir))
 		return
 	} else if j.Update {
 		args = append(args, "git", "pull", "origin", "master")

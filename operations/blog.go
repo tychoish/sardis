@@ -1,6 +1,8 @@
 package operations
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/grip"
@@ -66,7 +68,7 @@ func blogPublish() cli.Command {
 			}
 
 			if repo == nil || blog == nil {
-				return errors.Errorf("invalid configuration for '%s'", name)
+				return fmt.Errorf("invalid configuration for '%s'", name)
 			}
 
 			if !blog.Enabled {

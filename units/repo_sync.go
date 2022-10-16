@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/dependency"
 	"github.com/tychoish/amboy/job"
@@ -93,7 +92,7 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 
 	if stat, err := os.Stat(j.Path); os.IsNotExist(err) || !stat.IsDir() {
-		j.AddError(errors.Errorf("path '%s' does not exist", j.Path))
+		j.AddError(fmt.Errorf("path '%s' does not exist", j.Path))
 		return
 	}
 

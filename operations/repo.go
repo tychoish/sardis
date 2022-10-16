@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -88,7 +89,7 @@ func repoUpdate() cli.Command {
 
 			repos := conf.GetTaggedRepos(tags...)
 			if len(repos) == 0 {
-				return errors.Errorf("no tagged repository named '%v' configured", tags)
+				return fmt.Errorf("no tagged repository named '%v' configured", tags)
 			}
 
 			queue := env.Queue()

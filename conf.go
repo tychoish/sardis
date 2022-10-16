@@ -433,7 +433,7 @@ func (conf *NotifyConf) Validate() error {
 		"pass": conf.Password,
 	} {
 		if v == "" {
-			catcher.Add(errors.Errorf("missing value for '%s'", k))
+			catcher.Add(fmt.Errorf("missing value for '%s'", k))
 		}
 	}
 
@@ -467,7 +467,7 @@ func (conf *ArchLinuxConf) Validate() error {
 
 		conf.BuildPath, err = homedir.Expand(conf.BuildPath)
 		if err != nil {
-			return errors.WithStack(err)
+			return err
 		}
 	}
 
@@ -475,24 +475,24 @@ func (conf *ArchLinuxConf) Validate() error {
 	if stat, err := os.Stat(conf.BuildPath); os.IsNotExist(err) {
 		catcher.Add(errors.Wrap(os.MkdirAll(conf.BuildPath, 0755), "problem making build directory"))
 	} else if !stat.IsDir() {
-		catcher.Add(errors.Errorf("arch build path '%s' is a file not a directory", conf.BuildPath))
+		catcher.Add(fmt.Errorf("arch build path '%s' is a file not a directory", conf.BuildPath))
 	}
 
 	for idx, pkg := range conf.AurPackages {
 		if pkg.Name == "" {
-			catcher.Add(errors.Errorf("aur package at index=%d does not have name", idx))
+			catcher.Add(fmt.Errorf("aur package at index=%d does not have name", idx))
 		}
 		if strings.Contains(pkg.Name, ".+=") {
-			catcher.Add(errors.Errorf("aur package '%s' at index=%d has invalid character", pkg.Name, idx))
+			catcher.Add(fmt.Errorf("aur package '%s' at index=%d has invalid character", pkg.Name, idx))
 		}
 	}
 
 	for idx, pkg := range conf.Packages {
 		if pkg.Name == "" {
-			catcher.Add(errors.Errorf("package at index=%d does not have name", idx))
+			catcher.Add(fmt.Errorf("package at index=%d does not have name", idx))
 		}
 		if strings.Contains(pkg.Name, ".+=") {
-			catcher.Add(errors.Errorf("package '%s' at index=%d has invalid character", pkg.Name, idx))
+			catcher.Add(fmt.Errorf("package '%s' at index=%d has invalid character", pkg.Name, idx))
 		}
 	}
 	return catcher.Resolve()
@@ -508,7 +508,7 @@ func (conf *RepoConf) Validate() error {
 	}
 
 	if conf.Remote == "" {
-		return errors.Errorf("'%s' does not specify a remote", conf.Name)
+		return fmt.Errorf("'%s' does not specify a remote", conf.Name)
 	}
 
 	if conf.Fetch && conf.LocalSync {
@@ -518,7 +518,7 @@ func (conf *RepoConf) Validate() error {
 	var err error
 	conf.Path, err = homedir.Expand(conf.Path)
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 
 	conf.Post = util.TryExpandHomeDirs(conf.Post)
@@ -598,10 +598,10 @@ func (conf *CredentialsConf) Validate() error {
 	var err error
 	conf.Path, err = homedir.Expand(conf.Path)
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 
-	return errors.WithStack(util.UnmarshalFile(conf.Path, &conf))
+	return util.UnmarshalFile(conf.Path, &conf)
 }
 
 func (h *HostConf) Validate() error {
@@ -626,7 +626,7 @@ func (conf *Configuration) GetHost(name string) (*HostConf, error) {
 		}
 	}
 
-	return nil, errors.Errorf("could not find a host named '%s'", name)
+	return nil, fmt.Errorf("could not find a host named '%s'", name)
 }
 
 func (conf *CommandConf) Validate() error {

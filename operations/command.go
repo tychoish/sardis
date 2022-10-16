@@ -45,7 +45,7 @@ func RunCommand() cli.Command {
 			for idx, name := range ops {
 				cmd, ok := cmds[name]
 				if !ok {
-					return errors.Errorf("command '%s' [%d/%d] does not exist", name, idx+1, len(ops))
+					return fmt.Errorf("command '%s' [%d/%d] does not exist", name, idx+1, len(ops))
 				}
 				err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
 					Append(cmd.Command).SetCombinedSender(level.Info, grip.Sender()).
@@ -60,7 +60,7 @@ func RunCommand() cli.Command {
 						return true
 					}).Run(ctx)
 				if err != nil {
-					return errors.WithStack(err)
+					return err
 				}
 			}
 

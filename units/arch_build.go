@@ -59,7 +59,7 @@ func (j *archAbsBuildJob) Run(ctx context.Context) {
 	pkgbuild := filepath.Join(dir, "PKGBUILD")
 
 	if _, err := os.Stat(pkgbuild); os.IsNotExist(err) {
-		j.AddError(errors.Errorf("%s does not exist", pkgbuild))
+		j.AddError(fmt.Errorf("%s does not exist", pkgbuild))
 		return
 	}
 

@@ -3,7 +3,6 @@ package operations
 import (
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/emt"
 	"github.com/tychoish/grip"
@@ -35,7 +34,7 @@ func configCheck() cli.Command {
 			if err == nil {
 				grip.Info("configuration is valid")
 			}
-			return errors.Wrap(err, "configuration validation error")
+			return err
 		},
 	}
 }

@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/pkg/errors"
@@ -56,7 +57,7 @@ func requirePathExists(flagName string) cli.BeforeFunc {
 		}
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return errors.Errorf("configuration file %s does not exist", path)
+			return fmt.Errorf("configuration file %s does not exist", path)
 		}
 
 		return c.Set(flagName, path)
@@ -87,7 +88,7 @@ func requireStringOrFirstArgSet(flagName string) cli.BeforeFunc {
 		value := c.String(flagName)
 		if value == "" {
 			if c.NArg() != 1 {
-				return errors.Errorf("must specify a '%s'", flagName)
+				return fmt.Errorf("must specify a '%s'", flagName)
 			}
 			value = c.Args().Get(0)
 		}

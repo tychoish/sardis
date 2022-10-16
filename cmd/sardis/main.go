@@ -145,7 +145,7 @@ func loggingSetup(conf sardis.LoggingConf) {
 	}
 
 	if runtime.GOOS == "linux" {
-		sys, err := system.MakeDefaultSystem()
+		sys, err := system.MakeDefault()
 		if err != nil {
 			return
 		}

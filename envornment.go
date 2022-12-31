@@ -2,7 +2,7 @@
 Package sardis holds a a number of application level constants and
 shared resources for the sardis application.
 
-Services Cache
+# Services Cache
 
 The sink package maintains a public interface to a shared cache of
 interfaces and services for use in building tools within sink. The
@@ -261,7 +261,6 @@ func (c *appServicesCache) initTwitter() error {
 	}
 
 	twitter.SetErrorHandler(send.ErrorHandlerFromSender(root))
-
 	return nil
 }
 

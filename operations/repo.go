@@ -121,9 +121,7 @@ func repoUpdate() cli.Command {
 			if stat.Total > 0 || !stat.IsComplete() {
 				amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
 			}
-			if err := amboy.ResolveErrors(ctx, queue); err != nil {
-				catcher.Errorf("jobs encountered error: %w", err)
-			}
+			catcher.Add(amboy.ResolveErrors(ctx, queue))
 
 			if shouldNotify {
 				notify.Notice(message.Fields{

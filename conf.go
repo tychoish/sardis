@@ -15,7 +15,7 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
-	xmpp "github.com/tychoish/grip/x/xmpp"
+	"github.com/tychoish/grip/x/xmpp"
 	"github.com/tychoish/sardis/util"
 )
 
@@ -256,10 +256,8 @@ func (conf *Configuration) expandLinkedFiles(catcher emt.Catcher) {
 		go func(idx int, fn string) {
 			defer wg.Done()
 			conf, err := LoadConfiguration(fn)
-			if err := err; err != nil {
-				catcher.Errorf("problem reading linked config file %q: %w", err, fn)
-			}
 			if err != nil {
+				catcher.Errorf("problem reading linked config file %q: %w", err, fn)
 				return
 			}
 			if conf == nil {
@@ -612,7 +610,7 @@ func (h *HostConf) Validate() error {
 	catcher.NewWhen(h.Name == "", "cannot have an empty name for a host")
 	catcher.NewWhen(h.Hostname == "", "cannot have an empty host name")
 	catcher.NewWhen(h.Port == 0, "must specify a non-zero port number for a host")
-	catcher.NewWhen(!util.StringSliceContains([]string{"ssh", "jasper"}, h.Protocol), "host protocol must be ssh or jasper")
+	catcher.NewWhen(!util.SliceContains([]string{"ssh", "jasper"}, h.Protocol), "host protocol must be ssh or jasper")
 
 	if h.Protocol == "ssh" {
 		catcher.NewWhen(h.User == "", "must specify user for ssh hosts")

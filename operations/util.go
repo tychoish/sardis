@@ -85,7 +85,7 @@ func setupLinks() cli.Command {
 			}
 
 			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
-			catcher.Add(amboy.ResolveErrors(ctx, queue))
+			amboy.ExtractErrors(ctx, catcher, queue)
 
 			return catcher.Resolve()
 		},

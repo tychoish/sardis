@@ -121,7 +121,7 @@ func repoUpdate() cli.Command {
 			if stat.Total > 0 || !stat.IsComplete() {
 				amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
 			}
-			catcher.Add(amboy.ResolveErrors(ctx, queue))
+			amboy.ExtractErrors(ctx, catcher, queue)
 
 			if shouldNotify {
 				notify.Notice(message.Fields{
@@ -235,7 +235,7 @@ func repoClone() cli.Command {
 			}
 
 			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
-			catcher.Add(amboy.ResolveErrors(ctx, queue))
+			amboy.ExtractErrors(ctx, catcher, queue)
 			return catcher.Resolve()
 		},
 	}
@@ -320,8 +320,7 @@ func repoFetch() cli.Command {
 			}
 
 			amboy.WaitInterval(ctx, queue, 100*time.Millisecond)
-
-			catcher.Add(amboy.ResolveErrors(ctx, queue))
+			amboy.ExtractErrors(ctx, catcher, queue)
 
 			return catcher.Resolve()
 

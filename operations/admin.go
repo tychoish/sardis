@@ -73,7 +73,7 @@ func nightly() cli.Command {
 			if stat.Total > 0 {
 				amboy.WaitInterval(ctx, queue, 20*time.Millisecond)
 			}
-			catcher.Add(amboy.ResolveErrors(ctx, queue))
+			amboy.ExtractErrors(ctx, catcher, queue)
 
 			notify.WarningWhen(catcher.HasErrors() || time.Since(startAt) > time.Hour,
 				message.Fields{

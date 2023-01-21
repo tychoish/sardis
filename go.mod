@@ -11,7 +11,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/tychoish/amboy v0.0.0-20230101002553-13863324d55a
 	github.com/tychoish/emt v0.1.0
-	github.com/tychoish/grip v0.1.0
+	github.com/tychoish/grip v0.1.1
 	github.com/tychoish/grip/x/desktop v0.0.0-20221230171527-cc5986c5a29f
 	github.com/tychoish/grip/x/jira v0.0.0-20221230171527-cc5986c5a29f
 	github.com/tychoish/grip/x/system v0.0.0-20221230171527-cc5986c5a29f
@@ -86,6 +86,7 @@ require (
 	github.com/tklauser/numcpus v0.5.0 // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
 	github.com/tychoish/birch v0.0.0-20221231184222-0437ea03eb26 // indirect
+	github.com/tychoish/fun v0.1.0 // indirect
 	github.com/tychoish/gimlet v0.0.0-20220430160104-9dbd313f23e7 // indirect
 	github.com/tychoish/grip/x/metrics v0.0.0-20221015161242-1426883e127d // indirect
 	github.com/tychoish/grip/x/splunk v0.0.0-20221015161242-1426883e127d // indirect

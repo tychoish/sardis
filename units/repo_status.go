@@ -63,6 +63,7 @@ func (j *repoStatusJob) Run(ctx context.Context) {
 	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
 		"repo": j.Path,
 	})
+	sender.SetName(fmt.Sprintf("sardis.%s", repoStatusJobName))
 	sender.SetFormatter(send.MakeJSONFormatter())
 	logger := grip.NewLogger(sender)
 

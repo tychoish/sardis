@@ -281,11 +281,15 @@ github.com/tychoish/birch v0.0.0-20221231184222-0437ea03eb26/go.mod h1:jF/2WyEto
 github.com/tychoish/emt v0.0.0-20220306153139-74b97c67f209/go.mod h1:KMhVWIsL98Q8AoorphjsOQWabcNOoYqMSpODR/rtRb4=
 github.com/tychoish/emt v0.1.0 h1:OMJ/lKO17hxijZW2UdbZY4vOfTwVKZzTb8FB0g8fh74=
 github.com/tychoish/emt v0.1.0/go.mod h1:KMhVWIsL98Q8AoorphjsOQWabcNOoYqMSpODR/rtRb4=
+github.com/tychoish/fun v0.1.0 h1:ZLg0PpvTzcCbsmrkFG8w/Ano41Nia87kB44frnWf/Kk=
+github.com/tychoish/fun v0.1.0/go.mod h1:84A+BwGecz23UotmbB4mtvVS5ZcsZpspecduxpwF/XM=
 github.com/tychoish/gimlet v0.0.0-20220430160104-9dbd313f23e7 h1:ODYpfaba/8V0hhlRmkzCizakPxG2f8CMPjAkY9OwLA0=
 github.com/tychoish/gimlet v0.0.0-20220430160104-9dbd313f23e7/go.mod h1:eM2pD524BXVelLl7n2RKKN9iDzoxo1X1pIUeQDmh2Ck=
 github.com/tychoish/grip v0.0.0-20220426125019-871b9a2e8544/go.mod h1:3tvVQ8VrpPHtvrIH+sP+voliM/JZNgu8XuZzVCBbEjs=
 github.com/tychoish/grip v0.1.0 h1:9sqCK8j4teuRQBYEf5oivmju4k2SxSJfrMhHaW7EVc0=
 github.com/tychoish/grip v0.1.0/go.mod h1:MQJx1mQV4rUBK2G/UxB+e6zxBI4zNOg2iiB191vwmvk=
+github.com/tychoish/grip v0.1.1 h1:P1hXdnagbrwIRWaO9+awGdEQKRkOpFBUdJf4llEyObc=
+github.com/tychoish/grip v0.1.1/go.mod h1:Vxl3fsRs/5aAsnS3ff7/OT3C+A/kEWf08FgA2xSJfMY=
 github.com/tychoish/grip/x/desktop v0.0.0-20221230171527-cc5986c5a29f h1:VsY1xkQFIJaZ/AXRSBsw0+DCtWkmafAJtGFf6mikMV4=
 github.com/tychoish/grip/x/desktop v0.0.0-20221230171527-cc5986c5a29f/go.mod h1:70NpJ4+YsQrHURlV24ZT/nsC+30n5tGhX9nrKOCdTHE=
 github.com/tychoish/grip/x/jira v0.0.0-20221230171527-cc5986c5a29f h1:Ch46fdWwm2gsEDNHS7RPq9K2DLgXyvzIOEKtrebJniQ=

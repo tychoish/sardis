@@ -27,7 +27,7 @@ func main() {
 	// environment.
 	app := buildApp()
 	err := app.Run(os.Args)
-	grip.Error(err)
+	grip.EmergencyFatal(err)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -132,10 +132,10 @@ func buildApp() *cli.App {
 func loggingSetup(conf sardis.LoggingConf) {
 	grip.Sender().SetName(conf.Name)
 	sender := grip.Sender()
-
 	li := sender.Level()
 	li.Threshold = conf.Priority
 	li.Default = level.Debug
+	sender.SetName("sardis")
 	grip.Critical(sender.SetLevel(li))
 	grip.SetGlobalLogger(grip.NewLogger(sender))
 
@@ -171,6 +171,7 @@ func loggingSetup(conf sardis.LoggingConf) {
 			sender = sys
 		}
 
+		sender.SetName("sardis")
 		grip.SetGlobalLogger(grip.NewLogger(sender))
 	}
 }

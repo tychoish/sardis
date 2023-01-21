@@ -28,6 +28,7 @@ import (
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/queue"
 	"github.com/tychoish/emt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -106,7 +107,7 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 		return errors.New("cannot reconfigure the environment")
 	}
 
-	catcher := emt.NewBasicCatcher()
+	catcher := &erc.Collector{}
 	var err error
 
 	c.conf = conf

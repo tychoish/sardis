@@ -1,7 +1,9 @@
 package util
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -45,4 +47,19 @@ func TryExpandHomeDirs(in []string) []string {
 	}
 
 	return out
+}
+
+func CollapseHomeDir(in string) string {
+	dir, err := homedir.Dir()
+	if err != nil {
+		return in
+	}
+	if !strings.Contains(in, dir) {
+		return in
+	}
+	in = strings.Replace(in, dir, "~", 1)
+	if strings.HasSuffix(in, "~") {
+		in = fmt.Sprint(in, string(filepath.Separator))
+	}
+	return in
 }

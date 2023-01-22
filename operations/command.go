@@ -10,6 +10,7 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/util"
 	"github.com/urfave/cli"
 )
 
@@ -38,28 +39,66 @@ func RunCommand() cli.Command {
 			defer cancel()
 
 			conf := env.Configuration()
-
 			cmds := conf.ExportCommands()
+			terms := conf.ExportTerminalCommands()
+
 			ops := c.StringSlice(commandFlagName)
+			var fontSize int
+			if util.GetHostname() == "derrida" {
+				fontSize = 12
+			} else {
+				fontSize = 7
+			}
+
 			for idx, name := range ops {
-				cmd, ok := cmds[name]
-				if !ok {
-					return fmt.Errorf("command '%s' [%d/%d] does not exist", name, idx+1, len(ops))
+				cmd, cmdOk := cmds[name]
+				if cmdOk {
+					err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
+						Append(cmd.Command).SetCombinedSender(level.Info, grip.Sender()).
+						Prerequisite(func() bool {
+							grip.Info(message.Fields{
+								"cmd":  name,
+								"dir":  cmd.Directory,
+								"exec": cmd.Command,
+								"num":  idx + 1,
+								"len":  len(ops),
+							})
+							return true
+						}).Run(ctx)
+
+					if err != nil {
+						return err
+					}
+					continue
 				}
-				err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
-					Append(cmd.Command).SetCombinedSender(level.Info, grip.Sender()).
-					Prerequisite(func() bool {
-						grip.Info(message.Fields{
-							"cmd":  name,
-							"dir":  cmd.Directory,
-							"exec": cmd.Command,
-							"num":  idx + 1,
-							"len":  len(ops),
-						})
-						return true
-					}).Run(ctx)
-				if err != nil {
-					return err
+				cmd, termOk := terms[name]
+				if termOk {
+					err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
+						SetCombinedSender(level.Info, grip.Sender()).
+						Append(fmt.Sprintln(
+							"alacritty",
+							"-o", fmt.Sprintf("font.size=%d", fontSize),
+							"--title", cmd.Name,
+							"--command", cmd.Command,
+						)).
+						Prerequisite(func() bool {
+							grip.Info(message.Fields{
+								"type": "term",
+								"cmd":  name,
+								"dir":  cmd.Directory,
+								"exec": cmd.Command,
+								"num":  idx + 1,
+								"len":  len(ops),
+							})
+							return true
+						}).Run(ctx)
+					if err != nil {
+						return err
+					}
+				}
+
+				if !cmdOk && !termOk {
+					return fmt.Errorf("command %q not defined", name)
 				}
 			}
 
@@ -79,9 +118,16 @@ func listCommands() cli.Command {
 			table := tabby.New()
 			table.AddHeader("Name", "Command", "Directory")
 			for _, cmd := range env.Configuration().Commands {
-				table.AddLine(cmd.Name, cmd.Command, cmd.Directory)
+				table.AddLine(cmd.Name, cmd.Command, util.CollapseHomeDir(cmd.Directory))
 			}
+			table.Print()
+			fmt.Println()
 
+			table = tabby.New()
+			table.AddHeader("Terminal", "Command")
+			for _, term := range env.Configuration().TerminalCommands {
+				table.AddLine(term.Name, term.Command)
+			}
 			table.Print()
 
 			return nil

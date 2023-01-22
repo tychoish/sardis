@@ -20,13 +20,14 @@ import (
 )
 
 type Configuration struct {
-	Settings Settings      `bson:"settings" json:"settings" yaml:"settings"`
-	Repo     []RepoConf    `bson:"repo" json:"repo" yaml:"repo"`
-	Links    []LinkConf    `bson:"links" json:"links" yaml:"links"`
-	Hosts    []HostConf    `bson:"hosts" json:"hosts" yaml:"hosts"`
-	System   SystemConf    `bson:"system" json:"system" yaml:"system"`
-	Commands []CommandConf `bson:"commands" json:"commands" yaml:"commands"`
-	Blog     []BlogConf    `bson:"blog" json:"blog" yaml:"blog"`
+	Settings         Settings      `bson:"settings" json:"settings" yaml:"settings"`
+	Repo             []RepoConf    `bson:"repo" json:"repo" yaml:"repo"`
+	Links            []LinkConf    `bson:"links" json:"links" yaml:"links"`
+	Hosts            []HostConf    `bson:"hosts" json:"hosts" yaml:"hosts"`
+	System           SystemConf    `bson:"system" json:"system" yaml:"system"`
+	Commands         []CommandConf `bson:"commands" json:"commands" yaml:"commands"`
+	TerminalCommands []CommandConf `bson:"terminals" json:"terminals" yaml:"terminals"`
+	Blog             []BlogConf    `bson:"blog" json:"blog" yaml:"blog"`
 
 	repoTags         map[string][]*RepoConf
 	indexedRepoCount int
@@ -222,6 +223,11 @@ func (conf *Configuration) Validate() error {
 	for idx := range conf.Commands {
 		if err := conf.Commands[idx].Validate(); err != nil {
 			catcher.Errorf("%d of %T is not valid: %w", err, idx, conf.Commands[idx])
+		}
+	}
+	for idx := range conf.TerminalCommands {
+		if err := conf.TerminalCommands[idx].Validate(); err != nil {
+			catcher.Errorf("%d of %T is not valid: %w", err, idx, conf.TerminalCommands[idx])
 		}
 	}
 
@@ -645,6 +651,16 @@ func (conf *Configuration) ExportCommands() map[string]CommandConf {
 	out := make(map[string]CommandConf, len(conf.Commands))
 	for idx := range conf.Commands {
 		cmd := conf.Commands[idx]
+		out[cmd.Name] = cmd
+	}
+
+	return out
+}
+
+func (conf *Configuration) ExportTerminalCommands() map[string]CommandConf {
+	out := make(map[string]CommandConf, len(conf.TerminalCommands))
+	for idx := range conf.TerminalCommands {
+		cmd := conf.TerminalCommands[idx]
 		out[cmd.Name] = cmd
 	}
 

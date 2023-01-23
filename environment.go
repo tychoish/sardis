@@ -27,7 +27,6 @@ import (
 
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/queue"
-	"github.com/tychoish/emt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -147,7 +146,7 @@ func (c *appServicesCache) initSender() error {
 	}
 	loggers = append(loggers, sender)
 	c.appendCloser("sender-notify", func(ctx context.Context) error {
-		catcher := emt.NewCatcher()
+		catcher := &erc.Collector{}
 		catcher.Add(sender.Flush(ctx))
 		catcher.Add(sender.Close())
 		return catcher.Resolve()
@@ -329,7 +328,7 @@ func (c *appServicesCache) Close(ctx context.Context) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	catcher := emt.NewBasicCatcher()
+	catcher := &erc.Collector{}
 
 	for idx, op := range c.closers {
 		startAt := time.Now()

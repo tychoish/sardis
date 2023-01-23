@@ -10,7 +10,8 @@ require (
 	github.com/go-git/go-git/v5 v5.2.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/tychoish/amboy v0.0.0-20230101002553-13863324d55a
-	github.com/tychoish/emt v0.1.0
+	github.com/tychoish/birch v0.0.0-20221231184222-0437ea03eb26
+	github.com/tychoish/fun v0.1.0
 	github.com/tychoish/grip v0.1.1
 	github.com/tychoish/grip/x/desktop v0.0.0-20221230171527-cc5986c5a29f
 	github.com/tychoish/grip/x/jira v0.0.0-20221230171527-cc5986c5a29f
@@ -19,6 +20,7 @@ require (
 	github.com/tychoish/grip/x/xmpp v0.0.0-20221230171527-cc5986c5a29f
 	github.com/tychoish/jasper v0.0.0-20221231195305-5b320d30da93
 	github.com/urfave/cli v1.22.4
+	go.mongodb.org/mongo-driver v1.11.1
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -85,8 +87,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/tklauser/numcpus v0.5.0 // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
-	github.com/tychoish/birch v0.0.0-20221231184222-0437ea03eb26 // indirect
-	github.com/tychoish/fun v0.1.0 // indirect
+	github.com/tychoish/emt v0.1.0 // indirect
 	github.com/tychoish/gimlet v0.0.0-20220430160104-9dbd313f23e7 // indirect
 	github.com/tychoish/grip/x/metrics v0.0.0-20221015161242-1426883e127d // indirect
 	github.com/tychoish/grip/x/splunk v0.0.0-20221015161242-1426883e127d // indirect
@@ -107,3 +108,9 @@ require (
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
+
+replace github.com/tychoish/birch => /home/tychoish/src/birch
+
+replace github.com/tychoish/jasper => /home/tychoish/src/jasper
+
+replace github.com/tychoish/fun => /home/tychoish/src/fun

@@ -1,7 +1,7 @@
 package operations
 
 import (
-	"github.com/tychoish/emt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
@@ -40,7 +40,7 @@ func fetchAur() cli.Command {
 			ctx, cancel := env.Context()
 			defer cancel()
 
-			catcher := emt.NewBasicCatcher()
+			catcher := &erc.Collector{}
 
 			for _, name := range c.StringSlice(nameFlagName) {
 				job := units.NewArchFetchAurJob(name, true)
@@ -69,7 +69,7 @@ func buildPkg() cli.Command {
 			ctx, cancel := env.Context()
 			defer cancel()
 
-			catcher := emt.NewBasicCatcher()
+			catcher := &erc.Collector{}
 
 			for _, name := range c.StringSlice(nameFlagName) {
 				job := units.NewArchAbsBuildJob(name)
@@ -98,7 +98,7 @@ func installAur() cli.Command {
 			ctx, cancel := env.Context()
 			defer cancel()
 
-			catcher := emt.NewBasicCatcher()
+			catcher := &erc.Collector{}
 
 			for _, name := range c.StringSlice(nameFlagName) {
 				job := units.NewArchFetchAurJob(name, true)
@@ -128,7 +128,7 @@ func setupArchLinux() cli.Command {
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
 			conf := env.Configuration()
-			catcher := emt.NewBasicCatcher()
+			catcher := &erc.Collector{}
 			ctx, cancel := env.Context()
 			defer cancel()
 

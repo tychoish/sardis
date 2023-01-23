@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/tychoish/amboy"
-	"github.com/tychoish/emt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
@@ -48,7 +48,7 @@ func nightly() cli.Command {
 			env := sardis.GetEnvironment()
 			conf := env.Configuration()
 			queue := env.Queue()
-			catcher := emt.NewBasicCatcher()
+			catcher := &erc.Collector{}
 			notify := env.Logger()
 			ctx, cancel := env.Context()
 			defer cancel()
@@ -73,11 +73,10 @@ func nightly() cli.Command {
 			if stat.Total > 0 {
 				amboy.WaitInterval(ctx, queue, 20*time.Millisecond)
 			}
-			amboy.ExtractErrors(ctx, catcher, queue)
+			catcher.Add(amboy.ResolveErrors(ctx, queue))
 
 			notify.WarningWhen(catcher.HasErrors() || time.Since(startAt) > time.Hour,
 				message.Fields{
-					"errs":    catcher.Len(),
 					"jobs":    stat.Total,
 					"msg":     "problem running nightly tasks",
 					"dur_sec": time.Since(startAt).Seconds(),

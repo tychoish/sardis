@@ -27,7 +27,7 @@ func main() {
 	// environment.
 	app := buildApp()
 	err := app.Run(os.Args)
-	grip.EmergencyFatal(err)
+	grip.Error(err)
 	if err != nil {
 		os.Exit(1)
 	}

@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/tychoish/emt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli"
 )
 
 func mergeBeforeFuncs(ops ...func(c *cli.Context) error) cli.BeforeFunc {
 	return func(c *cli.Context) error {
-		catcher := emt.NewBasicCatcher()
+		catcher := &erc.Collector{}
 
 		for _, op := range ops {
 			catcher.Add(op(c))
@@ -24,7 +24,7 @@ func mergeBeforeFuncs(ops ...func(c *cli.Context) error) cli.BeforeFunc {
 
 func addRemanderToStringSliceFlag(name string) cli.BeforeFunc {
 	return func(c *cli.Context) error {
-		catcher := emt.NewBasicCatcher()
+		catcher := &erc.Collector{}
 		for _, v := range c.Args() {
 			catcher.Add(c.Set(name, v))
 		}
@@ -72,7 +72,7 @@ func requireCommandsSet(flagName string) cli.BeforeFunc {
 				return errors.New("must specify a command name")
 			}
 
-			catcher := emt.NewBasicCatcher()
+			catcher := &erc.Collector{}
 			catcher.Add(c.Set(flagName, c.Args().First()))
 			for _, it := range c.Args().Tail() {
 				catcher.Add(c.Set(flagName, it))

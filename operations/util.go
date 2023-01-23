@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/tychoish/amboy"
-	"github.com/tychoish/emt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/dupe"
@@ -78,14 +78,14 @@ func setupLinks() cli.Command {
 			defer cancel()
 
 			queue := env.Queue()
-			catcher := emt.NewBasicCatcher()
+			catcher := &erc.Collector{}
 
 			for _, link := range conf.Links {
 				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(link)))
 			}
 
 			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
-			amboy.ExtractErrors(ctx, catcher, queue)
+			catcher.Add(amboy.ResolveErrors(ctx, queue))
 
 			return catcher.Resolve()
 		},

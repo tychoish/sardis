@@ -10,7 +10,7 @@ import (
 	"github.com/cheynewallace/tabby"
 	"github.com/mitchellh/go-homedir"
 	"github.com/tychoish/amboy"
-	"github.com/tychoish/emt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
@@ -92,7 +92,7 @@ func repoUpdate() cli.Command {
 			}
 
 			queue := env.Queue()
-			catcher := emt.NewBasicCatcher()
+			catcher := &erc.Collector{}
 			wg := &sync.WaitGroup{}
 
 			shouldNotify := false
@@ -121,12 +121,12 @@ func repoUpdate() cli.Command {
 			if stat.Total > 0 || !stat.IsComplete() {
 				amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
 			}
-			amboy.ExtractErrors(ctx, catcher, queue)
+			catcher.Add(amboy.ResolveErrors(ctx, queue))
 
 			if shouldNotify {
 				notify.Notice(message.Fields{
 					"tag":     tags,
-					"errors":  catcher.Len(),
+					"errors":  catcher.HasErrors(),
 					"jobs":    stat.Total,
 					"repos":   len(repos),
 					"op":      "repo sync",
@@ -136,13 +136,12 @@ func repoUpdate() cli.Command {
 
 			// QUESTION: should we send notification here
 			grip.Notice(message.Fields{
-				"op":       "repo sync",
-				"code":     "success",
-				"tag":      tags,
-				"dur_sec":  time.Since(started).Seconds(),
-				"err":      catcher.HasErrors(),
-				"num_errs": catcher.Len(),
-				"jobs":     stat.Total,
+				"op":      "repo sync",
+				"code":    "success",
+				"tag":     tags,
+				"dur_sec": time.Since(started).Seconds(),
+				"err":     catcher.HasErrors(),
+				"jobs":    stat.Total,
 			})
 
 			return catcher.Resolve()
@@ -180,7 +179,7 @@ func repoCleanup() cli.Command {
 			}
 
 			queue := env.Queue()
-			catcher := emt.NewBasicCatcher()
+			catcher := &erc.Collector{}
 			for _, repo := range repos {
 				catcher.Add(queue.Put(ctx, units.NewRepoCleanupJob(repo.Path)))
 			}
@@ -212,7 +211,7 @@ func repoClone() cli.Command {
 
 			conf := env.Configuration()
 
-			catcher := emt.NewBasicCatcher()
+			catcher := &erc.Collector{}
 			queue := env.Queue()
 
 			repos := conf.GetTaggedRepos(name)
@@ -235,7 +234,7 @@ func repoClone() cli.Command {
 			}
 
 			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
-			amboy.ExtractErrors(ctx, catcher, queue)
+			catcher.Add(amboy.ResolveErrors(ctx, queue))
 			return catcher.Resolve()
 		},
 	}
@@ -270,7 +269,7 @@ func repoStatus() cli.Command {
 					repos = append(repos, env.Configuration().GetTaggedRepos(tag)...)
 				}
 			}
-			catcher := emt.NewBasicCatcher()
+			catcher := &erc.Collector{}
 
 			for _, repo := range repos {
 				j := units.NewRepoStatusJob(repo.Path)
@@ -309,7 +308,7 @@ func repoFetch() cli.Command {
 
 			queue := env.Queue()
 
-			catcher := emt.NewBasicCatcher()
+			catcher := &erc.Collector{}
 
 			for idx := range repos {
 				repo := &repos[idx]
@@ -320,7 +319,7 @@ func repoFetch() cli.Command {
 			}
 
 			amboy.WaitInterval(ctx, queue, 100*time.Millisecond)
-			amboy.ExtractErrors(ctx, catcher, queue)
+			catcher.Add(amboy.ResolveErrors(ctx, queue))
 
 			return catcher.Resolve()
 

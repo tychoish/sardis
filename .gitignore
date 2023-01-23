@@ -5,3 +5,4 @@ build
 sardis
 !cmd/sardis
 
+sardis.test

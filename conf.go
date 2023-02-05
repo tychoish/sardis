@@ -227,7 +227,7 @@ func (conf *Configuration) Validate() error {
 	}
 	for idx := range conf.TerminalCommands {
 		if err := conf.TerminalCommands[idx].Validate(); err != nil {
-			catcher.Errorf("%d of %T is not valid: %w", err, idx, conf.TerminalCommands[idx])
+			catcher.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.TerminalCommands[idx], err))
 		}
 	}
 

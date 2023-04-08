@@ -132,11 +132,8 @@ func buildApp() *cli.App {
 func loggingSetup(conf sardis.LoggingConf) {
 	grip.Sender().SetName(conf.Name)
 	sender := grip.Sender()
-	li := sender.Level()
-	li.Threshold = conf.Priority
-	li.Default = level.Debug
 	sender.SetName("sardis")
-	grip.Critical(sender.SetLevel(li))
+	sender.SetPriority(conf.Priority)
 	grip.SetGlobalLogger(grip.NewLogger(sender))
 
 	if conf.EnableJSONFormating {
@@ -155,11 +152,7 @@ func loggingSetup(conf sardis.LoggingConf) {
 		}
 
 		sys.SetName(conf.Name)
-
-		err = sys.SetLevel(li)
-		if err != nil {
-			return
-		}
+		sys.SetPriority(conf.Priority)
 
 		if conf.EnableJSONFormating {
 			sys.SetFormatter(send.MakeJSONFormatter())

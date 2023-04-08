@@ -131,19 +131,18 @@ func (c *appServicesCache) initSender() error {
 		loggers = append(loggers, root)
 		c.logger = grip.NewLogger(send.MakeMulti(loggers...))
 	}()
-	levels := send.LevelInfo{Default: level.Notice, Threshold: level.Info}
 	sender, err := xmpp.NewSender(
-		c.conf.Settings.Notification.Name,
 		c.conf.Settings.Notification.Target,
 		xmpp.ConnectionInfo{
 			Hostname: c.conf.Settings.Notification.Host,
 			Username: c.conf.Settings.Notification.User,
 			Password: c.conf.Settings.Notification.Password,
-		},
-		levels)
+		})
 	if err != nil {
 		return fmt.Errorf("problem creating sender: %w", err)
 	}
+	sender.SetPriority(level.Info)
+	sender.SetName(c.conf.Settings.Notification.Name)
 	loggers = append(loggers, sender)
 	c.appendCloser("sender-notify", func(ctx context.Context) error {
 		catcher := &erc.Collector{}
@@ -162,11 +161,11 @@ func (c *appServicesCache) initSender() error {
 		return fmt.Sprintf("[%s:%s] %s", c.conf.Settings.Notification.Name, host, m.String()), nil
 	})
 
-	desktop, err := desktop.NewSender(c.conf.Settings.Notification.Name, levels)
-	if err != nil {
-		return fmt.Errorf("problem creating sender: %w", err)
-	}
+	desktop := desktop.MakeSender()
+	desktop.SetName(c.conf.Settings.Notification.Name)
 	loggers = append(loggers, desktop)
+
+	grip.SetGlobalLogger(grip.NewLogger(send.MakeMulti(loggers...)))
 
 	return nil
 }

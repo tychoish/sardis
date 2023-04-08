@@ -8,17 +8,18 @@ require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
 	github.com/cheynewallace/tabby v1.1.0
 	github.com/go-git/go-git/v5 v5.2.0
+	github.com/google/uuid v1.3.0
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/tychoish/amboy v0.0.0-20230101002553-13863324d55a
-	github.com/tychoish/birch v0.0.0-20221231184222-0437ea03eb26
-	github.com/tychoish/fun v0.1.0
-	github.com/tychoish/grip v0.1.1
-	github.com/tychoish/grip/x/desktop v0.0.0-20221230171527-cc5986c5a29f
-	github.com/tychoish/grip/x/jira v0.0.0-20221230171527-cc5986c5a29f
-	github.com/tychoish/grip/x/system v0.0.0-20221230171527-cc5986c5a29f
-	github.com/tychoish/grip/x/twitter v0.0.0-20221230171527-cc5986c5a29f
-	github.com/tychoish/grip/x/xmpp v0.0.0-20221230171527-cc5986c5a29f
-	github.com/tychoish/jasper v0.0.0-20221231195305-5b320d30da93
+	github.com/tychoish/amboy v0.0.0-20230408193931-6ba4e429a638
+	github.com/tychoish/birch v0.2.1
+	github.com/tychoish/fun v0.8.4
+	github.com/tychoish/grip v0.2.2
+	github.com/tychoish/grip/x/desktop v0.0.0-20230408193845-65b5e49e301a
+	github.com/tychoish/grip/x/jira v0.0.0-20230408193845-65b5e49e301a
+	github.com/tychoish/grip/x/system v0.0.0-20230408193845-65b5e49e301a
+	github.com/tychoish/grip/x/twitter v0.0.0-20230408193845-65b5e49e301a
+	github.com/tychoish/grip/x/xmpp v0.0.0-20230408193845-65b5e49e301a
+	github.com/tychoish/jasper v0.0.0-00010101000000-000000000000
 	github.com/urfave/cli v1.22.4
 	go.mongodb.org/mongo-driver v1.11.1
 	gopkg.in/yaml.v2 v2.4.0
@@ -30,15 +31,15 @@ require (
 	github.com/VividCortex/ewma v1.1.1 // indirect
 	github.com/andygrunwald/go-jira v1.15.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
-	github.com/containerd/cgroups v1.0.4 // indirect
+	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
-	github.com/coreos/go-systemd/v22 v22.4.0 // indirect
+	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/dghubble/go-twitter v0.0.0-20220626024101-68c0170dc641 // indirect
 	github.com/dghubble/oauth1 v0.7.1 // indirect
 	github.com/dghubble/sling v1.4.0 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
-	github.com/docker/docker v20.10.19+incompatible // indirect
+	github.com/docker/docker v20.10.23+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
@@ -59,7 +60,6 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
@@ -76,7 +76,7 @@ require (
 	github.com/phyber/negroni-gzip v1.0.0 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rs/cors v1.8.2 // indirect
+	github.com/rs/cors v1.8.3 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
@@ -84,24 +84,25 @@ require (
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	github.com/tadvi/systray v0.0.0-20190226123456-11a2b8fa57af // indirect
-	github.com/tklauser/go-sysconf v0.3.10 // indirect
-	github.com/tklauser/numcpus v0.5.0 // indirect
+	github.com/tklauser/go-sysconf v0.3.11 // indirect
+	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
-	github.com/tychoish/emt v0.1.0 // indirect
-	github.com/tychoish/gimlet v0.0.0-20220430160104-9dbd313f23e7 // indirect
-	github.com/tychoish/grip/x/metrics v0.0.0-20221015161242-1426883e127d // indirect
-	github.com/tychoish/grip/x/splunk v0.0.0-20221015161242-1426883e127d // indirect
-	github.com/ulikunitz/xz v0.5.10 // indirect
+	github.com/tychoish/birch/x/ftdc v0.0.0-20230218012303-165f4d35e29f // indirect
+	github.com/tychoish/birch/x/mrpc v0.0.0-20230408192718-ea2b06ab9878 // indirect
+	github.com/tychoish/gimlet v0.0.0-20230130001449-8987c96bb886 // indirect
+	github.com/tychoish/grip/x/metrics v0.0.0-20230408192639-ef555fcdf0fd // indirect
+	github.com/tychoish/grip/x/splunk v0.0.0-20230408192639-ef555fcdf0fd // indirect
+	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
-	golang.org/x/crypto v0.0.0-20221012134737-56aed061732a // indirect
-	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
-	golang.org/x/net v0.0.0-20221014081412-f15817d10f9b // indirect
-	golang.org/x/sys v0.0.0-20221013171732-95e765b1cc43 // indirect
-	golang.org/x/text v0.3.8 // indirect
-	golang.org/x/tools v0.1.12 // indirect
+	golang.org/x/crypto v0.5.0 // indirect
+	golang.org/x/mod v0.7.0 // indirect
+	golang.org/x/net v0.5.0 // indirect
+	golang.org/x/sys v0.4.0 // indirect
+	golang.org/x/text v0.6.0 // indirect
+	golang.org/x/tools v0.5.0 // indirect
 	gonum.org/v1/gonum v0.7.0 // indirect
 	google.golang.org/genproto v0.0.0-20221014213838-99cd37c6964a // indirect
 	google.golang.org/grpc v1.50.1 // indirect

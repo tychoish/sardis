@@ -6,3 +6,5 @@ sardis
 !cmd/sardis
 
 sardis.test
+coverage
+coverage.*

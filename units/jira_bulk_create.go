@@ -58,9 +58,7 @@ func (j *jiraBulkCreateJob) Run(ctx context.Context) {
 		return
 	}
 
-	if data.Priority.IsValid() {
-		data.Priority = level.Info
-	}
+	data.Priority = level.Info
 
 	env := sardis.GetEnvironment()
 	logger := env.JiraIssue()
@@ -68,7 +66,7 @@ func (j *jiraBulkCreateJob) Run(ctx context.Context) {
 	msgs := make([]message.Composer, len(data.Tickets))
 	for idx := range data.Tickets {
 		msg := jira.MakeIssue(&data.Tickets[idx])
-		j.AddError(msg.SetPriority(data.Priority))
+		msg.SetPriority(data.Priority)
 		msgs[idx] = msg
 		if !msg.Loggable() {
 			j.AddError(fmt.Errorf("invalid/unlogable message at index %d, '%s'", idx, msg.String()))

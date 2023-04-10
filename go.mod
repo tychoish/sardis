@@ -8,13 +8,12 @@ require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
 	github.com/cheynewallace/tabby v1.1.0
 	github.com/go-git/go-git/v5 v5.2.0
-	github.com/google/uuid v1.3.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/tychoish/amboy v0.0.0-20230408193931-6ba4e429a638
 	github.com/tychoish/birch v0.2.1
 	github.com/tychoish/fun v0.8.4
 	github.com/tychoish/grip v0.2.2
-	github.com/tychoish/grip/x/desktop v0.0.0-20230408193845-65b5e49e301a
+	github.com/tychoish/grip/x/desktop v0.0.0-20230410151833-a85d50c7008b
 	github.com/tychoish/grip/x/jira v0.0.0-20230408193845-65b5e49e301a
 	github.com/tychoish/grip/x/system v0.0.0-20230408193845-65b5e49e301a
 	github.com/tychoish/grip/x/twitter v0.0.0-20230408193845-65b5e49e301a
@@ -60,6 +59,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect

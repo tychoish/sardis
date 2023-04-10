@@ -27,6 +27,7 @@ import (
 
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/queue"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -160,12 +161,12 @@ func (c *appServicesCache) initSender() error {
 	sender.SetFormatter(func(m message.Composer) (string, error) {
 		return fmt.Sprintf("[%s:%s] %s", c.conf.Settings.Notification.Name, host, m.String()), nil
 	})
-
 	desktop := desktop.MakeSender()
 	desktop.SetName(c.conf.Settings.Notification.Name)
+
 	loggers = append(loggers, desktop)
 
-	grip.SetGlobalLogger(grip.NewLogger(send.MakeMulti(loggers...)))
+	c.logger = grip.NewLogger(fun.Must(send.NewMulti("sardis", loggers)))
 
 	return nil
 }

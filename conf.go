@@ -447,12 +447,13 @@ func (conf *NotifyConf) Validate() error {
 func (conf *AmboyConf) Validate() error {
 	catcher := &erc.Collector{}
 
-	if conf.Workers < 1 {
-		catcher.Add(errors.New("must specify one or more workers"))
+	if conf.Workers <= 1 {
+		conf.Workers = 1
+	} else if conf.Workers < 2 {
+		grip.Debug("should specify more workers")
 	}
 
 	if conf.Size < conf.Workers {
-		grip.Warning("suspect config; must specify more storage than workers")
 		conf.Size = 2 * conf.Workers
 	}
 

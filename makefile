@@ -37,6 +37,7 @@ endif
 
 build:$(buildDir)/$(name)
 $(name):$(buildDir)/$(name)
+	rm $(buildDir)/$(name)
 	ln -s $(buildDir)/$(name)
 $(buildDir)/$(name):$(srcFiles)
 	@mkdir -p $(buildDir)

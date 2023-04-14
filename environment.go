@@ -102,6 +102,7 @@ type closerOp struct {
 func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+	c.ctx, c.rootCancel = context.WithCancel(ctx)
 
 	if c.conf != nil {
 		return errors.New("cannot reconfigure the environment")
@@ -111,7 +112,6 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 	var err error
 
 	c.conf = conf
-	c.ctx, c.rootCancel = context.WithCancel(ctx)
 	c.jpm, err = jasper.NewSynchronizedManager(false)
 	catcher.Add(err)
 

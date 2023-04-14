@@ -27,6 +27,7 @@ func RunCommand() cli.Command {
 		},
 		Subcommands: []cli.Command{
 			listCommands(),
+			dmenuListCmds(),
 			qrCode(),
 		},
 		Before: mergeBeforeFuncs(
@@ -131,6 +132,34 @@ func listCommands() cli.Command {
 			table.Print()
 
 			return nil
+		},
+	}
+}
+func dmenuListCmds() cli.Command {
+	return cli.Command{
+		Name:   "dmenu",
+		Usage:  "return a list of defined commands",
+		Before: requireConfig(),
+		Action: func(c *cli.Context) error {
+			env := sardis.GetEnvironment()
+
+			ctx, cancel := env.Context()
+			defer cancel()
+
+			conf := env.Configuration()
+			cmds := append(conf.TerminalCommands, conf.Commands...)
+
+			buf := &bytes.Buffer{}
+
+			for idx := range append(cmds) {
+				buf.Write([]byte(cmds[idx].Name))
+				if idx+1 == len(cmds) {
+					break
+				}
+				buf.Write([]byte("\n"))
+			}
+
+			return env.Jasper().CreateCommand(ctx).Bash(`cmd=$(dmenu "$@" -i -nb '#000000' -nf '#ffffff' -fn 'Source Code Pro-11') && sardis run $cmd`).SetInput(buf).Run(ctx)
 		},
 	}
 }

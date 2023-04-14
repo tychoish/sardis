@@ -45,9 +45,12 @@ func RunCommand() cli.Command {
 
 			ops := c.StringSlice(commandFlagName)
 			var fontSize int
-			if util.GetHostname() == "derrida" {
+			switch util.GetHostname() {
+			case "derrida":
 				fontSize = 12
-			} else {
+			case "arendt":
+				fontSize = 9
+			case "deleuze":
 				fontSize = 7
 			}
 

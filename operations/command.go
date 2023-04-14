@@ -2,10 +2,12 @@ package operations
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 
 	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
 	"github.com/cheynewallace/tabby"
+	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -39,76 +41,81 @@ func RunCommand() cli.Command {
 			ctx, cancel := env.Context()
 			defer cancel()
 
-			conf := env.Configuration()
-			cmds := conf.ExportCommands()
-			terms := conf.ExportTerminalCommands()
-
 			ops := c.StringSlice(commandFlagName)
-			var fontSize int
-			switch util.GetHostname() {
-			case "derrida":
-				fontSize = 12
-			case "arendt":
-				fontSize = 9
-			case "deleuze":
-				fontSize = 7
-			}
 
-			for idx, name := range ops {
-				cmd, cmdOk := cmds[name]
-				if cmdOk {
-					err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
-						Append(cmd.Command).SetCombinedSender(level.Info, grip.Sender()).
-						Prerequisite(func() bool {
-							grip.Info(message.Fields{
-								"cmd":  name,
-								"dir":  cmd.Directory,
-								"exec": cmd.Command,
-								"num":  idx + 1,
-								"len":  len(ops),
-							})
-							return true
-						}).Run(ctx)
-
-					if err != nil {
-						return err
-					}
-					continue
-				}
-				cmd, termOk := terms[name]
-				if termOk {
-					err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
-						SetCombinedSender(level.Info, grip.Sender()).
-						Append(fmt.Sprintln(
-							"alacritty",
-							"-o", fmt.Sprintf("font.size=%d", fontSize),
-							"--title", cmd.Name,
-							"--command", cmd.Command,
-						)).
-						Prerequisite(func() bool {
-							grip.Info(message.Fields{
-								"type": "term",
-								"cmd":  name,
-								"dir":  cmd.Directory,
-								"exec": cmd.Command,
-								"num":  idx + 1,
-								"len":  len(ops),
-							})
-							return true
-						}).Run(ctx)
-					if err != nil {
-						return err
-					}
-				}
-
-				if !cmdOk && !termOk {
-					return fmt.Errorf("command %q not defined", name)
-				}
-			}
-
-			return nil
+			return runConfiguredCommand(ctx, env, ops)
 		},
 	}
+}
+
+func runConfiguredCommand(ctx context.Context, env sardis.Environment, ops []string) error {
+	conf := env.Configuration()
+	cmds := conf.ExportCommands()
+	terms := conf.ExportTerminalCommands()
+
+	var fontSize int
+	switch util.GetHostname() {
+	case "derrida":
+		fontSize = 12
+	case "arendt", "deleuze":
+		fontSize = 8
+	}
+
+	for idx, name := range ops {
+		cmd, cmdOk := cmds[name]
+		if cmdOk {
+			err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
+				SetOutputSender(level.Info, grip.Sender()).
+				SetErrorSender(level.Error, grip.Sender()).
+				Append(cmd.Command).
+				Prerequisite(func() bool {
+					grip.Info(message.Fields{
+						"cmd":  name,
+						"dir":  cmd.Directory,
+						"exec": cmd.Command,
+						"num":  idx + 1,
+						"len":  len(ops),
+					})
+					return true
+				}).Run(ctx)
+
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		cmd, termOk := terms[name]
+		if termOk {
+			err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
+				SetOutputSender(level.Info, grip.Sender()).
+				SetErrorSender(level.Error, grip.Sender()).
+				Append(fmt.Sprintln(
+					"alacritty",
+					"-o", fmt.Sprintf("font.size=%d", fontSize),
+					"--title", cmd.Name,
+					"--command", cmd.Command,
+				)).
+				Prerequisite(func() bool {
+					grip.Info(message.Fields{
+						"type": "term",
+						"cmd":  name,
+						"dir":  cmd.Directory,
+						"exec": cmd.Command,
+						"num":  idx + 1,
+						"len":  len(ops),
+					})
+					return true
+				}).Run(ctx)
+			if err != nil {
+				return err
+			}
+		}
+
+		if !cmdOk && !termOk {
+			return fmt.Errorf("command %q not defined", name)
+		}
+	}
+	return nil
 }
 
 func listCommands() cli.Command {
@@ -152,17 +159,21 @@ func dmenuListCmds() cli.Command {
 			conf := env.Configuration()
 			cmds := append(conf.TerminalCommands, conf.Commands...)
 
-			buf := &bytes.Buffer{}
+			opts := make([]string, len(cmds))
 
 			for idx := range append(cmds) {
-				buf.Write([]byte(cmds[idx].Name))
-				if idx+1 == len(cmds) {
-					break
-				}
-				buf.Write([]byte("\n"))
+				opts = append(opts, cmds[idx].Name)
 			}
 
-			return env.Jasper().CreateCommand(ctx).Bash(`cmd=$(dmenu "$@" -i -nb '#000000' -nf '#ffffff' -fn 'Source Code Pro-11') && sardis run $cmd`).SetInput(buf).Run(ctx)
+			cmd, err := godmenu.RunDMenu(ctx, godmenu.Options{
+				Selections: opts,
+			})
+
+			if err != nil {
+				return err
+			}
+
+			return runConfiguredCommand(ctx, env, []string{cmd})
 		},
 	}
 }

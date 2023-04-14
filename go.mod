@@ -11,13 +11,14 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/tychoish/amboy v0.0.0-20230408193931-6ba4e429a638
 	github.com/tychoish/birch v0.2.1
-	github.com/tychoish/fun v0.8.4
-	github.com/tychoish/grip v0.2.2
-	github.com/tychoish/grip/x/desktop v0.0.0-20230410151833-a85d50c7008b
-	github.com/tychoish/grip/x/jira v0.0.0-20230408193845-65b5e49e301a
-	github.com/tychoish/grip/x/system v0.0.0-20230408193845-65b5e49e301a
-	github.com/tychoish/grip/x/twitter v0.0.0-20230408193845-65b5e49e301a
-	github.com/tychoish/grip/x/xmpp v0.0.0-20230408193845-65b5e49e301a
+	github.com/tychoish/fun v0.8.5
+	github.com/tychoish/godmenu v0.1.0
+	github.com/tychoish/grip v0.2.4
+	github.com/tychoish/grip/x/desktop v0.0.0-20230414052605-c655d8eb9965
+	github.com/tychoish/grip/x/jira v0.0.0-20230414052605-c655d8eb9965
+	github.com/tychoish/grip/x/system v0.0.0-20230414052605-c655d8eb9965
+	github.com/tychoish/grip/x/twitter v0.0.0-20230414052605-c655d8eb9965
+	github.com/tychoish/grip/x/xmpp v0.0.0-20230414052605-c655d8eb9965
 	github.com/tychoish/jasper v0.0.0-00010101000000-000000000000
 	github.com/urfave/cli v1.22.4
 	go.mongodb.org/mongo-driver v1.11.1
@@ -100,7 +101,7 @@ require (
 	golang.org/x/crypto v0.5.0 // indirect
 	golang.org/x/mod v0.7.0 // indirect
 	golang.org/x/net v0.5.0 // indirect
-	golang.org/x/sys v0.4.0 // indirect
+	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/text v0.6.0 // indirect
 	golang.org/x/tools v0.5.0 // indirect
 	gonum.org/v1/gonum v0.7.0 // indirect
@@ -115,3 +116,13 @@ replace github.com/tychoish/birch => /home/tychoish/src/birch
 replace github.com/tychoish/jasper => /home/tychoish/src/jasper
 
 replace github.com/tychoish/fun => /home/tychoish/src/fun
+
+replace github.com/tychoish/grip/x/desktop => /home/tychoish/src/grip/x/desktop
+
+replace github.com/tychoish/grip/x/jira => /home/tychoish/src/grip/x/jira
+
+replace github.com/tychoish/grip/x/system => /home/tychoish/src/grip/x/system
+
+replace github.com/tychoish/grip/x/twitter => /home/tychoish/src/grip/x/twitter
+
+replace github.com/tychoish/grip/x/xmpp => /home/tychoish/src/grip/x/xmpp

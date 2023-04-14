@@ -27,7 +27,6 @@ import (
 
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/queue"
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -166,7 +165,7 @@ func (c *appServicesCache) initSender() error {
 
 	loggers = append(loggers, desktop)
 
-	c.logger = grip.NewLogger(fun.Must(send.NewMulti("sardis", loggers)))
+	c.logger = grip.NewLogger(send.NewMulti("sardis", loggers))
 
 	return nil
 }

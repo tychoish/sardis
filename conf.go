@@ -28,6 +28,7 @@ type Configuration struct {
 	Commands         []CommandConf `bson:"commands" json:"commands" yaml:"commands"`
 	TerminalCommands []CommandConf `bson:"terminals" json:"terminals" yaml:"terminals"`
 	Blog             []BlogConf    `bson:"blog" json:"blog" yaml:"blog"`
+	Menus            []MenuConf    `bson:"menu" json:"menu" yaml:"menu"`
 
 	repoTags         map[string][]*RepoConf
 	indexedRepoCount int
@@ -173,6 +174,12 @@ type BlogConf struct {
 	DeployCommands []string `bson:"deploy_commands" json:"deploy_commands" yaml:"deploy_commands"`
 }
 
+type MenuConf struct {
+	Name       string   `bson:"name" json:"name" yaml:"name"`
+	Command    string   `bson:"command" json:"command" yaml:"command"`
+	Selections []string `bson:"selections" json:"selections" yaml:"selections"`
+}
+
 func LoadConfiguration(fn string) (*Configuration, error) {
 	out := &Configuration{}
 
@@ -187,47 +194,62 @@ type validatable interface {
 	Validate() error
 }
 
+func (conf *MenuConf) Validate() error {
+	ec := &erc.Collector{}
+
+	erc.Whenf(ec, conf.Command == "", "must specify command for %q", conf.Name)
+	erc.Whenf(ec, len(conf.Selections) == 0, "must specify options for %q", conf.Name)
+
+	return ec.Resolve()
+}
+
 func (conf *Configuration) Validate() error {
-	catcher := &erc.Collector{}
+	ec := &erc.Collector{}
 
-	catcher.Add(conf.Settings.Validate())
-	catcher.Add(conf.System.Arch.Validate())
+	ec.Add(conf.Settings.Validate())
+	ec.Add(conf.System.Arch.Validate())
 
-	conf.expandLinkedFiles(catcher)
+	conf.expandLinkedFiles(ec)
 
 	for idx := range conf.System.Services {
 		if err := conf.System.Services[idx].Validate(); err != nil {
-			catcher.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.System.Services[idx], err))
+			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.System.Services[idx], err))
 		}
 	}
 
 	for idx := range conf.Repo {
 		if err := conf.Repo[idx].Validate(); err != nil {
-			catcher.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Repo[idx], err))
+			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Repo[idx], err))
 		}
 	}
 
-	conf.Links = conf.expandLinks(catcher)
+	conf.Links = conf.expandLinks(ec)
 	for idx := range conf.Links {
 		if err := conf.Links[idx].Validate(); err != nil {
-			catcher.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Links[idx], err))
+			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Links[idx], err))
 		}
 	}
 
 	for idx := range conf.Hosts {
 		if err := conf.Hosts[idx].Validate(); err != nil {
-			catcher.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Hosts[idx], err))
+			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Hosts[idx], err))
 		}
 	}
 
 	for idx := range conf.Commands {
 		if err := conf.Commands[idx].Validate(); err != nil {
-			catcher.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Commands[idx], err))
+			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Commands[idx], err))
 		}
 	}
 	for idx := range conf.TerminalCommands {
 		if err := conf.TerminalCommands[idx].Validate(); err != nil {
-			catcher.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.TerminalCommands[idx], err))
+			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.TerminalCommands[idx], err))
+		}
+	}
+	for idx := range conf.Menus {
+		erc.Whenf(ec, conf.Menus[idx].Name == "", "must specify name for dmenu spec at item %d", idx)
+		if err := conf.Menus[idx].Validate(); err != nil {
+			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.System.Services[idx], err))
 		}
 	}
 
@@ -235,7 +257,7 @@ func (conf *Configuration) Validate() error {
 		conf.mapReposByTags()
 	}
 
-	return catcher.Resolve()
+	return ec.Resolve()
 }
 
 func fileExists(fn string) bool { _, err := os.Stat(fn); return !os.IsNotExist(err) }

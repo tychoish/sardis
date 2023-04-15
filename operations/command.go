@@ -16,8 +16,9 @@ import (
 	"github.com/urfave/cli"
 )
 
+const commandFlagName = "command"
+
 func RunCommand() cli.Command {
-	const commandFlagName = "command"
 	return cli.Command{
 		Name:  "run",
 		Usage: "runs a predefined command",
@@ -29,7 +30,7 @@ func RunCommand() cli.Command {
 		},
 		Subcommands: []cli.Command{
 			listCommands(),
-			dmenuListCmds(),
+			dmenuListCmds(dmenuListCommandAll),
 			qrCode(),
 		},
 		Before: mergeBeforeFuncs(
@@ -145,7 +146,16 @@ func listCommands() cli.Command {
 		},
 	}
 }
-func dmenuListCmds() cli.Command {
+
+type dmenuListCommandTypes int
+
+const (
+	dmenuListCommandAll dmenuListCommandTypes = iota
+	dmenuListCommandTerm
+	dmenuListCommandRun
+)
+
+func dmenuListCmds(kind dmenuListCommandTypes) cli.Command {
 	return cli.Command{
 		Name:   "dmenu",
 		Usage:  "return a list of defined commands",
@@ -157,7 +167,16 @@ func dmenuListCmds() cli.Command {
 			defer cancel()
 
 			conf := env.Configuration()
-			cmds := append(conf.TerminalCommands, conf.Commands...)
+			var cmds []sardis.CommandConf
+
+			switch kind {
+			case dmenuListCommandAll:
+				cmds = append(conf.TerminalCommands, conf.Commands...)
+			case dmenuListCommandRun:
+				cmds = conf.Commands
+			case dmenuListCommandTerm:
+				cmds = conf.TerminalCommands
+			}
 
 			opts := make([]string, len(cmds))
 

@@ -12,7 +12,7 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/grip/x/system"
-	jaspercli "github.com/tychoish/jasper/cli"
+	jaspercli "github.com/tychoish/jasper/x/cli"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/operations"
 	"github.com/tychoish/sardis/util"

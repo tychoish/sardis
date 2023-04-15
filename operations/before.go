@@ -96,6 +96,19 @@ func requireStringOrFirstArgSet(flagName string) cli.BeforeFunc {
 	}
 }
 
+func setFirstArgWhenStringUnset(flagName string) cli.BeforeFunc {
+	return func(c *cli.Context) error {
+		value := c.String(flagName)
+		if value == "" {
+			if c.NArg() != 1 {
+				return nil
+			}
+			value = c.Args().Get(0)
+		}
+		return c.Set(flagName, value)
+	}
+}
+
 func setAllTailArguements(flagName string) cli.BeforeFunc {
 	return func(c *cli.Context) error {
 		for _, a := range c.Args() {

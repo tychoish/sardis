@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/tychoish/jasper"
-	jaspercli "github.com/tychoish/jasper/cli"
 	"github.com/tychoish/jasper/options"
-	"github.com/tychoish/jasper/remote"
+	jaspercli "github.com/tychoish/jasper/x/cli"
+	"github.com/tychoish/jasper/x/remote"
 )
 
 type HostConf struct {

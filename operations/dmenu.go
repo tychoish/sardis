@@ -7,6 +7,8 @@ import (
 	"github.com/cheynewallace/tabby"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/godmenu"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/level"
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli"
 )
@@ -157,17 +159,19 @@ func DMenu() cli.Command {
 		},
 		Flags: []cli.Flag{
 			cli.StringSliceFlag{
-				Name:  joinFlagNames(commandFlagName, "c"),
-				Usage: "specify a default flag name",
+				Name:     joinFlagNames(commandFlagName, "c"),
+				Usage:    "specify a default flag name",
+				Required: false,
 			},
 		},
-		Before: requireStringOrFirstArgSet(commandFlagName),
+		Before: setFirstArgWhenStringUnset(commandFlagName),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
 			ctx, cancel := env.Context()
 			defer cancel()
 			name := c.String(commandFlagName)
 			conf := env.Configuration()
+			others := []string{}
 			for _, menu := range conf.Menus {
 				if menu.Name == name {
 					opts := make([]string, len(menu.Selections))
@@ -180,11 +184,27 @@ func DMenu() cli.Command {
 						return err
 					}
 
-					return env.Jasper().CreateCommand(ctx).Append(fmt.Sprintf("%s %s", menu.Command, output)).Run(ctx)
+					err = env.Jasper().CreateCommand(ctx).Append(fmt.Sprintf("%s %s", menu.Command, output)).
+						SetCombinedSender(level.Notice, grip.Sender()).Run(ctx)
+					if err != nil {
+						env.Logger().Errorf("%s running %s failed: %s", name, output, err.Error())
+						return err
+					}
+					env.Logger().Noticef("%s running %s completed", name, output)
+					return nil
 				}
+				others = append(others, menu.Name)
 			}
+			others = append(others, "term", "run")
 
-			return fmt.Errorf("could not find dmenu %q", name)
+			output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: others})
+			if err != nil {
+				return err
+			}
+			// don't notify here let the inner one do that
+			return env.Jasper().CreateCommand(ctx).Append(fmt.Sprintf("%s %s", "sardis dmenu", output)).
+				SetCombinedSender(level.Notice, grip.Sender()).Run(ctx)
+
 		},
 	}
 }

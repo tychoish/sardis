@@ -126,19 +126,45 @@ func listCommands() cli.Command {
 		Before: requireConfig(),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
+			conf := env.Configuration()
 
 			table := tabby.New()
 			table.AddHeader("Name", "Command", "Directory")
-			for _, cmd := range env.Configuration().Commands {
-				table.AddLine(cmd.Name, cmd.Command, util.CollapseHomeDir(cmd.Directory))
+			for _, cmd := range conf.Commands {
+				if cmd.Group == "" {
+					table.AddLine(cmd.Name, cmd.Command, util.CollapseHomeDir(cmd.Directory))
+				}
 			}
+
+			table.Print()
+			fmt.Println()
+
+			table.AddHeader("Name", "Group", "Command", "Directory")
+			for _, cmd := range conf.Commands {
+				if cmd.Group != "" {
+					table.AddLine(cmd.Name, cmd.Group, cmd.Command, util.CollapseHomeDir(cmd.Directory))
+				}
+			}
+
 			table.Print()
 			fmt.Println()
 
 			table = tabby.New()
 			table.AddHeader("Terminal", "Command")
-			for _, term := range env.Configuration().TerminalCommands {
-				table.AddLine(term.Name, term.Command)
+			for _, term := range conf.TerminalCommands {
+				if term.Group == "" {
+					table.AddLine(term.Name, term.Command)
+				}
+			}
+
+			table.Print()
+			fmt.Println()
+
+			table.AddHeader("Terminal", "Group", "Command")
+			for _, term := range conf.TerminalCommands {
+				if term.Group != "" {
+					table.AddLine(term.Name, term.Group, term.Command)
+				}
 			}
 			table.Print()
 
@@ -153,6 +179,7 @@ const (
 	dmenuListCommandAll dmenuListCommandTypes = iota
 	dmenuListCommandTerm
 	dmenuListCommandRun
+	dmenuListCommandGroup
 )
 
 func dmenuListCmds(kind dmenuListCommandTypes) cli.Command {
@@ -178,9 +205,9 @@ func dmenuListCmds(kind dmenuListCommandTypes) cli.Command {
 				cmds = conf.TerminalCommands
 			}
 
-			opts := make([]string, len(cmds))
+			opts := make([]string, 0, len(cmds))
 
-			for idx := range append(cmds) {
+			for idx := range cmds {
 				opts = append(opts, cmds[idx].Name)
 			}
 

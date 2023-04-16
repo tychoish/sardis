@@ -163,20 +163,46 @@ func listMenus() cli.Command {
 
 			table := tabby.New()
 			table.AddHeader("Name", "Selections")
-			for _, m := range conf.Menus {
-				table.AddLine(m.Name, strings.Join(m.Selections, ", "))
-			}
 
 			cmds := []string{}
+			groups := map[string][]string{}
 			for _, cmd := range conf.TerminalCommands {
-				cmds = append(cmds, cmd.Name)
+				if cmd.Group == "" {
+					cmds = append(cmds, cmd.Name)
+					continue
+				}
+				groups[cmd.Group] = append(groups[cmd.Group], cmd.Name)
 			}
-			table.AddLine("term", strings.Join(cmds, ", "))
+			if len(cmds) > 0 {
+				table.AddLine("term", strings.Join(cmds, ", "))
+			}
 			cmds = []string{}
 			for _, cmd := range conf.Commands {
-				cmds = append(cmds, cmd.Name)
+				if cmd.Group == "" {
+					cmds = append(cmds, cmd.Name)
+					continue
+				}
+				groups[cmd.Group] = append(groups[cmd.Group], cmd.Name)
 			}
-			table.AddLine("run", strings.Join(cmds, ", "))
+			if len(cmds) > 0 {
+				table.AddLine("run", strings.Join(cmds, ", "))
+			}
+			for _, m := range conf.Menus {
+				out := make([]string, 0, len(m.Selections)+len(m.Aliases))
+				out = append(out, m.Selections...)
+				if len(m.Aliases) > 0 {
+					for _, p := range m.Aliases {
+						out = append(out, fmt.Sprintf("%s [%s]", p.Key, p.Value))
+					}
+				}
+				if len(out) > 0 {
+					table.AddLine(m.Name, strings.Join(out, "; "))
+				}
+			}
+
+			for group, cmds := range groups {
+				table.AddLine(group, strings.Join(cmds, ", "))
+			}
 
 			table.Print()
 			return nil
@@ -213,19 +239,52 @@ func DMenu() cli.Command {
 			name := c.String(commandFlagName)
 			conf := env.Configuration()
 			others := []string{}
+			groupings := map[string][]string{}
+			for _, cmd := range append(conf.Commands, conf.TerminalCommands...) {
+				if cmd.Group == "" {
+					continue
+				}
+				groupings[cmd.Group] = append(groupings[cmd.Group], cmd.Name)
+			}
+
+			if group, ok := groupings[name]; ok {
+				cmd, err := godmenu.RunDMenu(ctx, godmenu.Options{
+					Selections: group,
+				})
+
+				if err != nil {
+					return err
+				}
+
+				return runConfiguredCommand(ctx, env, []string{cmd})
+			}
+
 			for _, menu := range conf.Menus {
 				if menu.Name == name {
-					opts := make([]string, len(menu.Selections))
-					for idx := range opts {
-						opts[idx] = menu.Selections[idx]
+					items := len(menu.Selections) + len(menu.Aliases)
+					mapping := make(map[string]string, len(menu.Selections)+len(menu.Aliases))
+					opts := make([]string, 0, items)
+					for _, item := range opts {
+						opts = append(opts, item)
+						mapping[item] = item
+					}
+					for _, p := range menu.Aliases {
+						mapping[p.Key] = p.Value
+						opts = append(opts, p.Key)
 					}
 
 					output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: opts})
 					if err != nil {
 						return err
 					}
+					var cmd string
+					if menu.Command == "" {
+						cmd = mapping[output]
+					} else {
+						cmd = fmt.Sprintf("%s %s", menu.Command, mapping[output])
+					}
 
-					err = env.Jasper().CreateCommand(ctx).Append(fmt.Sprintf("%s %s", menu.Command, output)).
+					err = env.Jasper().CreateCommand(ctx).Append(cmd).
 						SetCombinedSender(level.Notice, grip.Sender()).Run(ctx)
 					if err != nil {
 						env.Logger().Errorf("%s running %s failed: %s", name, output, err.Error())
@@ -236,8 +295,11 @@ func DMenu() cli.Command {
 				}
 				others = append(others, menu.Name)
 			}
-			others = append(others, "term", "run")
+			for group := range groupings {
+				others = append(others, group)
+			}
 
+			others = append(others, "term", "run")
 			output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: others})
 			if err != nil {
 				return err

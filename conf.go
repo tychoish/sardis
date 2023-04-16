@@ -12,6 +12,7 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/mitchellh/go-homedir"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -166,6 +167,7 @@ type CommandConf struct {
 	Name      string `bson:"name" json:"name" yaml:"name"`
 	Directory string `bson:"directory" json:"directory" yaml:"directory"`
 	Command   string `bson:"command" json:"command" yaml:"command"`
+	Group     string `bson:"group" json:"group" yaml:"group"`
 }
 
 type BlogConf struct {
@@ -176,9 +178,10 @@ type BlogConf struct {
 }
 
 type MenuConf struct {
-	Name       string   `bson:"name" json:"name" yaml:"name"`
-	Command    string   `bson:"command" json:"command" yaml:"command"`
-	Selections []string `bson:"selections" json:"selections" yaml:"selections"`
+	Name       string                     `bson:"name" json:"name" yaml:"name"`
+	Command    string                     `bson:"command" json:"command" yaml:"command"`
+	Selections []string                   `bson:"selections" json:"selections" yaml:"selections"`
+	Aliases    []fun.Pair[string, string] `bson:"aliases" json:"aliases" yaml:"aliases"`
 }
 
 func LoadConfiguration(fn string) (*Configuration, error) {
@@ -204,8 +207,7 @@ func (conf *MenuConf) Validate() error {
 		erc.Wrapf(err, "%s [%s] does not exist", base, conf.Command)
 	}
 
-	// erc.Whenf(ec, conf.Command == "", "must specify command for %q", conf.Name)
-	erc.Whenf(ec, len(conf.Selections) == 0, "must specify options for %q", conf.Name)
+	erc.Whenf(ec, len(conf.Selections) == 0 && len(conf.Aliases) == 0, "must specify options for %q", conf.Name)
 
 	return ec.Resolve()
 }

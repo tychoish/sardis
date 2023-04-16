@@ -54,12 +54,12 @@ func runConfiguredCommand(ctx context.Context, env sardis.Environment, ops []str
 	cmds := conf.ExportCommands()
 	terms := conf.ExportTerminalCommands()
 
-	var fontSize int
+	var fontSize float64
 	switch util.GetHostname() {
 	case "derrida":
 		fontSize = 12
 	case "arendt", "deleuze":
-		fontSize = 8
+		fontSize = 8.5
 	}
 
 	for idx, name := range ops {
@@ -92,7 +92,7 @@ func runConfiguredCommand(ctx context.Context, env sardis.Environment, ops []str
 				SetErrorSender(level.Error, grip.Sender()).
 				Append(fmt.Sprintln(
 					"alacritty",
-					"-o", fmt.Sprintf("font.size=%d", fontSize),
+					"-o", fmt.Sprintf("font.size=%f", fontSize),
 					"--title", cmd.Name,
 					"--command", cmd.Command,
 				)).

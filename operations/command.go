@@ -129,44 +129,67 @@ func listCommands() cli.Command {
 			conf := env.Configuration()
 
 			table := tabby.New()
-			table.AddHeader("Name", "Command", "Directory")
+			lines := [][]any{}
 			for _, cmd := range conf.Commands {
 				if cmd.Group == "" {
-					table.AddLine(cmd.Name, cmd.Command, util.CollapseHomeDir(cmd.Directory))
+					lines = append(lines, []any{cmd.Name, cmd.Command, util.CollapseHomeDir(cmd.Directory)})
 				}
 			}
+			if len(lines) > 0 {
+				table.AddHeader("Name", "Command", "Directory")
+				for _, ln := range lines {
+					table.AddLine(ln...)
+				}
 
-			table.Print()
-			fmt.Println()
+				table.Print()
+			}
 
-			table.AddHeader("Name", "Group", "Command", "Directory")
+			lines = [][]any{}
 			for _, cmd := range conf.Commands {
 				if cmd.Group != "" {
-					table.AddLine(cmd.Name, cmd.Group, cmd.Command, util.CollapseHomeDir(cmd.Directory))
+					lines = append(lines, []any{cmd.Name, cmd.Group, cmd.Command, util.CollapseHomeDir(cmd.Directory)})
 				}
 			}
+			if len(lines) > 0 {
+				table.AddHeader("Name", "Group", "Command", "Directory")
+				for _, ln := range lines {
+					table.AddLine(ln...)
+				}
 
-			table.Print()
-			fmt.Println()
+				fmt.Println()
+				table.Print()
+			}
 
-			table = tabby.New()
-			table.AddHeader("Terminal", "Command")
+			lines = [][]any{}
 			for _, term := range conf.TerminalCommands {
 				if term.Group == "" {
-					table.AddLine(term.Name, term.Command)
+					lines = append(lines, []any{term.Name, term.Command})
 				}
 			}
 
-			table.Print()
-			fmt.Println()
+			if len(lines) > 0 {
+				table.AddHeader("Terminal", "Command")
+				for _, ln := range lines {
+					table.AddLine(ln...)
+				}
+				fmt.Println()
+				table.Print()
+			}
 
-			table.AddHeader("Terminal", "Group", "Command")
+			lines = [][]any{}
 			for _, term := range conf.TerminalCommands {
 				if term.Group != "" {
-					table.AddLine(term.Name, term.Group, term.Command)
+					lines = append(lines, []any{term.Name, term.Group, term.Command})
 				}
 			}
-			table.Print()
+			if len(lines) > 0 {
+				table.AddHeader("Terminal", "Group", "Command")
+				for _, ln := range lines {
+					table.AddLine(ln...)
+				}
+				fmt.Println()
+				table.Print()
+			}
 
 			return nil
 		},

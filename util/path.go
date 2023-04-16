@@ -10,6 +10,11 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 )
 
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}
+
 func GetHomeDir() string {
 	userHome, err := homedir.Dir()
 	if err != nil {

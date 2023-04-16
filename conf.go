@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -197,7 +198,13 @@ type validatable interface {
 func (conf *MenuConf) Validate() error {
 	ec := &erc.Collector{}
 
-	erc.Whenf(ec, conf.Command == "", "must specify command for %q", conf.Name)
+	if conf.Command != "" {
+		base := strings.Split(conf.Command, " ")[0]
+		_, err := exec.LookPath(base)
+		erc.Wrapf(err, "%s [%s] does not exist", base, conf.Command)
+	}
+
+	// erc.Whenf(ec, conf.Command == "", "must specify command for %q", conf.Name)
 	erc.Whenf(ec, len(conf.Selections) == 0, "must specify options for %q", conf.Name)
 
 	return ec.Resolve()
@@ -249,7 +256,7 @@ func (conf *Configuration) Validate() error {
 	for idx := range conf.Menus {
 		erc.Whenf(ec, conf.Menus[idx].Name == "", "must specify name for dmenu spec at item %d", idx)
 		if err := conf.Menus[idx].Validate(); err != nil {
-			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.System.Services[idx], err))
+			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Menus[idx], err))
 		}
 	}
 

@@ -14,11 +14,11 @@ require (
 	github.com/tychoish/fun v0.8.5
 	github.com/tychoish/godmenu v0.1.0
 	github.com/tychoish/grip v0.2.4
-	github.com/tychoish/grip/x/desktop v0.0.0-20230414052605-c655d8eb9965
-	github.com/tychoish/grip/x/jira v0.0.0-20230414052605-c655d8eb9965
-	github.com/tychoish/grip/x/system v0.0.0-20230414052605-c655d8eb9965
-	github.com/tychoish/grip/x/twitter v0.0.0-20230414052605-c655d8eb9965
-	github.com/tychoish/grip/x/xmpp v0.0.0-20230414052605-c655d8eb9965
+	github.com/tychoish/grip/x/desktop v0.0.0-00010101000000-000000000000
+	github.com/tychoish/grip/x/jira v0.0.0-00010101000000-000000000000
+	github.com/tychoish/grip/x/system v0.0.0-00010101000000-000000000000
+	github.com/tychoish/grip/x/twitter v0.0.0-00010101000000-000000000000
+	github.com/tychoish/grip/x/xmpp v0.0.0-00010101000000-000000000000
 	github.com/tychoish/jasper v0.0.0-20230415083349-ed64615c7d7e
 	github.com/tychoish/jasper/x/cli v0.0.0-00010101000000-000000000000
 	github.com/tychoish/jasper/x/remote v0.0.0-00010101000000-000000000000

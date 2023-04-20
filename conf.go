@@ -22,15 +22,15 @@ import (
 )
 
 type Configuration struct {
-	Settings         Settings      `bson:"settings" json:"settings" yaml:"settings"`
-	Repo             []RepoConf    `bson:"repo" json:"repo" yaml:"repo"`
-	Links            []LinkConf    `bson:"links" json:"links" yaml:"links"`
-	Hosts            []HostConf    `bson:"hosts" json:"hosts" yaml:"hosts"`
-	System           SystemConf    `bson:"system" json:"system" yaml:"system"`
-	Commands         []CommandConf `bson:"commands" json:"commands" yaml:"commands"`
-	TerminalCommands []CommandConf `bson:"terminals" json:"terminals" yaml:"terminals"`
-	Blog             []BlogConf    `bson:"blog" json:"blog" yaml:"blog"`
-	Menus            []MenuConf    `bson:"menu" json:"menu" yaml:"menu"`
+	Settings         Settings           `bson:"settings" json:"settings" yaml:"settings"`
+	Repo             []RepoConf         `bson:"repo" json:"repo" yaml:"repo"`
+	Links            []LinkConf         `bson:"links" json:"links" yaml:"links"`
+	Hosts            []HostConf         `bson:"hosts" json:"hosts" yaml:"hosts"`
+	System           SystemConf         `bson:"system" json:"system" yaml:"system"`
+	Commands         []CommandGroupConf `bson:"commands" json:"commands" yaml:"commands"`
+	TerminalCommands []CommandConf      `bson:"terminals" json:"terminals" yaml:"terminals"`
+	Blog             []BlogConf         `bson:"blog" json:"blog" yaml:"blog"`
+	Menus            []MenuConf         `bson:"menu" json:"menu" yaml:"menu"`
 
 	repoTags         map[string][]*RepoConf
 	indexedRepoCount int
@@ -163,11 +163,18 @@ type AmboyConf struct {
 	Size    int `bson:"size" json:"size" yaml:"size"`
 }
 
+type CommandGroupConf struct {
+	Name      string        `bson:"name" json:"name" yaml:"name"`
+	Directory string        `bson:"directory" json:"directory" yaml:"directory"`
+	Command   string        `bson:"default_command" json:"default_command" yaml:"default_command"`
+	Commands  []CommandConf `bson:"commands" json:"commands" yaml:"commands"`
+}
+
 type CommandConf struct {
 	Name      string `bson:"name" json:"name" yaml:"name"`
 	Directory string `bson:"directory" json:"directory" yaml:"directory"`
 	Command   string `bson:"command" json:"command" yaml:"command"`
-	Group     string `bson:"group" json:"group" yaml:"group"`
+	Alias     string `bson:"alias" json:"alias" yaml:"alias"`
 }
 
 type BlogConf struct {
@@ -248,11 +255,6 @@ func (conf *Configuration) Validate() error {
 	for idx := range conf.Commands {
 		if err := conf.Commands[idx].Validate(); err != nil {
 			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Commands[idx], err))
-		}
-	}
-	for idx := range conf.TerminalCommands {
-		if err := conf.TerminalCommands[idx].Validate(); err != nil {
-			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.TerminalCommands[idx], err))
 		}
 	}
 	for idx := range conf.Menus {
@@ -667,34 +669,72 @@ func (conf *Configuration) GetHost(name string) (*HostConf, error) {
 	return nil, fmt.Errorf("could not find a host named '%s'", name)
 }
 
-func (conf *CommandConf) Validate() error {
-	catcher := &erc.Collector{}
-	erc.When(catcher, conf.Name == "", "commands must have a name")
-	erc.When(catcher, conf.Command == "", "commands must have specify commands")
-
+func (conf *CommandGroupConf) Validate() error {
 	var err error
-	conf.Directory, err = homedir.Expand(conf.Directory)
-	catcher.Add(err)
+	home := util.GetHomeDir()
+	catcher := &erc.Collector{}
+
+	if conf.Directory == "" {
+		conf.Directory = home
+	}
+	erc.When(catcher, conf.Name == "", "command group must have name")
+
+	for idx := range conf.Commands {
+		cmd := conf.Commands[idx]
+
+		if cmd.Directory == "" {
+			cmd.Directory = conf.Directory
+		}
+
+		if conf.Command != "" {
+			if cmd.Command == "" {
+				cmd.Command = conf.Command
+			}
+			if strings.Contains(conf.Command, "{{command}}") {
+				cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
+			}
+
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Alias)
+		}
+
+		erc.Whenf(catcher, cmd.Name == "", "commands [%d] must have a name", idx)
+
+		cmd.Directory, err = homedir.Expand(cmd.Directory)
+		catcher.Add(erc.Wrapf(err, "command %q at %d", cmd.Name, idx))
+		conf.Commands[idx] = cmd
+	}
 
 	return catcher.Resolve()
 }
 
-func (conf *Configuration) ExportCommands() map[string]CommandConf {
+func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
+	out := make(map[string]CommandConf)
+	for _, group := range conf.Commands {
+		for idx := range group.Commands {
+			cmd := group.Commands[idx]
+			out[cmd.Name] = cmd
+			out[cmd.Alias] = cmd
+		}
+	}
+	return out
+}
+
+func (conf *Configuration) ExportCommandGroups() map[string]CommandGroupConf {
+	out := make(map[string]CommandGroupConf, len(conf.Commands))
+	for idx := range conf.Commands {
+		group := conf.Commands[idx]
+		out[group.Name] = group
+	}
+	return out
+}
+
+func (conf *CommandGroupConf) ExportCommands() map[string]CommandConf {
 	out := make(map[string]CommandConf, len(conf.Commands))
 	for idx := range conf.Commands {
 		cmd := conf.Commands[idx]
 		out[cmd.Name] = cmd
+		out[cmd.Alias] = cmd
 	}
-
-	return out
-}
-
-func (conf *Configuration) ExportTerminalCommands() map[string]CommandConf {
-	out := make(map[string]CommandConf, len(conf.TerminalCommands))
-	for idx := range conf.TerminalCommands {
-		cmd := conf.TerminalCommands[idx]
-		out[cmd.Name] = cmd
-	}
-
 	return out
 }

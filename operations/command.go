@@ -51,63 +51,34 @@ func RunCommand() cli.Command {
 
 func runConfiguredCommand(ctx context.Context, env sardis.Environment, ops []string) error {
 	conf := env.Configuration()
-	cmds := conf.ExportCommands()
-	terms := conf.ExportTerminalCommands()
+	cmds := conf.ExportAllCommands()
 
 	for idx, name := range ops {
-		cmd, cmdOk := cmds[name]
-		if cmdOk {
-			err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
-				SetOutputSender(level.Info, grip.Sender()).
-				SetErrorSender(level.Error, grip.Sender()).
-				Append(cmd.Command).
-				Prerequisite(func() bool {
-					grip.Info(message.Fields{
-						"cmd":  name,
-						"dir":  cmd.Directory,
-						"exec": cmd.Command,
-						"num":  idx + 1,
-						"len":  len(ops),
-					})
-					return true
-				}).Run(ctx)
-
-			if err != nil {
-				return err
-			}
-			continue
+		cmd, ok := cmds[name]
+		if !ok {
+			return fmt.Errorf("command name %q is not defined", name)
 		}
-		cmd, termOk := terms[name]
-		if termOk {
-			err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
-				SetOutputSender(level.Info, grip.Sender()).
-				SetErrorSender(level.Error, grip.Sender()).
-				Append(fmt.Sprintln(
-					"alacritty",
-					"msg",
-					"create-window",
-					"--title", cmd.Name,
-					"--command", cmd.Command,
-				)).
-				Prerequisite(func() bool {
-					grip.Info(message.Fields{
-						"type": "term",
-						"cmd":  name,
-						"dir":  cmd.Directory,
-						"exec": cmd.Command,
-						"num":  idx + 1,
-						"len":  len(ops),
-					})
-					return true
-				}).Run(ctx)
-			if err != nil {
-				return err
-			}
+		err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
+			SetOutputSender(level.Info, grip.Sender()).
+			SetErrorSender(level.Error, grip.Sender()).
+			Append(cmd.Command).
+			Prerequisite(func() bool {
+				grip.Info(message.Fields{
+					"cmd":  name,
+					"dir":  cmd.Directory,
+					"exec": cmd.Command,
+					"num":  idx + 1,
+					"len":  len(ops),
+				})
+				return true
+			}).Run(ctx)
+		if err != nil {
+			// notify.Error(message.WrapError(err, name))
+			return err
 		}
 
-		if !cmdOk && !termOk {
-			return fmt.Errorf("command %q not defined", name)
-		}
+		// notify.Noticeln(name, "completed")
+		continue
 	}
 	return nil
 }
@@ -120,69 +91,26 @@ func listCommands() cli.Command {
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
 			conf := env.Configuration()
+			homedir := util.GetHomeDir()
 
 			table := tabby.New()
-			lines := [][]any{}
-			for _, cmd := range conf.Commands {
-				if cmd.Group == "" {
-					lines = append(lines, []any{cmd.Name, cmd.Command, util.CollapseHomeDir(cmd.Directory)})
-				}
-			}
-			if len(lines) > 0 {
-				table.AddHeader("Name", "Command", "Directory")
-				for _, ln := range lines {
-					table.AddLine(ln...)
-				}
+			table.AddHeader("Name", "Group", "Command", "Directory")
+			for _, group := range conf.Commands {
+				for _, cmd := range group.Commands {
 
-				table.Print()
-			}
+					if cmd.Directory == homedir {
+						cmd.Directory = ""
+					}
 
-			lines = [][]any{}
-			for _, cmd := range conf.Commands {
-				if cmd.Group != "" {
-					lines = append(lines, []any{cmd.Name, cmd.Group, cmd.Command, util.CollapseHomeDir(cmd.Directory)})
+					switch {
+					case cmd.Alias != "":
+						table.AddLine(cmd.Name, group.Name, cmd.Alias, cmd.Directory)
+					default:
+						table.AddLine(cmd.Name, group.Name, cmd.Command, cmd.Directory)
+					}
 				}
 			}
-			if len(lines) > 0 {
-				table.AddHeader("Name", "Group", "Command", "Directory")
-				for _, ln := range lines {
-					table.AddLine(ln...)
-				}
-
-				fmt.Println()
-				table.Print()
-			}
-
-			lines = [][]any{}
-			for _, term := range conf.TerminalCommands {
-				if term.Group == "" {
-					lines = append(lines, []any{term.Name, term.Command})
-				}
-			}
-
-			if len(lines) > 0 {
-				table.AddHeader("Terminal", "Command")
-				for _, ln := range lines {
-					table.AddLine(ln...)
-				}
-				fmt.Println()
-				table.Print()
-			}
-
-			lines = [][]any{}
-			for _, term := range conf.TerminalCommands {
-				if term.Group != "" {
-					lines = append(lines, []any{term.Name, term.Group, term.Command})
-				}
-			}
-			if len(lines) > 0 {
-				table.AddHeader("Terminal", "Group", "Command")
-				for _, ln := range lines {
-					table.AddLine(ln...)
-				}
-				fmt.Println()
-				table.Print()
-			}
+			table.Print()
 
 			return nil
 		},
@@ -193,9 +121,8 @@ type dmenuListCommandTypes int
 
 const (
 	dmenuListCommandAll dmenuListCommandTypes = iota
-	dmenuListCommandTerm
-	dmenuListCommandRun
 	dmenuListCommandGroup
+	dmenuListCommandRun
 )
 
 func dmenuListCmds(kind dmenuListCommandTypes) cli.Command {
@@ -214,17 +141,30 @@ func dmenuListCmds(kind dmenuListCommandTypes) cli.Command {
 
 			switch kind {
 			case dmenuListCommandAll:
-				cmds = append(conf.TerminalCommands, conf.Commands...)
+				allCmd := conf.ExportAllCommands()
+				for _, cmd := range allCmd {
+					cmds = append(cmds, cmd)
+				}
 			case dmenuListCommandRun:
-				cmds = conf.Commands
-			case dmenuListCommandTerm:
-				cmds = conf.TerminalCommands
+				allCmd := conf.ExportAllCommands()
+				for _, cmd := range allCmd {
+					if cmd.Name != "" {
+						cmds = append(cmds, cmd)
+					}
+				}
+			case dmenuListCommandGroup:
+				for _, group := range conf.Commands {
+					cmds = append(cmds, sardis.CommandConf{
+						Name:    group.Name,
+						Command: fmt.Sprintln("sardis dmenu", group.Name),
+					})
+				}
 			}
 
 			opts := make([]string, 0, len(cmds))
 
-			for idx := range cmds {
-				opts = append(opts, cmds[idx].Name)
+			for _, cmd := range cmds {
+				opts = append(opts, cmd.Name)
 			}
 
 			cmd, err := godmenu.RunDMenu(ctx, godmenu.Options{

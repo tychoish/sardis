@@ -12,7 +12,6 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
-	"github.com/tychoish/sardis/util"
 	"github.com/urfave/cli"
 )
 
@@ -91,22 +90,16 @@ func listCommands() cli.Command {
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment()
 			conf := env.Configuration()
-			homedir := util.GetHomeDir()
 
 			table := tabby.New()
-			table.AddHeader("Name", "Group", "Command", "Directory")
+			table.AddHeader("Name", "Group", "Command")
 			for _, group := range conf.Commands {
 				for _, cmd := range group.Commands {
-
-					if cmd.Directory == homedir {
-						cmd.Directory = ""
-					}
-
 					switch {
 					case cmd.Alias != "":
-						table.AddLine(cmd.Name, group.Name, cmd.Alias, cmd.Directory)
+						table.AddLine(cmd.Name, group.Name, cmd.Alias)
 					default:
-						table.AddLine(cmd.Name, group.Name, cmd.Command, cmd.Directory)
+						table.AddLine(cmd.Name, group.Name, cmd.Command)
 					}
 				}
 			}

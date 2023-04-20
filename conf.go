@@ -686,18 +686,6 @@ func (conf *CommandGroupConf) Validate() error {
 			cmd.Directory = conf.Directory
 		}
 
-		if conf.Command != "" {
-			if cmd.Command == "" {
-				cmd.Command = conf.Command
-			}
-			if strings.Contains(conf.Command, "{{command}}") {
-				cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
-			}
-
-			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
-			cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Alias)
-		}
-
 		erc.Whenf(catcher, cmd.Name == "", "commands [%d] must have a name", idx)
 
 		cmd.Directory, err = homedir.Expand(cmd.Directory)
@@ -715,9 +703,26 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 			cmd := group.Commands[idx]
 			out[cmd.Name] = cmd
 			out[cmd.Alias] = cmd
+
+			cmd.resolve(group.Command)
+
+			group.Commands[idx] = cmd
 		}
 	}
 	return out
+}
+
+func (conf *CommandConf) resolve(baseCmd string) {
+	if baseCmd == "" {
+		return
+	}
+
+	if strings.Contains(conf.Command, "{{command}}") {
+		conf.Command = strings.ReplaceAll(baseCmd, "{{command}}", conf.Command)
+	}
+
+	conf.Command = strings.ReplaceAll(conf.Command, "{{name}}", conf.Name)
+	conf.Command = strings.ReplaceAll(conf.Command, "{{alias}}", conf.Alias)
 }
 
 func (conf *Configuration) ExportCommandGroups() map[string]CommandGroupConf {

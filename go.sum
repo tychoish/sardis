@@ -266,8 +266,8 @@ github.com/tychoish/gimlet v0.0.0-20230130001449-8987c96bb886/go.mod h1:aASKQIwB
 github.com/tychoish/godmenu v0.1.0 h1:JfFaQRsOOql9XKlgjrcPCaluUryxZXUoEtr4KMfFa68=
 github.com/tychoish/godmenu v0.1.0/go.mod h1:Dtf6cda1ihkmn707FYZyJ+lIaXLlraSvG1ieBkDT15U=
 github.com/tychoish/grip v0.1.1/go.mod h1:Vxl3fsRs/5aAsnS3ff7/OT3C+A/kEWf08FgA2xSJfMY=
-github.com/tychoish/grip v0.2.4 h1:u759iHGTvvCpFMBO4RxWywlvscB3O0esr22w5HntuUw=
-github.com/tychoish/grip v0.2.4/go.mod h1:jQlzC/krYSoYf2HF5FSYBwc1ABVkWz+DKyvmff36PGc=
+github.com/tychoish/grip v0.2.7 h1:/xDTjr/90/lS4zo7PQKP0JXrCsnlxEZX36ylOtZREzM=
+github.com/tychoish/grip v0.2.7/go.mod h1:GbjJm1Rg/yFSoibHIM33LIEf2nmGjItcNPhCquAh1EY=
 github.com/tychoish/grip/x/metrics v0.0.0-20230414135146-97625602a7ee h1:WdORe70Qk3ieaQLd3wMSVuXmc7mJfkQrQ/rb1fxnSio=
 github.com/tychoish/grip/x/metrics v0.0.0-20230414135146-97625602a7ee/go.mod h1:rMHIbZFnaJiB7I4yD4D/TfLIg5mzMb94mPVbebN/uP0=
 github.com/tychoish/grip/x/splunk v0.0.0-20230414135146-97625602a7ee h1:NV4z26eQU6yv+ealvdcl3yXjVeHxc76RBeHCVCnxq1w=

@@ -11,9 +11,10 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/tychoish/amboy v0.0.0-20230408193931-6ba4e429a638
 	github.com/tychoish/birch v0.2.3-0.20230413052020-46068f63d7bb
-	github.com/tychoish/fun v0.8.5
+	github.com/tychoish/cmdr v0.0.0-00010101000000-000000000000
+	github.com/tychoish/fun v0.8.9
 	github.com/tychoish/godmenu v0.1.0
-	github.com/tychoish/grip v0.2.4
+	github.com/tychoish/grip v0.2.7
 	github.com/tychoish/grip/x/desktop v0.0.0-00010101000000-000000000000
 	github.com/tychoish/grip/x/jira v0.0.0-00010101000000-000000000000
 	github.com/tychoish/grip/x/system v0.0.0-00010101000000-000000000000
@@ -123,3 +124,5 @@ replace github.com/tychoish/grip/x/system => /home/tychoish/src/grip/x/system
 replace github.com/tychoish/grip/x/twitter => /home/tychoish/src/grip/x/twitter
 
 replace github.com/tychoish/grip/x/xmpp => /home/tychoish/src/grip/x/xmpp
+
+replace github.com/tychoish/cmdr => /home/tychoish/src/cmdr

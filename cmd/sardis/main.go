@@ -112,6 +112,7 @@ func buildApp() *cli.App {
 		conf.Settings.Notification.Name = conf.Settings.Logging.Name
 
 		loggingSetup(conf.Settings.Logging)
+		app.Writer = send.MakeWriter(grip.Sender())
 
 		if err := env.Configure(ctx, conf); err != nil {
 			return fmt.Errorf("problem configuring app: %w", err)
@@ -127,6 +128,7 @@ func buildApp() *cli.App {
 	}
 
 	return app
+
 }
 
 // logging setup is separate to make it unit testable
@@ -168,4 +170,5 @@ func loggingSetup(conf sardis.LoggingConf) {
 		sender.SetName("sardis")
 		grip.SetGlobalLogger(grip.NewLogger(sender))
 	}
+
 }

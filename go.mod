@@ -115,6 +115,8 @@ replace github.com/tychoish/jasper/x/splunk => /home/tychoish/src/jasper/x/splun
 
 replace github.com/tychoish/fun => /home/tychoish/src/fun
 
+replace github.com/tychoish/grip => /home/tychoish/src/grip
+
 replace github.com/tychoish/grip/x/desktop => /home/tychoish/src/grip/x/desktop
 
 replace github.com/tychoish/grip/x/jira => /home/tychoish/src/grip/x/jira

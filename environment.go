@@ -61,8 +61,10 @@ type Environment interface {
 	Context() (context.Context, context.CancelFunc)
 	Configuration() *Configuration
 	Queue() amboy.Queue
-	Logger() grip.Logger
 	Jasper() jasper.Manager
+
+	Desktop() grip.Logger
+	Logger() grip.Logger
 
 	Twitter() grip.Logger
 	JiraIssue() grip.Logger
@@ -83,8 +85,9 @@ type CloserFunc func(context.Context) error
 type appServicesCache struct {
 	queue      amboy.Queue
 	conf       *Configuration
-	logger     grip.Logger
+	notifySend grip.Logger
 	jiraIssue  grip.Logger
+	desktop    grip.Logger
 	twitter    grip.Logger
 	jpm        jasper.Manager
 	ctx        context.Context
@@ -129,14 +132,16 @@ func (c *appServicesCache) initSender() error {
 	var loggers []send.Sender
 	defer func() {
 		loggers = append(loggers, root)
-		c.logger = grip.NewLogger(send.MakeMulti(loggers...))
+		c.notifySend = grip.NewLogger(send.MakeMulti(loggers...))
 	}()
 	sender, err := xmpp.NewSender(
 		c.conf.Settings.Notification.Target,
 		xmpp.ConnectionInfo{
-			Hostname: c.conf.Settings.Notification.Host,
-			Username: c.conf.Settings.Notification.User,
-			Password: c.conf.Settings.Notification.Password,
+			Hostname:             c.conf.Settings.Notification.Host,
+			Username:             c.conf.Settings.Notification.User,
+			Password:             c.conf.Settings.Notification.Password,
+			DisableTLS:           true,
+			AllowUnencryptedAuth: true,
 		})
 	if err != nil {
 		return fmt.Errorf("problem creating sender: %w", err)
@@ -160,12 +165,8 @@ func (c *appServicesCache) initSender() error {
 	sender.SetFormatter(func(m message.Composer) (string, error) {
 		return fmt.Sprintf("[%s:%s] %s", c.conf.Settings.Notification.Name, host, m.String()), nil
 	})
-	desktop := desktop.MakeSender()
-	desktop.SetName(c.conf.Settings.Notification.Name)
 
-	loggers = append(loggers, desktop)
-
-	c.logger = grip.NewLogger(send.NewMulti("sardis", loggers))
+	c.notifySend = grip.NewLogger(send.NewMulti("sardis", loggers))
 
 	return nil
 }
@@ -375,30 +376,39 @@ func (c *appServicesCache) Configuration() *Configuration {
 	return &out
 }
 
-func (c *appServicesCache) Logger() grip.Logger {
-	c.mutex.RLock()
-	if c.logger.Sender() != nil {
-		c.mutex.RUnlock()
-		return c.logger
-	}
-	c.mutex.RUnlock()
-
+func (c *appServicesCache) Desktop() grip.Logger {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	if c.desktop.Sender() == nil {
+		desktop := desktop.MakeSender()
+		desktop.SetName(c.conf.Settings.Notification.Name)
+		c.desktop = grip.NewLogger(desktop)
+	}
+
+	return c.desktop
+}
+
+func (c *appServicesCache) Logger() grip.Logger {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if c.notifySend.Sender() != nil {
+		return c.notifySend
+	}
 	err := c.initSender()
 
 	grip.Critical(message.WrapError(err, "problem configuring notification sender"))
 	c.addError("notify-constructor", err)
 
-	return c.logger
+	return c.notifySend
 }
 
 func (c *appServicesCache) JiraIssue() grip.Logger {
 	c.mutex.RLock()
 	if c.jiraIssue.Sender() != nil {
 		c.mutex.RUnlock()
-		return c.logger
+		return c.notifySend
 	}
 	c.mutex.RUnlock()
 

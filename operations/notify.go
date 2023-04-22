@@ -18,6 +18,7 @@ func Notify() cli.Command {
 		Subcommands: []cli.Command{
 			notifyPipe(),
 			notifySend(),
+			notifyDesktop(),
 		},
 	}
 }
@@ -47,6 +48,17 @@ func notifySend() cli.Command {
 		Before: requireConfig(),
 		Action: func(c *cli.Context) error {
 			sardis.GetEnvironment().Logger().Notice(strings.Join(c.Args(), " "))
+			return nil
+		},
+	}
+}
+func notifyDesktop() cli.Command {
+	return cli.Command{
+		Name:   "desktop",
+		Usage:  "send the remaining arguments over xmpp",
+		Before: requireConfig(),
+		Action: func(c *cli.Context) error {
+			sardis.GetEnvironment().Desktop().Notice(strings.Join(c.Args(), " "))
 			return nil
 		},
 	}

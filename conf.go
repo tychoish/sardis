@@ -167,6 +167,7 @@ type CommandGroupConf struct {
 	Name      string        `bson:"name" json:"name" yaml:"name"`
 	Directory string        `bson:"directory" json:"directory" yaml:"directory"`
 	Command   string        `bson:"default_command" json:"default_command" yaml:"default_command"`
+	Notify    *bool         `bson:"notify" json:"notify" yaml:"notify"`
 	Commands  []CommandConf `bson:"commands" json:"commands" yaml:"commands"`
 }
 
@@ -175,6 +176,7 @@ type CommandConf struct {
 	Directory string `bson:"directory" json:"directory" yaml:"directory"`
 	Command   string `bson:"command" json:"command" yaml:"command"`
 	Alias     string `bson:"alias" json:"alias" yaml:"alias"`
+	Notify    bool   `bson:"notify" json:"notify" yaml:"notify"`
 }
 
 type BlogConf struct {
@@ -678,9 +680,11 @@ func (conf *CommandGroupConf) Validate() error {
 		conf.Directory = home
 	}
 	erc.When(catcher, conf.Name == "", "command group must have name")
+	shouldNotify := conf.Notify != nil && *conf.Notify
 
 	for idx := range conf.Commands {
 		cmd := conf.Commands[idx]
+		cmd.Notify = cmd.Notify || shouldNotify
 
 		if cmd.Directory == "" {
 			cmd.Directory = conf.Directory

@@ -53,6 +53,7 @@ func runConfiguredCommand(ctx context.Context, env sardis.Environment, ops []str
 	conf := env.Configuration()
 	cmds := conf.ExportAllCommands()
 
+	notify := env.Desktop()
 	for idx, name := range ops {
 		cmd, ok := cmds[name]
 		if !ok {
@@ -71,14 +72,20 @@ func runConfiguredCommand(ctx context.Context, env sardis.Environment, ops []str
 					"len":  len(ops),
 				})
 				return true
-			}).Run(ctx)
+			}).
+			PostHook(func(err error) error {
+				if err != nil {
+					notify.Error(message.WrapError(err, name))
+					return err
+				}
+
+				notify.Noticeln(name, "completed")
+				return nil
+			}).
+			Run(ctx)
 		if err != nil {
-			// notify.Error(message.WrapError(err, name))
 			return err
 		}
-
-		// notify.Noticeln(name, "completed")
-		continue
 	}
 	return nil
 }

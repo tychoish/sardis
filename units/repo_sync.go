@@ -101,7 +101,7 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 		"op": "running",
 	})
 
-	env := sardis.GetEnvironment()
+	env := sardis.GetEnvironment(ctx)
 	conf := env.Configuration()
 	cmd := env.Jasper().CreateCommand(ctx)
 

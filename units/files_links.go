@@ -62,7 +62,7 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 		return
 	}
 
-	jpm := sardis.GetEnvironment().Jasper()
+	jpm := sardis.GetEnvironment(ctx).Jasper()
 
 	if _, err := os.Stat(j.Conf.Path); !os.IsNotExist(err) {
 		if !j.Conf.Update {

@@ -49,7 +49,7 @@ func NewSystemServiceSetupJob(conf sardis.SystemdServiceConf) amboy.Job {
 func (j *setupServiceJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 
-	env := sardis.GetEnvironment()
+	env := sardis.GetEnvironment(ctx)
 	jasper := env.Jasper()
 	cmd := jasper.CreateCommand(ctx)
 

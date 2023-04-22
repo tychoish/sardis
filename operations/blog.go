@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -13,17 +14,17 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Blog() cli.Command {
+func Blog(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:  "blog",
 		Usage: "publish/manage blogging",
 		Subcommands: []cli.Command{
-			blogPublish(),
+			blogPublish(ctx),
 		},
 	}
 }
 
-func blogPublish() cli.Command {
+func blogPublish(ctx context.Context) cli.Command {
 	const blogNameFlag = "blog"
 	return cli.Command{
 		Name:  "publish",
@@ -35,9 +36,9 @@ func blogPublish() cli.Command {
 				Value: "blog",
 			},
 		},
-		Before: mergeBeforeFuncs(requireConfig(), requireStringOrFirstArgSet(blogNameFlag)),
+		Before: mergeBeforeFuncs(requireConfig(ctx), requireStringOrFirstArgSet(blogNameFlag)),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 

@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -18,28 +19,28 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Repo() cli.Command {
+func Repo(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:  "repo",
 		Usage: "a collections of commands to manage repositories",
 		Subcommands: []cli.Command{
-			repoClone(),
-			repoUpdate(),
-			repoCleanup(),
-			repoStatus(),
-			repoFetch(),
-			repoList(),
+			repoClone(ctx),
+			repoUpdate(ctx),
+			repoCleanup(ctx),
+			repoStatus(ctx),
+			repoFetch(ctx),
+			repoList(ctx),
 		},
 	}
 }
 
-func repoList() cli.Command {
+func repoList(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:   "list",
 		Usage:  "return a list of configured repos",
-		Before: requireConfig(),
+		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 
 			homedir, _ := homedir.Expand("~/")
 
@@ -63,7 +64,7 @@ func repoList() cli.Command {
 	}
 }
 
-func repoUpdate() cli.Command {
+func repoUpdate(ctx context.Context) cli.Command {
 	const repoTagFlagName = "repo"
 	return cli.Command{
 		Name:    "update",
@@ -75,11 +76,11 @@ func repoUpdate() cli.Command {
 				Usage: "specify tag of repos to update",
 			},
 		},
-		Before: mergeBeforeFuncs(requireConfig(), setAllTailArguements(repoTagFlagName)),
+		Before: mergeBeforeFuncs(requireConfig(ctx), setAllTailArguements(repoTagFlagName)),
 		Action: func(c *cli.Context) error {
 			tags := c.StringSlice(repoTagFlagName)
 
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 
@@ -149,7 +150,7 @@ func repoUpdate() cli.Command {
 	}
 }
 
-func repoCleanup() cli.Command {
+func repoCleanup(ctx context.Context) cli.Command {
 	const repoFlagName = "repo"
 	return cli.Command{
 		Name:  "gc",
@@ -164,7 +165,7 @@ func repoCleanup() cli.Command {
 		Action: func(c *cli.Context) error {
 			tags := c.StringSlice(repoFlagName)
 
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 
@@ -191,7 +192,7 @@ func repoCleanup() cli.Command {
 	}
 }
 
-func repoClone() cli.Command {
+func repoClone(ctx context.Context) cli.Command {
 	const nameFlagName = "name"
 	return cli.Command{
 		Name:  "clone",
@@ -205,7 +206,7 @@ func repoClone() cli.Command {
 		Action: func(c *cli.Context) error {
 			name := c.String(nameFlagName)
 
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 
@@ -241,7 +242,7 @@ func repoClone() cli.Command {
 
 }
 
-func repoStatus() cli.Command {
+func repoStatus(ctx context.Context) cli.Command {
 	const repoFlagName = "repo"
 	return cli.Command{
 		Name:  "status",
@@ -256,7 +257,7 @@ func repoStatus() cli.Command {
 		Action: func(c *cli.Context) error {
 			tags := c.StringSlice(repoFlagName)
 
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 
@@ -282,7 +283,7 @@ func repoStatus() cli.Command {
 	}
 }
 
-func repoFetch() cli.Command {
+func repoFetch(ctx context.Context) cli.Command {
 	const repoFlagName = "repo"
 	return cli.Command{
 		Name:   "fetch",
@@ -297,7 +298,7 @@ func repoFetch() cli.Command {
 		Action: func(c *cli.Context) error {
 			names := c.StringSlice(repoFlagName)
 
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 

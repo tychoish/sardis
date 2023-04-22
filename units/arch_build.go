@@ -53,7 +53,7 @@ func (j *archAbsBuildJob) Run(ctx context.Context) {
 		return
 	}
 
-	env := sardis.GetEnvironment()
+	env := sardis.GetEnvironment(ctx)
 	conf := env.Configuration()
 	dir := filepath.Join(conf.System.Arch.BuildPath, j.Name)
 	pkgbuild := filepath.Join(dir, "PKGBUILD")

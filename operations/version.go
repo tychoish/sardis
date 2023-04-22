@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -8,7 +9,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Version() cli.Command {
+func Version(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:  "version",
 		Usage: "returns the version and build information of the binary",

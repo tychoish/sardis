@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -9,17 +10,17 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Jira() cli.Command {
+func Jira(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:  "jira",
 		Usage: "a collections of commands for jira management",
 		Subcommands: []cli.Command{
-			bulkCreateTickets(),
+			bulkCreateTickets(ctx),
 		},
 	}
 }
 
-func bulkCreateTickets() cli.Command {
+func bulkCreateTickets(ctx context.Context) cli.Command {
 	const pathFlagName = "path"
 
 	return cli.Command{
@@ -33,11 +34,11 @@ func bulkCreateTickets() cli.Command {
 		},
 		Before: mergeBeforeFuncs(
 			requirePathExists(pathFlagName),
-			requireConfig(),
+			requireConfig(ctx),
 		),
 		Action: func(c *cli.Context) error {
 			path := c.String(pathFlagName)
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 

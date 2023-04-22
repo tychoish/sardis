@@ -57,7 +57,7 @@ func (j *repoStatusJob) Run(ctx context.Context) {
 		return
 	}
 
-	cmd := sardis.GetEnvironment().Jasper()
+	cmd := sardis.GetEnvironment(ctx).Jasper()
 
 	startAt := time.Now()
 	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{

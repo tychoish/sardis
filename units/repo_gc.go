@@ -60,7 +60,7 @@ func (j *repoCleanupJob) Run(ctx context.Context) {
 		"op": "running",
 	})
 
-	cmd := sardis.GetEnvironment().Jasper()
+	cmd := sardis.GetEnvironment(ctx).Jasper()
 
 	startAt := time.Now()
 	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{

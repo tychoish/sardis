@@ -2,6 +2,7 @@ package operations
 
 import (
 	"bufio"
+	"context"
 	"os"
 	"strings"
 
@@ -10,26 +11,26 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Notify() cli.Command {
+func Notify(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:    "notify",
 		Aliases: []string{"xmpp"},
 		Usage:   "send an xmpp message",
 		Subcommands: []cli.Command{
-			notifyPipe(),
-			notifySend(),
-			notifyDesktop(),
+			notifyPipe(ctx),
+			notifySend(ctx),
+			notifyDesktop(ctx),
 		},
 	}
 }
 
-func notifyPipe() cli.Command {
+func notifyPipe(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:   "pipe",
 		Usage:  "send the contents of standard input over xmpp",
-		Before: requireConfig(),
+		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			logger := env.Logger()
 
 			scanner := bufio.NewScanner(os.Stdin)
@@ -41,24 +42,24 @@ func notifyPipe() cli.Command {
 	}
 }
 
-func notifySend() cli.Command {
+func notifySend(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:   "send",
 		Usage:  "send the remaining arguments over xmpp",
-		Before: requireConfig(),
+		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			sardis.GetEnvironment().Logger().Notice(strings.Join(c.Args(), " "))
+			sardis.GetEnvironment(ctx).Logger().Notice(strings.Join(c.Args(), " "))
 			return nil
 		},
 	}
 }
-func notifyDesktop() cli.Command {
+func notifyDesktop(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:   "desktop",
 		Usage:  "send the remaining arguments over xmpp",
-		Before: requireConfig(),
+		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			sardis.GetEnvironment().Desktop().Notice(strings.Join(c.Args(), " "))
+			sardis.GetEnvironment(ctx).Desktop().Notice(strings.Join(c.Args(), " "))
 			return nil
 		},
 	}

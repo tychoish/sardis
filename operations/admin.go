@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"context"
 	"time"
 
 	"github.com/tychoish/amboy"
@@ -12,24 +13,24 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Admin() cli.Command {
+func Admin(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name: "admin",
 		Subcommands: []cli.Command{
-			configCheck(),
-			nightly(),
-			setupLinks(),
+			configCheck(ctx),
+			nightly(ctx),
+			setupLinks(ctx),
 		},
 	}
 }
 
-func configCheck() cli.Command {
+func configCheck(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:   "config",
 		Usage:  "validated configuration",
-		Before: requireConfig(),
+		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			conf := sardis.GetEnvironment().Configuration()
+			conf := sardis.GetEnvironment(ctx).Configuration()
 			err := conf.Validate()
 			if err == nil {
 				grip.Info("configuration is valid")
@@ -39,13 +40,13 @@ func configCheck() cli.Command {
 	}
 }
 
-func nightly() cli.Command {
+func nightly(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:   "nightly",
 		Usage:  "run nightly config operation",
-		Before: requireConfig(),
+		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			conf := env.Configuration()
 			queue := env.Queue()
 			catcher := &erc.Collector{}

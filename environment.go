@@ -27,6 +27,7 @@ import (
 
 	"github.com/tychoish/amboy"
 	"github.com/tychoish/amboy/queue"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -43,21 +44,22 @@ import (
 // and is specified with -ldflags at build time
 var BuildRevision = ""
 
-var servicesCache *appServicesCache
-
 const SSHAgentSocketEnvVar = "SSH_AUTH_SOCK"
 
-func init() {
-	servicesCache = &appServicesCache{}
+type envCtxKey struct{}
+
+func GetEnvironment(ctx context.Context) Environment {
+	env, ok := ctx.Value(envCtxKey{}).(Environment)
+	fun.Invariant(ok, "environment context key must be of the correct type")
+	fun.Invariant(env != nil, "environment must be defined")
+	return env
 }
 
-func GetEnvironment() Environment {
-	return servicesCache
+func WithEvironment(ctx context.Context, env Environment) context.Context {
+	return context.WithValue(ctx, envCtxKey{}, env)
 }
 
 type Environment interface {
-	Configure(context.Context, *Configuration) error
-
 	Context() (context.Context, context.CancelFunc)
 	Configuration() *Configuration
 	Queue() amboy.Queue
@@ -75,6 +77,15 @@ type Environment interface {
 }
 
 type CloserFunc func(context.Context) error
+
+func NewEnvironment(ctx context.Context, conf *Configuration) (Environment, error) {
+	env := &appServicesCache{}
+	err := env.Configure(ctx, conf)
+	if err != nil {
+		return nil, err
+	}
+	return env, nil
+}
 
 ////////////////////////////////////////////////////////////////////////
 //

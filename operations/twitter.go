@@ -1,13 +1,14 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli"
 )
 
-func Tweet() cli.Command {
+func Tweet(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:  "tweet",
 		Usage: "send a tweet",
@@ -18,7 +19,7 @@ func Tweet() cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			msg := c.String("message")
 
 			if len(msg) > 280 {

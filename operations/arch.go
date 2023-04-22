@@ -1,6 +1,8 @@
 package operations
 
 import (
+	"context"
+
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
@@ -11,20 +13,20 @@ import (
 
 const nameFlagName = "name"
 
-func ArchLinux() cli.Command {
+func ArchLinux(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:  "arch",
 		Usage: "arch linux management options",
 		Subcommands: []cli.Command{
-			fetchAur(),
-			buildPkg(),
-			installAur(),
-			setupArchLinux(),
+			fetchAur(ctx),
+			buildPkg(ctx),
+			installAur(ctx),
+			setupArchLinux(ctx),
 		},
 	}
 }
 
-func fetchAur() cli.Command {
+func fetchAur(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:  "fetch",
 		Usage: "donwload source to build directory",
@@ -34,9 +36,9 @@ func fetchAur() cli.Command {
 				Usage: "specify the name of a package",
 			},
 		},
-		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig()),
+		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig(ctx)),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 
@@ -53,7 +55,7 @@ func fetchAur() cli.Command {
 	}
 }
 
-func buildPkg() cli.Command {
+func buildPkg(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:  "build",
 		Usage: "donwload source to build directory",
@@ -63,9 +65,9 @@ func buildPkg() cli.Command {
 				Usage: "specify the name of a package",
 			},
 		},
-		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig()),
+		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig(ctx)),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 
@@ -82,7 +84,7 @@ func buildPkg() cli.Command {
 	}
 }
 
-func installAur() cli.Command {
+func installAur(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:  "install",
 		Usage: "combination download+build+install",
@@ -92,9 +94,9 @@ func installAur() cli.Command {
 				Usage: "specify the name of a package",
 			},
 		},
-		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig()),
+		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig(ctx)),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 
@@ -119,14 +121,14 @@ func installAur() cli.Command {
 	}
 }
 
-func setupArchLinux() cli.Command {
+func setupArchLinux(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:   "setup",
 		Usage:  "bootstrap/setup system according to packages described",
 		Flags:  []cli.Flag{},
-		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig()),
+		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig(ctx)),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			conf := env.Configuration()
 			catcher := &erc.Collector{}
 			ctx, cancel := env.Context()

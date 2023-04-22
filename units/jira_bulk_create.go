@@ -60,7 +60,7 @@ func (j *jiraBulkCreateJob) Run(ctx context.Context) {
 
 	data.Priority = level.Info
 
-	env := sardis.GetEnvironment()
+	env := sardis.GetEnvironment(ctx)
 	logger := env.JiraIssue()
 
 	msgs := make([]message.Composer, len(data.Tickets))

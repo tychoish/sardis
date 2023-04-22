@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -12,11 +13,11 @@ import (
 	"github.com/urfave/cli"
 )
 
-func listMenus() cli.Command {
+func listMenus(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name: "list",
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			conf := env.Configuration()
 
 			table := tabby.New()
@@ -62,15 +63,15 @@ func listMenus() cli.Command {
 	}
 }
 
-func DMenu() cli.Command {
-	cmds := dmenuListCmds(dmenuListCommandRun)
+func DMenu(ctx context.Context) cli.Command {
+	cmds := dmenuListCmds(ctx, dmenuListCommandRun)
 	cmds.Name = "all"
 
 	return cli.Command{
 		Name: "dmenu",
 		Subcommands: []cli.Command{
 			cmds,
-			listMenus(),
+			listMenus(ctx),
 		},
 		Flags: []cli.Flag{
 			cli.StringSliceFlag{
@@ -81,7 +82,7 @@ func DMenu() cli.Command {
 		},
 		Before: setFirstArgWhenStringUnset(commandFlagName),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 			name := c.String(commandFlagName)

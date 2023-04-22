@@ -70,7 +70,7 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 		return
 	}
 
-	env := sardis.GetEnvironment()
+	env := sardis.GetEnvironment(ctx)
 	conf := env.Configuration()
 	cmd := env.Jasper().CreateCommand(ctx)
 

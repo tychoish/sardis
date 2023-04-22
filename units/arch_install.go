@@ -50,7 +50,7 @@ func (j *archInstallPackagesJob) Run(ctx context.Context) {
 	}
 	args := append([]string{"pacman", "--sync", "--refresh"}, j.Names...)
 
-	env := sardis.GetEnvironment()
+	env := sardis.GetEnvironment(ctx)
 	j.AddError(env.Jasper().CreateCommand(ctx).ID(j.ID()).
 		Priority(level.Info).Add(args).
 		SetOutputSender(level.Info, grip.Sender()).Run(ctx))

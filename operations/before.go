@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -32,9 +33,9 @@ func addRemanderToStringSliceFlag(name string) cli.BeforeFunc {
 	}
 }
 
-func requireConfig() cli.BeforeFunc {
+func requireConfig(ctx context.Context) cli.BeforeFunc {
 	return func(c *cli.Context) error {
-		env := sardis.GetEnvironment()
+		env := sardis.GetEnvironment(ctx)
 		if env == nil {
 			return errors.New("nil environment")
 		}

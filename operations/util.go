@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -13,19 +14,19 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Utilities() cli.Command {
+func Utilities(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:    "util",
 		Aliases: []string{"utility"},
 		Usage:   "short utility commands",
 		Subcommands: []cli.Command{
-			setupLinks(),
-			diffTrees(),
+			setupLinks(ctx),
+			diffTrees(ctx),
 		},
 	}
 }
 
-func diffTrees() cli.Command {
+func diffTrees(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:  "tree-diff",
 		Usage: "Compare two trees of files",
@@ -67,12 +68,12 @@ func diffTrees() cli.Command {
 	}
 }
 
-func setupLinks() cli.Command {
+func setupLinks(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:  "setup-links",
 		Usage: "setup all configured links",
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			conf := env.Configuration()
 			ctx, cancel := env.Context()
 			defer cancel()

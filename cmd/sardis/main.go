@@ -38,21 +38,6 @@ func buildApp() *cli.App {
 	app.Usage = "a personal automation tool"
 	app.Version = "0.0.1-pre"
 
-	app.Commands = []cli.Command{
-		operations.Notify(),
-		operations.Tweet(),
-		operations.Version(),
-		operations.DMenu(),
-		operations.Admin(),
-		operations.ArchLinux(),
-		operations.Repo(),
-		operations.Jira(),
-		operations.RunCommand(),
-		operations.Blog(),
-		operations.Utilities(),
-		jaspercli.Jasper(),
-	}
-
 	const (
 		levelFlag         = "level"
 		nameFlag          = "name"
@@ -93,10 +78,26 @@ func buildApp() *cli.App {
 		},
 	}
 
+	setCommands := func(ctx context.Context) {
+		app.Commands = []cli.Command{
+			operations.Notify(ctx),
+			operations.Tweet(ctx),
+			operations.Version(ctx),
+			operations.DMenu(ctx),
+			operations.Admin(ctx),
+			operations.ArchLinux(ctx),
+			operations.Repo(ctx),
+			operations.Jira(ctx),
+			operations.RunCommand(ctx),
+			operations.Blog(ctx),
+			operations.Utilities(ctx),
+			jaspercli.Jasper(),
+		}
+
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	app.Before = func(c *cli.Context) error {
-		env := sardis.GetEnvironment()
-
 		path := c.String("conf")
 		conf, err := sardis.LoadConfiguration(path)
 		if err != nil {
@@ -114,15 +115,21 @@ func buildApp() *cli.App {
 		loggingSetup(conf.Settings.Logging)
 		app.Writer = send.MakeWriter(grip.Sender())
 
-		if err := env.Configure(ctx, conf); err != nil {
+		env, err := sardis.NewEnvironment(ctx, conf)
+		if err != nil {
 			return fmt.Errorf("problem configuring app: %w", err)
 		}
+
+		ctx = sardis.WithEvironment(ctx, env)
+
+		// reset now so we give things the right context
+		setCommands(ctx)
 
 		return nil
 	}
 
 	app.After = func(c *cli.Context) error {
-		err := sardis.GetEnvironment().Close(ctx)
+		err := sardis.GetEnvironment(ctx).Close(ctx)
 		cancel()
 		return err
 	}
@@ -170,5 +177,4 @@ func loggingSetup(conf sardis.LoggingConf) {
 		sender.SetName("sardis")
 		grip.SetGlobalLogger(grip.NewLogger(sender))
 	}
-
 }

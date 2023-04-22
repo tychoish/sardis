@@ -18,7 +18,7 @@ import (
 
 const commandFlagName = "command"
 
-func RunCommand() cli.Command {
+func RunCommand(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:  "run",
 		Usage: "runs a predefined command",
@@ -29,16 +29,16 @@ func RunCommand() cli.Command {
 			},
 		},
 		Subcommands: []cli.Command{
-			listCommands(),
-			dmenuListCmds(dmenuListCommandAll),
-			qrCode(),
+			listCommands(ctx),
+			dmenuListCmds(ctx, dmenuListCommandAll),
+			qrCode(ctx),
 		},
 		Before: mergeBeforeFuncs(
-			requireConfig(),
+			requireConfig(ctx),
 			requireCommandsSet(commandFlagName),
 		),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 
@@ -54,6 +54,7 @@ func runConfiguredCommand(ctx context.Context, env sardis.Environment, ops []str
 	cmds := conf.ExportAllCommands()
 
 	notify := env.Desktop()
+
 	for idx, name := range ops {
 		cmd, ok := cmds[name]
 		if !ok {
@@ -90,13 +91,13 @@ func runConfiguredCommand(ctx context.Context, env sardis.Environment, ops []str
 	return nil
 }
 
-func listCommands() cli.Command {
+func listCommands(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:   "list",
 		Usage:  "return a list of defined commands",
-		Before: requireConfig(),
+		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			conf := env.Configuration()
 			homedir := util.GetHomeDir()
 
@@ -132,13 +133,13 @@ const (
 	dmenuListCommandRun
 )
 
-func dmenuListCmds(kind dmenuListCommandTypes) cli.Command {
+func dmenuListCmds(ctx context.Context, kind dmenuListCommandTypes) cli.Command {
 	return cli.Command{
 		Name:   "dmenu",
 		Usage:  "return a list of defined commands",
-		Before: requireConfig(),
+		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 
 			ctx, cancel := env.Context()
 			defer cancel()
@@ -193,13 +194,13 @@ type bufCloser struct {
 
 func (b bufCloser) Close() error { return nil }
 
-func qrCode() cli.Command {
+func qrCode(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name:   "qr",
 		Usage:  "gets qrcode from x11 clipboard and renders it on the terminal",
-		Before: requireConfig(),
+		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment()
+			env := sardis.GetEnvironment(ctx)
 			ctx, cancel := env.Context()
 			defer cancel()
 			buf := &bufCloser{}

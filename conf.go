@@ -388,6 +388,10 @@ func (conf *Configuration) expandLinks(catcher *erc.Collector) []LinkConf {
 }
 
 func (conf *Configuration) GetTaggedRepos(tags ...string) []RepoConf {
+	if len(tags) == 0 {
+		return conf.Repo
+	}
+
 	var out []RepoConf
 
 	for _, t := range tags {

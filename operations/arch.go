@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 
+	"github.com/tychoish/amboy"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
@@ -38,16 +39,10 @@ func fetchAur(ctx context.Context) cli.Command {
 		},
 		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig(ctx)),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
-
 			catcher := &erc.Collector{}
 
 			for _, name := range c.StringSlice(nameFlagName) {
-				job := units.NewArchFetchAurJob(name, true)
-				job.Run(ctx)
-				catcher.Add(job.Error())
+				catcher.Add(amboy.RunJob(ctx, units.NewArchFetchAurJob(name, true)))
 			}
 
 			return catcher.Resolve()
@@ -67,16 +62,10 @@ func buildPkg(ctx context.Context) cli.Command {
 		},
 		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig(ctx)),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
-
 			catcher := &erc.Collector{}
 
 			for _, name := range c.StringSlice(nameFlagName) {
-				job := units.NewArchAbsBuildJob(name)
-				job.Run(ctx)
-				catcher.Add(job.Error())
+				catcher.Add(amboy.RunJob(ctx, units.NewArchAbsBuildJob(name)))
 			}
 
 			return catcher.Resolve()
@@ -96,24 +85,15 @@ func installAur(ctx context.Context) cli.Command {
 		},
 		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig(ctx)),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
-
 			catcher := &erc.Collector{}
 
 			for _, name := range c.StringSlice(nameFlagName) {
-				job := units.NewArchFetchAurJob(name, true)
-				job.Run(ctx)
-
-				if err := job.Error(); err != nil {
+				if err := amboy.RunJob(ctx, units.NewArchFetchAurJob(name, true)); err != nil {
 					catcher.Add(err)
 					continue
 				}
 
-				job = units.NewArchAbsBuildJob(name)
-				job.Run(ctx)
-				catcher.Add(job.Error())
+				catcher.Add(amboy.RunJob(ctx, units.NewArchAbsBuildJob(name)))
 			}
 
 			return catcher.Resolve()
@@ -131,8 +111,6 @@ func setupArchLinux(ctx context.Context) cli.Command {
 			env := sardis.GetEnvironment(ctx)
 			conf := env.Configuration()
 			catcher := &erc.Collector{}
-			ctx, cancel := env.Context()
-			defer cancel()
 
 			pkgs := []string{}
 			for _, pkg := range conf.System.Arch.Packages {

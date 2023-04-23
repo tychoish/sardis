@@ -3,10 +3,8 @@ package operations
 import (
 	"context"
 	"os"
-	"time"
 
 	"github.com/tychoish/amboy"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/dupe"
@@ -75,20 +73,13 @@ func setupLinks(ctx context.Context) cli.Command {
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment(ctx)
 			conf := env.Configuration()
-			ctx, cancel := env.Context()
-			defer cancel()
 
-			queue := env.Queue()
-			catcher := &erc.Collector{}
-
+			jobs, worker := units.SetupQueue(amboy.RunJob)
 			for _, link := range conf.Links {
-				catcher.Add(queue.Put(ctx, units.NewSymlinkCreateJob(link)))
+				jobs.PushBack(units.NewSymlinkCreateJob(link))
 			}
 
-			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
-			catcher.Add(amboy.ResolveErrors(ctx, queue))
-
-			return catcher.Resolve()
+			return worker(ctx)
 		},
 	}
 

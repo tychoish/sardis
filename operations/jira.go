@@ -39,8 +39,6 @@ func bulkCreateTickets(ctx context.Context) cli.Command {
 		Action: func(c *cli.Context) error {
 			path := c.String(pathFlagName)
 			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
 
 			conf := env.Configuration()
 			if conf.Settings.Credentials.Jira.URL == "" {

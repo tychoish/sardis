@@ -39,8 +39,6 @@ func RunCommand(ctx context.Context) cli.Command {
 		),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
 
 			ops := c.StringSlice(commandFlagName)
 
@@ -141,9 +139,6 @@ func dmenuListCmds(ctx context.Context, kind dmenuListCommandTypes) cli.Command 
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment(ctx)
 
-			ctx, cancel := env.Context()
-			defer cancel()
-
 			conf := env.Configuration()
 			var cmds []sardis.CommandConf
 
@@ -201,8 +196,7 @@ func qrCode(ctx context.Context) cli.Command {
 		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
+
 			buf := &bufCloser{}
 
 			err := env.Jasper().CreateCommand(ctx).

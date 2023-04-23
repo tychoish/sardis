@@ -39,8 +39,6 @@ func blogPublish(ctx context.Context) cli.Command {
 		Before: mergeBeforeFuncs(requireConfig(ctx), requireStringOrFirstArgSet(blogNameFlag)),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
 
 			conf := env.Configuration()
 			notify := env.Logger()

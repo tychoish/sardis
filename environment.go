@@ -21,14 +21,15 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/tychoish/amboy"
-	"github.com/tychoish/amboy/queue"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/itertool"
+	"github.com/tychoish/fun/seq"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -49,9 +50,12 @@ const SSHAgentSocketEnvVar = "SSH_AUTH_SOCK"
 type envCtxKey struct{}
 
 func GetEnvironment(ctx context.Context) Environment {
-	env, ok := ctx.Value(envCtxKey{}).(Environment)
+	val := ctx.Value(envCtxKey{})
+	fun.Invariant(val != nil, "environment must non-nil")
+
+	env, ok := val.(Environment)
 	fun.Invariant(ok, "environment context key must be of the correct type")
-	fun.Invariant(env != nil, "environment must be defined")
+
 	return env
 }
 
@@ -60,9 +64,7 @@ func WithEvironment(ctx context.Context, env Environment) context.Context {
 }
 
 type Environment interface {
-	Context() (context.Context, context.CancelFunc)
 	Configuration() *Configuration
-	Queue() amboy.Queue
 	Jasper() jasper.Manager
 
 	Desktop() grip.Logger
@@ -71,8 +73,6 @@ type Environment interface {
 	Twitter() grip.Logger
 	JiraIssue() grip.Logger
 
-	AddCloseError(string, error)
-	RegisterCloser(string, CloserFunc)
 	Close(context.Context) error
 }
 
@@ -94,28 +94,21 @@ func NewEnvironment(ctx context.Context, conf *Configuration) (Environment, erro
 // see the documentation for the corresponding global methods for
 
 type appServicesCache struct {
-	queue      amboy.Queue
+	mutex sync.RWMutex
+
 	conf       *Configuration
 	notifySend grip.Logger
 	jiraIssue  grip.Logger
 	desktop    grip.Logger
 	twitter    grip.Logger
 	jpm        jasper.Manager
-	ctx        context.Context
-	rootCancel context.CancelFunc
-	closers    []closerOp
-	mutex      sync.RWMutex
-}
 
-type closerOp struct {
-	name   string
-	closer CloserFunc
+	closers seq.List[fun.WorkerFunc]
 }
 
 func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.ctx, c.rootCancel = context.WithCancel(ctx)
 
 	if c.conf != nil {
 		return errors.New("cannot reconfigure the environment")
@@ -123,13 +116,11 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 
 	catcher := &erc.Collector{}
 	var err error
-
 	c.conf = conf
 	c.jpm, err = jasper.NewSynchronizedManager(false)
 	catcher.Add(err)
 
 	catcher.Add(conf.Validate())
-	catcher.Add(c.initQueue())
 	catcher.Add(c.initSSHSetting(ctx))
 
 	c.appendCloser("close-jasper", c.jpm.Close)
@@ -217,7 +208,7 @@ func (c *appServicesCache) initSSHSetting(ctx context.Context) error {
 	return err
 }
 
-func (c *appServicesCache) initJira() error {
+func (c *appServicesCache) initJira(ctx context.Context) error {
 	root := grip.Sender()
 	loggers := []send.Sender{}
 	defer func() {
@@ -230,7 +221,7 @@ func (c *appServicesCache) initJira() error {
 		return nil
 	}
 
-	sender, err := jira.MakeIssueSender(c.ctx, &jira.Options{
+	sender, err := jira.MakeIssueSender(ctx, &jira.Options{
 		Name:    c.conf.Settings.Notification.Name,
 		BaseURL: c.conf.Settings.Credentials.Jira.URL,
 		BasicAuthOpts: jira.BasicAuth{
@@ -250,7 +241,7 @@ func (c *appServicesCache) initJira() error {
 	return nil
 }
 
-func (c *appServicesCache) initTwitter() error {
+func (c *appServicesCache) initTwitter(ctx context.Context) error {
 	root := grip.Sender()
 	loggers := []send.Sender{}
 	defer func() {
@@ -259,7 +250,7 @@ func (c *appServicesCache) initTwitter() error {
 	}()
 
 	conf := c.conf.Settings.Credentials.Twitter
-	twitter, err := twitter.MakeSender(c.ctx, &twitter.Options{
+	twitter, err := twitter.MakeSender(ctx, &twitter.Options{
 		Name:           conf.Username + ".sardis",
 		ConsumerKey:    conf.ConsumerKey,
 		ConsumerSecret: conf.ConsumerSecret,
@@ -275,56 +266,10 @@ func (c *appServicesCache) initTwitter() error {
 	return nil
 }
 
-func (c *appServicesCache) initQueue() error {
-	c.queue = queue.NewLocalLimitedSize(&queue.FixedSizeQueueOptions{
-		Workers:  c.conf.Settings.Queue.Workers,
-		Capacity: c.conf.Settings.Queue.Size,
-	})
-
-	grip.Debug(message.Fields{
-		"op":      "configured local queue",
-		"size":    c.conf.Settings.Queue.Size,
-		"workers": c.conf.Settings.Queue.Workers,
-	})
-
-	c.closers = append(c.closers, closerOp{
-		name:   "local-queue-termination",
-		closer: func(ctx context.Context) error { c.queue.Runner().Close(ctx); return nil },
-	})
-
-	return nil
-}
-
-func (c *appServicesCache) Queue() amboy.Queue {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-
-	if !c.queue.Info().Started {
-		grip.Alert(message.WrapError(c.queue.Start(c.ctx), "problem starting queue"))
-	}
-
-	return c.queue
-}
-
 func (c *appServicesCache) Jasper() jasper.Manager {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	return c.jpm
-}
-
-func (c *appServicesCache) Context() (context.Context, context.CancelFunc) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-
-	return context.WithCancel(c.ctx)
-}
-
-func (c *appServicesCache) AddCloseError(name string, err error) {
-	if err == nil {
-		return
-	}
-
-	c.RegisterCloser(name, func(_ context.Context) error { return err })
 }
 
 func (c *appServicesCache) addError(name string, err error) {
@@ -338,38 +283,52 @@ func (c *appServicesCache) addError(name string, err error) {
 func (c *appServicesCache) Close(ctx context.Context) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+	start := time.Now()
 
 	catcher := &erc.Collector{}
+	itertool.ParallelForEach(ctx,
+		seq.ListValues(c.closers.Iterator()),
+		func(ctx context.Context, wf fun.WorkerFunc) error { return wf.Run(ctx) },
+		itertool.Options{
+			ContinueOnPanic: true,
+			ContinueOnError: true,
+			NumWorkers:      runtime.NumCPU(),
+		},
+	)
 
-	for idx, op := range c.closers {
+	grip.Debug(message.Fields{
+		"op":       "run all closers",
+		"num":      c.closers.Len(),
+		"duration": time.Since(start),
+	})
+
+	return catcher.Resolve()
+}
+
+func (c *appServicesCache) appendCloser(name string, fn CloserFunc) {
+	c.closers.PushBack(func(ctx context.Context) error {
 		startAt := time.Now()
-		err := op.closer(ctx)
-		catcher.Add(err)
+		err := fn(ctx)
 		msg := message.Fields{
-			"name":    op.name,
+			"name":    name,
 			"op":      "ran closer",
-			"idx":     idx,
-			"num_ops": len(c.closers),
 			"runtime": time.Since(startAt),
 		}
 
 		grip.DebugWhen(err == nil, msg)
 		grip.Notice(message.WrapError(err, msg))
-	}
-
-	c.rootCancel()
-	return catcher.Resolve()
+		return err
+	})
 }
 
-func (c *appServicesCache) appendCloser(name string, fn CloserFunc) {
-	c.closers = append(c.closers, closerOp{name: name, closer: fn})
+func WithDesktopNotify(ctx context.Context, conf *Configuration) context.Context {
+	desktop := desktop.MakeSender()
+	desktop.SetName(conf.Settings.Notification.Name)
+	return grip.WithContextLogger(ctx, grip.NewLogger(desktop), "desktop")
 }
 
-func (c *appServicesCache) RegisterCloser(n string, cf CloserFunc) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	c.appendCloser(n, cf)
+func DesktopNotify(ctx context.Context) grip.Logger {
+	return grip.ContextLogger(ctx, "desktop")
 }
 
 func (c *appServicesCache) Configuration() *Configuration {
@@ -392,9 +351,6 @@ func (c *appServicesCache) Desktop() grip.Logger {
 	defer c.mutex.Unlock()
 
 	if c.desktop.Sender() == nil {
-		desktop := desktop.MakeSender()
-		desktop.SetName(c.conf.Settings.Notification.Name)
-		c.desktop = grip.NewLogger(desktop)
 	}
 
 	return c.desktop
@@ -411,7 +367,6 @@ func (c *appServicesCache) Logger() grip.Logger {
 
 	grip.Critical(message.WrapError(err, "problem configuring notification sender"))
 	c.addError("notify-constructor", err)
-
 	return c.notifySend
 }
 
@@ -419,14 +374,14 @@ func (c *appServicesCache) JiraIssue() grip.Logger {
 	c.mutex.RLock()
 	if c.jiraIssue.Sender() != nil {
 		c.mutex.RUnlock()
-		return c.notifySend
+		return c.jiraIssue
 	}
 	c.mutex.RUnlock()
 
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	err := c.initJira()
+	err := c.initJira(context.TODO())
 
 	grip.Critical(message.WrapError(err, "problem configuring jira connection"))
 	c.addError("jira-constructor", err)
@@ -444,10 +399,13 @@ func (c *appServicesCache) Twitter() grip.Logger {
 
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	err := c.initTwitter()
+	err := c.initTwitter(ctx)
 
 	grip.Critical(message.WrapError(err, "problem configuring twitter client"))
+
 	c.addError("twitter-constructor", err)
 
 	return c.jiraIssue

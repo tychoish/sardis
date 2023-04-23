@@ -93,10 +93,11 @@ func buildApp() *cli.App {
 			operations.Utilities(ctx),
 			jaspercli.Jasper(),
 		}
-
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	setCommands(ctx)
+
 	app.Before = func(c *cli.Context) error {
 		path := c.String("conf")
 		conf, err := sardis.LoadConfiguration(path)
@@ -105,15 +106,20 @@ func buildApp() *cli.App {
 			return nil
 		}
 
-		conf.Settings.Logging.Name = c.String(nameFlag)
-		conf.Settings.Notification.Name = c.String(nameFlag)
 		conf.Settings.Logging.DisableStandardOutput = c.Bool(disableFlag)
 		conf.Settings.Logging.EnableJSONFormating = c.Bool(jsonFormatingFlag)
+		conf.Settings.Logging.Name = c.String(nameFlag)
 		conf.Settings.Logging.Priority = level.FromString(c.String(levelFlag))
 		conf.Settings.Notification.Name = conf.Settings.Logging.Name
 
 		loggingSetup(conf.Settings.Logging)
-		app.Writer = send.MakeWriter(grip.Sender())
+		output := send.MakeWriter(grip.Sender())
+		output.Set(level.Info)
+		app.Writer = output
+
+		errOut := send.MakeWriter(grip.Sender())
+		errOut.Set(level.Error)
+		app.ErrWriter = errOut
 
 		env, err := sardis.NewEnvironment(ctx, conf)
 		if err != nil {
@@ -121,7 +127,6 @@ func buildApp() *cli.App {
 		}
 
 		ctx = sardis.WithEvironment(ctx, env)
-
 		// reset now so we give things the right context
 		setCommands(ctx)
 

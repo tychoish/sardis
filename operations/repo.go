@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/cheynewallace/tabby"
 	"github.com/mitchellh/go-homedir"
 	"github.com/tychoish/amboy"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
@@ -81,8 +82,6 @@ func repoUpdate(ctx context.Context) cli.Command {
 			tags := c.StringSlice(repoTagFlagName)
 
 			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
 
 			notify := env.Logger()
 			conf := env.Configuration()
@@ -92,44 +91,33 @@ func repoUpdate(ctx context.Context) cli.Command {
 				return fmt.Errorf("no tagged repository named '%v' configured", tags)
 			}
 
-			queue := env.Queue()
-			catcher := &erc.Collector{}
-			wg := &sync.WaitGroup{}
-
 			shouldNotify := false
 
+			started := time.Now()
+			jobs, worker := units.SetupWorkers()
 			for idx := range repos {
-				repo := &repos[idx]
+				repo := repos[idx]
 				if repo.Disabled {
 					continue
 				}
 				if repo.Notify {
 					shouldNotify = true
 				}
-				units.SyncRepo(ctx, catcher, wg, queue, repo)
+				jobs.PushBack(func(ctx context.Context) error { return units.SyncRepo(ctx, repo).Run(ctx) })
 			}
-
-			wg.Wait()
-
-			started := time.Now()
-			stat := queue.Stats(ctx)
 			grip.Info(message.Fields{
 				"op":      "repo sync",
 				"message": "waiting for jobs to complete",
-				"jobs":    stat.Total,
 				"tags":    tags,
 			})
-			if stat.Total > 0 || !stat.IsComplete() {
-				amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
+
+			if err := worker(ctx); err != nil {
+				return err
 			}
-			catcher.Add(amboy.ResolveErrors(ctx, queue))
 
 			if shouldNotify {
 				notify.Notice(message.Fields{
 					"tag":     tags,
-					"errors":  catcher.HasErrors(),
-					"jobs":    stat.Total,
-					"repos":   len(repos),
 					"op":      "repo sync",
 					"dur_sec": time.Since(started).Seconds(),
 				})
@@ -141,11 +129,10 @@ func repoUpdate(ctx context.Context) cli.Command {
 				"code":    "success",
 				"tag":     tags,
 				"dur_sec": time.Since(started).Seconds(),
-				"err":     catcher.HasErrors(),
-				"jobs":    stat.Total,
+				"repos":   len(repos),
 			})
 
-			return catcher.Resolve()
+			return nil
 		},
 	}
 }
@@ -156,6 +143,7 @@ func repoCleanup(ctx context.Context) cli.Command {
 		Name:  "gc",
 		Usage: "run repository cleanup",
 		Flags: []cli.Flag{
+
 			cli.StringSliceFlag{
 				Name:  repoFlagName,
 				Usage: "specify a local repository to cleanup",
@@ -166,28 +154,15 @@ func repoCleanup(ctx context.Context) cli.Command {
 			tags := c.StringSlice(repoFlagName)
 
 			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
+			repos := env.Configuration().GetTaggedRepos(tags...)
 
-			var repos []sardis.RepoConf
-			if len(tags) == 0 {
-				// all repos
-				repos = env.Configuration().Repo
-			} else {
-				for _, tag := range tags {
-					repos = append(repos, env.Configuration().GetTaggedRepos(tag)...)
-				}
-			}
+			jobs, run := units.SetupQueue(amboy.RunJob)
 
-			queue := env.Queue()
-			catcher := &erc.Collector{}
 			for _, repo := range repos {
-				catcher.Add(queue.Put(ctx, units.NewRepoCleanupJob(repo.Path)))
+				jobs.PushBack(units.NewRepoCleanupJob(repo.Path))
 			}
 
-			amboy.WaitInterval(ctx, queue, time.Millisecond)
-
-			return amboy.ResolveErrors(ctx, queue)
+			return run(ctx)
 		},
 	}
 }
@@ -207,15 +182,10 @@ func repoClone(ctx context.Context) cli.Command {
 			name := c.String(nameFlagName)
 
 			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
-
 			conf := env.Configuration()
 
-			catcher := &erc.Collector{}
-			queue := env.Queue()
-
 			repos := conf.GetTaggedRepos(name)
+			jobs, run := units.SetupQueue(amboy.RunJob)
 
 			for idx := range repos {
 				if _, err := os.Stat(repos[idx].Path); !os.IsNotExist(err) {
@@ -227,16 +197,10 @@ func repoClone(ctx context.Context) cli.Command {
 					continue
 				}
 
-				catcher.Add(queue.Put(ctx, units.NewRepoCloneJob(&repos[idx])))
+				jobs.PushBack(units.NewRepoCloneJob(repos[idx]))
 			}
 
-			if catcher.HasErrors() {
-				return fmt.Errorf("problem queuing jobs: %w", catcher.Resolve())
-			}
-
-			amboy.WaitInterval(ctx, queue, 10*time.Millisecond)
-			catcher.Add(amboy.ResolveErrors(ctx, queue))
-			return catcher.Resolve()
+			return run(ctx)
 		},
 	}
 
@@ -258,25 +222,15 @@ func repoStatus(ctx context.Context) cli.Command {
 			tags := c.StringSlice(repoFlagName)
 
 			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
 
-			var repos []sardis.RepoConf
-			if len(tags) == 0 {
-				// all repos
-				repos = env.Configuration().Repo
-			} else {
-				for _, tag := range tags {
-					repos = append(repos, env.Configuration().GetTaggedRepos(tag)...)
-				}
-			}
 			catcher := &erc.Collector{}
 
-			for _, repo := range repos {
-				j := units.NewRepoStatusJob(repo.Path)
-				j.Run(ctx)
-				catcher.Add(j.Error())
-			}
+			catcher.Add(fun.Observe(ctx,
+				itertool.Slice(env.Configuration().GetTaggedRepos(tags...)),
+				func(conf sardis.RepoConf) {
+					grip.Info(conf.Name)
+					catcher.Add(units.WorkerJob(units.NewRepoStatusJob(conf.Path)).Run(ctx))
+				}))
 
 			return catcher.Resolve()
 		},
@@ -299,30 +253,20 @@ func repoFetch(ctx context.Context) cli.Command {
 			names := c.StringSlice(repoFlagName)
 
 			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
 
-			var repos []sardis.RepoConf
-			for _, tag := range names {
-				repos = append(repos, env.Configuration().GetTaggedRepos(tag)...)
-			}
+			repos := env.Configuration().GetTaggedRepos(names...)
 
-			queue := env.Queue()
-
-			catcher := &erc.Collector{}
-
+			jobs, run := units.SetupQueue(amboy.RunJob)
 			for idx := range repos {
-				repo := &repos[idx]
+				repo := repos[idx]
 
 				if repo.Fetch {
-					catcher.Add(queue.Put(ctx, units.NewRepoFetchJob(repo)))
+					jobs.PushBack(units.NewRepoFetchJob(repo))
+
 				}
 			}
 
-			amboy.WaitInterval(ctx, queue, 100*time.Millisecond)
-			catcher.Add(amboy.ResolveErrors(ctx, queue))
-
-			return catcher.Resolve()
+			return run(ctx)
 
 		},
 	}

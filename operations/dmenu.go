@@ -83,8 +83,6 @@ func DMenu(ctx context.Context) cli.Command {
 		Before: setFirstArgWhenStringUnset(commandFlagName),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment(ctx)
-			ctx, cancel := env.Context()
-			defer cancel()
 			name := c.String(commandFlagName)
 			conf := env.Configuration()
 			others := []string{}

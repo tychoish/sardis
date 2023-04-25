@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 
 	"github.com/tychoish/grip"
@@ -40,7 +39,6 @@ func buildApp() *cli.App {
 
 	const (
 		levelFlag         = "level"
-		nameFlag          = "name"
 		disableFlag       = "disableStdOutLogging"
 		jsonFormatingFlag = "jsonFormatLogging"
 	)
@@ -53,12 +51,6 @@ func buildApp() *cli.App {
 			Value: "info",
 			Usage: fmt.Sprintln("Specify lowest visible loglevel as string: ",
 				"'emergency|alert|critical|error|warning|notice|info|debug'"),
-		},
-		cli.StringFlag{
-			Name:   nameFlag,
-			EnvVar: "SARDIS_LOGGING_NAME",
-			Value:  app.Name,
-			Usage:  "use to set a different name to the logger",
 		},
 		cli.BoolFlag{
 			Name:   disableFlag,
@@ -108,9 +100,7 @@ func buildApp() *cli.App {
 
 		conf.Settings.Logging.DisableStandardOutput = c.Bool(disableFlag)
 		conf.Settings.Logging.EnableJSONFormating = c.Bool(jsonFormatingFlag)
-		conf.Settings.Logging.Name = c.String(nameFlag)
 		conf.Settings.Logging.Priority = level.FromString(c.String(levelFlag))
-		conf.Settings.Notification.Name = conf.Settings.Logging.Name
 
 		loggingSetup(conf.Settings.Logging)
 		output := send.MakeWriter(grip.Sender())
@@ -145,7 +135,6 @@ func buildApp() *cli.App {
 
 // logging setup is separate to make it unit testable
 func loggingSetup(conf sardis.LoggingConf) {
-	grip.Sender().SetName(conf.Name)
 	sender := grip.Sender()
 	sender.SetName("sardis")
 	sender.SetPriority(conf.Priority)
@@ -161,14 +150,6 @@ func loggingSetup(conf sardis.LoggingConf) {
 			return
 		}
 
-		if reflect.TypeOf(sys) == reflect.TypeOf(sender) {
-			grip.Debug("skipping attempt to mirror logs to systemd/syslog")
-			return
-		}
-
-		sys.SetName(conf.Name)
-		sys.SetPriority(conf.Priority)
-
 		if conf.EnableJSONFormating {
 			sys.SetFormatter(send.MakeJSONFormatter())
 		}
@@ -179,7 +160,7 @@ func loggingSetup(conf sardis.LoggingConf) {
 			sender = sys
 		}
 
-		sender.SetName("sardis")
+		sender.SetPriority(conf.Priority)
 		grip.SetGlobalLogger(grip.NewLogger(sender))
 	}
 }

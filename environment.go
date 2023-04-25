@@ -321,9 +321,9 @@ func (c *appServicesCache) appendCloser(name string, fn CloserFunc) {
 	})
 }
 
-func WithDesktopNotify(ctx context.Context, conf *Configuration) context.Context {
+func WithDesktopNotify(ctx context.Context) context.Context {
 	desktop := desktop.MakeSender()
-	desktop.SetName(conf.Settings.Notification.Name)
+	desktop.SetName(grip.Sender().Name())
 	return grip.WithContextLogger(ctx, grip.NewLogger(desktop), "desktop")
 }
 

@@ -123,7 +123,6 @@ type Settings struct {
 }
 
 type LoggingConf struct {
-	Name                  string         `bson:"name" json:"name" yaml:"name"`
 	DisableStandardOutput bool           `bson:"disable_standard_output" json:"disable_standard_output" yaml:"disable_standard_output"`
 	EnableJSONFormating   bool           `bson:"enable_json_formatting" json:"enable_json_formatting" yaml:"enable_json_formatting"`
 	Priority              level.Priority `bson:"priority" json:"priority" yaml:"priority"`

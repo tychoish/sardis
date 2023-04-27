@@ -12,6 +12,8 @@ import (
 )
 
 func Notify(ctx context.Context) cli.Command {
+	ctx = sardis.WithDesktopNotify(ctx)
+
 	return cli.Command{
 		Name:    "notify",
 		Aliases: []string{"xmpp"},
@@ -59,7 +61,7 @@ func notifyDesktop(ctx context.Context) cli.Command {
 		Usage:  "send the remaining arguments over xmpp",
 		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			sardis.GetEnvironment(ctx).Desktop().Notice(strings.Join(c.Args(), " "))
+			sardis.DesktopNotify(ctx).Notice(strings.Join(c.Args(), " "))
 			return nil
 		},
 	}

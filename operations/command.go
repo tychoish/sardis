@@ -19,6 +19,8 @@ import (
 const commandFlagName = "command"
 
 func RunCommand(ctx context.Context) cli.Command {
+	ctx = sardis.WithDesktopNotify(ctx)
+
 	return cli.Command{
 		Name:  "run",
 		Usage: "runs a predefined command",
@@ -39,7 +41,6 @@ func RunCommand(ctx context.Context) cli.Command {
 		),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment(ctx)
-
 			ops := c.StringSlice(commandFlagName)
 
 			return runConfiguredCommand(ctx, env, ops)
@@ -51,7 +52,7 @@ func runConfiguredCommand(ctx context.Context, env sardis.Environment, ops []str
 	conf := env.Configuration()
 	cmds := conf.ExportAllCommands()
 
-	notify := env.Desktop()
+	notify := sardis.DesktopNotify(ctx)
 
 	for idx, name := range ops {
 		cmd, ok := cmds[name]

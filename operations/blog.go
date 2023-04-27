@@ -86,7 +86,7 @@ func blogPublish(ctx context.Context) cli.Command {
 			jpm := env.Jasper()
 
 			err := jpm.CreateCommand(ctx).
-				AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
+				AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
 				Append(blog.DeployCommands...).
 				Directory(repo.Path).
 				SetOutputSender(level.Info, grip.Sender()).

@@ -1,13 +1,18 @@
 package util
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/tychoish/fun"
 )
 
 func FileExists(path string) bool {
@@ -67,4 +72,53 @@ func CollapseHomeDir(in string) string {
 		in = fmt.Sprint(in, string(filepath.Separator))
 	}
 	return in
+}
+
+func GetDirectoryContents(path string) (fun.Iterator[string], error) {
+	dir, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	return fun.Generator(func(ctx context.Context) (string, error) {
+		dir, err := dir.ReadDir(1)
+		if err != nil {
+			return "", err
+		}
+
+		fun.Invariant(len(dir) == 1, "impossible return value from ReadDir")
+
+		return filepath.Join(path, dir[0].Name()), nil
+	}), nil
+}
+
+func GetSSHAgentPath() (out string, err error) {
+	usr, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+
+	if path := filepath.Join("/run/user", usr.Uid, "ssh-agent-socket"); FileExists(path) {
+		return path, nil
+	}
+
+	err = filepath.Walk("/tmp", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+		if !strings.HasPrefix(path, "/tmp/ssh-") {
+			return nil
+		}
+
+		out = path
+		return io.EOF
+	})
+
+	if out == "" || err == nil {
+		return "", errors.New("could not find ssh socket")
+	}
+	return out, nil
 }

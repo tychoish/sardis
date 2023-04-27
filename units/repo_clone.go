@@ -81,7 +81,7 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 
 	j.AddError(cmd.ID(j.ID()).
 		Priority(level.Debug).
-		AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
+		AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
 		Directory(filepath.Dir(j.Conf.Path)).
 		SetOutputSender(level.Info, sender).
 		SetErrorSender(level.Warning, sender).

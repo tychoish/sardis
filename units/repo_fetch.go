@@ -87,7 +87,7 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 	})
 
 	cmd.ID(j.ID()).Directory(j.Conf.Path).
-		AddEnv(sardis.SSHAgentSocketEnvVar, conf.Settings.SSHAgentSocketPath).
+		AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
 		SetOutputSender(level.Info, sender).
 		SetErrorSender(level.Warning, sender)
 

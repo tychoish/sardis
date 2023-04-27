@@ -212,7 +212,7 @@ func (conf *MenuConf) Validate() error {
 	if conf.Command != "" {
 		base := strings.Split(conf.Command, " ")[0]
 		_, err := exec.LookPath(base)
-		erc.Wrapf(err, "%s [%s] does not exist", base, conf.Command)
+		ec.Add(erc.Wrapf(err, "%s [%s] does not exist", base, conf.Command))
 	}
 
 	erc.Whenf(ec, len(conf.Selections) == 0 && len(conf.Aliases) == 0, "must specify options for %q", conf.Name)
@@ -271,8 +271,6 @@ func (conf *Configuration) Validate() error {
 
 	return ec.Resolve()
 }
-
-func fileExists(fn string) bool { _, err := os.Stat(fn); return !os.IsNotExist(err) }
 
 func (conf *Configuration) expandLinkedFiles(catcher *erc.Collector) {
 	if conf.linkedFilesRead {
@@ -744,4 +742,11 @@ func (conf *CommandGroupConf) ExportCommands() map[string]CommandConf {
 		out[cmd.Alias] = cmd
 	}
 	return out
+}
+
+func (conf *Configuration) SSHAgentSocket() string {
+	if conf.Settings.SSHAgentSocketPath == "" {
+		conf.Settings.SSHAgentSocketPath = fun.Must(util.GetSSHAgentPath())
+	}
+	return conf.Settings.SSHAgentSocketPath
 }

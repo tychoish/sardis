@@ -19,14 +19,13 @@ func Tweet(ctx context.Context) cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
 			msg := c.String("message")
 
 			if len(msg) > 280 {
 				return fmt.Errorf("message is too long [%d]", len(msg))
 			}
-
-			env.Twitter().Info(msg)
+			ctx = sardis.WithTwitterLogger(ctx, sardis.GetEnvironment(ctx).Configuration())
+			sardis.Twitter(ctx).Info(msg)
 
 			return nil
 		},

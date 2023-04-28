@@ -9,20 +9,20 @@ require (
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/go-git/go-git/v5 v5.2.0
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/tychoish/amboy v0.0.0-20230408193931-6ba4e429a638
+	github.com/tychoish/amboy v0.0.0-20230414135238-247e579b3b94
 	github.com/tychoish/birch v0.2.3-0.20230413052020-46068f63d7bb
-	github.com/tychoish/cmdr v0.0.0-00010101000000-000000000000
-	github.com/tychoish/fun v0.8.9
+	github.com/tychoish/cmdr v0.1.0
+	github.com/tychoish/fun v0.9.0
 	github.com/tychoish/godmenu v0.1.0
-	github.com/tychoish/grip v0.2.7
-	github.com/tychoish/grip/x/desktop v0.0.0-00010101000000-000000000000
-	github.com/tychoish/grip/x/jira v0.0.0-00010101000000-000000000000
-	github.com/tychoish/grip/x/system v0.0.0-00010101000000-000000000000
-	github.com/tychoish/grip/x/twitter v0.0.0-00010101000000-000000000000
-	github.com/tychoish/grip/x/xmpp v0.0.0-00010101000000-000000000000
-	github.com/tychoish/jasper v0.0.0-20230415083349-ed64615c7d7e
-	github.com/tychoish/jasper/x/cli v0.0.0-00010101000000-000000000000
-	github.com/tychoish/jasper/x/remote v0.0.0-00010101000000-000000000000
+	github.com/tychoish/grip v0.2.8
+	github.com/tychoish/grip/x/desktop v0.0.0-20230427110835-c9728a14310e
+	github.com/tychoish/grip/x/jira v0.0.0-20230427110835-c9728a14310e
+	github.com/tychoish/grip/x/system v0.0.0-20230427110835-c9728a14310e
+	github.com/tychoish/grip/x/twitter v0.0.0-20230427110835-c9728a14310e
+	github.com/tychoish/grip/x/xmpp v0.0.0-20230427110835-c9728a14310e
+	github.com/tychoish/jasper v0.0.0-20230428170340-74877eeb5a0d
+	github.com/tychoish/jasper/x/cli v0.0.0-20230428164510-eed82f369905
+	github.com/tychoish/jasper/x/remote v0.0.0-20230428165720-cb453b83a84b
 	github.com/urfave/cli v1.22.12
 	go.mongodb.org/mongo-driver v1.11.1
 	gopkg.in/yaml.v2 v2.4.0
@@ -84,14 +84,14 @@ require (
 	github.com/tychoish/birch/x/mrpc v0.0.0-20230413052020-46068f63d7bb // indirect
 	github.com/tychoish/gimlet v0.0.0-20230130001449-8987c96bb886 // indirect
 	github.com/tychoish/grip/x/metrics v0.0.0-20230414135146-97625602a7ee // indirect
-	github.com/tychoish/grip/x/splunk v0.0.0-20230414135146-97625602a7ee // indirect
-	github.com/tychoish/jasper/x/splunk v0.0.0-00010101000000-000000000000 // indirect
+	github.com/tychoish/grip/x/splunk v0.0.0-20230427110835-c9728a14310e // indirect
+	github.com/tychoish/jasper/x/splunk v0.0.0-20230428164510-eed82f369905 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
-	golang.org/x/crypto v0.5.0 // indirect
+	golang.org/x/crypto v0.8.0 // indirect
 	golang.org/x/net v0.9.0 // indirect
 	golang.org/x/sys v0.7.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
@@ -100,29 +100,3 @@ require (
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
-
-replace github.com/tychoish/birch => /home/tychoish/src/birch
-
-replace github.com/tychoish/jasper => /home/tychoish/src/jasper
-
-replace github.com/tychoish/jasper/x/remote => /home/tychoish/src/jasper/x/remote
-
-replace github.com/tychoish/jasper/x/cli => /home/tychoish/src/jasper/x/cli
-
-replace github.com/tychoish/jasper/x/splunk => /home/tychoish/src/jasper/x/splunk
-
-replace github.com/tychoish/fun => /home/tychoish/src/fun
-
-replace github.com/tychoish/grip => /home/tychoish/src/grip
-
-replace github.com/tychoish/grip/x/desktop => /home/tychoish/src/grip/x/desktop
-
-replace github.com/tychoish/grip/x/jira => /home/tychoish/src/grip/x/jira
-
-replace github.com/tychoish/grip/x/system => /home/tychoish/src/grip/x/system
-
-replace github.com/tychoish/grip/x/twitter => /home/tychoish/src/grip/x/twitter
-
-replace github.com/tychoish/grip/x/xmpp => /home/tychoish/src/grip/x/xmpp
-
-replace github.com/tychoish/cmdr => /home/tychoish/src/cmdr

@@ -27,14 +27,10 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/seq"
-	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
-	"github.com/tychoish/grip/x/desktop"
-	"github.com/tychoish/grip/x/jira"
-	"github.com/tychoish/grip/x/twitter"
 	"github.com/tychoish/grip/x/xmpp"
 	"github.com/tychoish/jasper"
 )
@@ -67,8 +63,6 @@ type Environment interface {
 
 	Logger() grip.Logger
 
-	JiraIssue() grip.Logger
-
 	Close(context.Context) error
 }
 
@@ -94,7 +88,6 @@ type appServicesCache struct {
 
 	conf       *Configuration
 	notifySend grip.Logger
-	jiraIssue  grip.Logger
 	jpm        jasper.Manager
 
 	closers seq.List[fun.WorkerFunc]
@@ -166,39 +159,6 @@ func (c *appServicesCache) initSender() error {
 	return nil
 }
 
-func (c *appServicesCache) initJira(ctx context.Context) error {
-	root := grip.Sender()
-	loggers := []send.Sender{}
-	defer func() {
-		loggers = append(loggers, root)
-		c.jiraIssue = grip.NewLogger(send.MakeMulti(loggers...))
-	}()
-
-	if c.conf.Settings.Credentials.Jira.URL == "" {
-		grip.Warning("jira credentials are not configured")
-		return nil
-	}
-
-	sender, err := jira.MakeIssueSender(ctx, &jira.Options{
-		Name:    c.conf.Settings.Notification.Name,
-		BaseURL: c.conf.Settings.Credentials.Jira.URL,
-		BasicAuthOpts: jira.BasicAuth{
-			UseBasicAuth: true,
-			Username:     c.conf.Settings.Credentials.Jira.Username,
-			Password:     c.conf.Settings.Credentials.Jira.Password,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("problem setting up jira logger: %w", err)
-	}
-	loggers = append(loggers, sender)
-	c.appendCloser("sender-jira-issue", func(_ context.Context) error { return sender.Close() })
-
-	sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
-
-	return nil
-}
-
 func (c *appServicesCache) Jasper() jasper.Manager {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
@@ -254,40 +214,6 @@ func (c *appServicesCache) appendCloser(name string, fn CloserFunc) {
 	})
 }
 
-func Twitter(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "twitter") }
-func WithTwitterLogger(ctx context.Context, conf *Configuration) context.Context {
-	return grip.WithNewContextLogger(ctx, "twitter", func() send.Sender {
-		twitter, err := twitter.MakeSender(ctx, &twitter.Options{
-			Name:           fmt.Sprint("@", conf.Settings.Credentials.Twitter.Username, "/sardis"),
-			ConsumerKey:    conf.Settings.Credentials.Twitter.ConsumerKey,
-			ConsumerSecret: conf.Settings.Credentials.Twitter.ConsumerSecret,
-			AccessSecret:   conf.Settings.Credentials.Twitter.OauthSecret,
-			AccessToken:    conf.Settings.Credentials.Twitter.OauthToken,
-		})
-
-		if err != nil {
-			err = erc.Wrap(err, "problem constructing twitter sender")
-			if srv.HasCleanup(ctx) {
-				srv.AddCleanup(ctx, func(context.Context) error { return err })
-			} else {
-				grip.EmergencyPanic(err)
-			}
-		}
-
-		twitter.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
-		return twitter
-	})
-}
-
-func DesktopNotify(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "desktop") }
-func WithDesktopNotify(ctx context.Context) context.Context {
-	return grip.WithNewContextLogger(ctx, "desktop", func() send.Sender {
-		desktop := desktop.MakeSender()
-		desktop.SetName(grip.Sender().Name())
-		return desktop
-	})
-}
-
 func (c *appServicesCache) Configuration() *Configuration {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
@@ -315,23 +241,4 @@ func (c *appServicesCache) Logger() grip.Logger {
 	grip.Critical(message.WrapError(err, "problem configuring notification sender"))
 	c.addError("notify-constructor", err)
 	return c.notifySend
-}
-
-func (c *appServicesCache) JiraIssue() grip.Logger {
-	c.mutex.RLock()
-	if c.jiraIssue.Sender() != nil {
-		c.mutex.RUnlock()
-		return c.jiraIssue
-	}
-	c.mutex.RUnlock()
-
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	err := c.initJira(context.TODO())
-
-	grip.Critical(message.WrapError(err, "problem configuring jira connection"))
-	c.addError("jira-constructor", err)
-
-	return c.jiraIssue
 }

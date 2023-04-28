@@ -96,7 +96,7 @@ func DMenu(ctx context.Context) cli.Command {
 				cmds := group.ExportCommands()
 				opts := make([]string, 0, len(cmds))
 				for name, obj := range cmds {
-					if obj.Alias != "" && name == obj.Name {
+					if (obj.Alias != "" && name == obj.Name) || name == "" {
 						continue
 					}
 

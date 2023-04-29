@@ -9,6 +9,7 @@ import (
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli"
 )
@@ -85,6 +86,7 @@ func DMenu(ctx context.Context) cli.Command {
 			env := sardis.GetEnvironment(ctx)
 			name := c.String(commandFlagName)
 			conf := env.Configuration()
+
 			ctx = sardis.WithRemoteNotify(ctx, conf)
 			others := []string{}
 
@@ -142,7 +144,7 @@ func DMenu(ctx context.Context) cli.Command {
 						cmd = fmt.Sprintf("%s %s", menu.Command, mapping[output])
 					}
 
-					err = env.Jasper().CreateCommand(ctx).Append(cmd).
+					err = jasper.Context(ctx).CreateCommand(ctx).Append(cmd).
 						SetCombinedSender(level.Notice, grip.Sender()).Run(ctx)
 					if err != nil {
 						notify.Errorf("%s running %s failed: %s", name, output, err.Error())
@@ -160,7 +162,7 @@ func DMenu(ctx context.Context) cli.Command {
 			}
 
 			// don't notify here let the inner one do that
-			return env.Jasper().CreateCommand(ctx).Append(fmt.Sprintf("%s %s", "sardis dmenu", output)).
+			return jasper.Context(ctx).CreateCommand(ctx).Append(fmt.Sprintf("%s %s", "sardis dmenu", output)).
 				SetCombinedSender(level.Notice, grip.Sender()).Run(ctx)
 
 		},

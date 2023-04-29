@@ -14,7 +14,7 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
-	"github.com/tychoish/sardis"
+	"github.com/tychoish/jasper"
 )
 
 type repoCleanupJob struct {
@@ -60,7 +60,7 @@ func (j *repoCleanupJob) Run(ctx context.Context) {
 		"op": "running",
 	})
 
-	cmd := sardis.GetEnvironment(ctx).Jasper()
+	cmd := jasper.Context(ctx)
 
 	startAt := time.Now()
 	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{

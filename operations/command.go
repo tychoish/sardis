@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/util"
 	"github.com/urfave/cli"
@@ -59,7 +60,7 @@ func runConfiguredCommand(ctx context.Context, env sardis.Environment, ops []str
 		if !ok {
 			return fmt.Errorf("command name %q is not defined", name)
 		}
-		err := env.Jasper().CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
+		err := jasper.Context(ctx).CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
 			SetOutputSender(level.Info, grip.Sender()).
 			SetErrorSender(level.Error, grip.Sender()).
 			Append(cmd.Command).
@@ -196,11 +197,9 @@ func qrCode(ctx context.Context) cli.Command {
 		Usage:  "gets qrcode from x11 clipboard and renders it on the terminal",
 		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-
 			buf := &bufCloser{}
 
-			err := env.Jasper().CreateCommand(ctx).
+			err := jasper.Context(ctx).CreateCommand(ctx).
 				AppendArgs("xsel", "--clipboard", "--output").SetOutputWriter(buf).
 				Run(ctx)
 			if err != nil {

@@ -9,6 +9,7 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
 	"github.com/urfave/cli"
@@ -84,7 +85,7 @@ func blogPublish(ctx context.Context) cli.Command {
 				return fmt.Errorf("problem syncing blog repo: %w", err)
 			}
 
-			jpm := env.Jasper()
+			jpm := jasper.Context(ctx)
 
 			err := jpm.CreateCommand(ctx).
 				AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).

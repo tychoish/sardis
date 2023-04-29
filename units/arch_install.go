@@ -10,7 +10,7 @@ import (
 	"github.com/tychoish/amboy/registry"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
-	"github.com/tychoish/sardis"
+	"github.com/tychoish/jasper"
 )
 
 type archInstallPackagesJob struct {
@@ -50,8 +50,7 @@ func (j *archInstallPackagesJob) Run(ctx context.Context) {
 	}
 	args := append([]string{"pacman", "--sync", "--refresh"}, j.Names...)
 
-	env := sardis.GetEnvironment(ctx)
-	j.AddError(env.Jasper().CreateCommand(ctx).ID(j.ID()).
+	j.AddError(jasper.Context(ctx).CreateCommand(ctx).ID(j.ID()).
 		Priority(level.Info).Add(args).
 		SetOutputSender(level.Info, grip.Sender()).Run(ctx))
 }

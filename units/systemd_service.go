@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 )
 
@@ -49,8 +50,7 @@ func NewSystemServiceSetupJob(conf sardis.SystemdServiceConf) amboy.Job {
 func (j *setupServiceJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 
-	env := sardis.GetEnvironment(ctx)
-	jasper := env.Jasper()
+	jasper := jasper.Context(ctx)
 	cmd := jasper.CreateCommand(ctx)
 
 	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{

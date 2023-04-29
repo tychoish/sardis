@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/amboy/registry"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 )
 
@@ -63,7 +64,7 @@ func (j *archAbsBuildJob) Run(ctx context.Context) {
 		return
 	}
 
-	j.AddError(env.Jasper().CreateCommand(ctx).ID(j.ID()).Priority(level.Info).
+	j.AddError(jasper.Context(ctx).CreateCommand(ctx).ID(j.ID()).Priority(level.Info).
 		AppendArgs("makepkg", "--syncdeps", "--force", "--install", "--noconfirm").
 		SetOutputSender(level.Info, grip.Sender()).ID(j.ID()).Directory(dir).Run(ctx))
 }

@@ -17,17 +17,9 @@ package sardis
 import (
 	"context"
 	"errors"
-	"runtime"
 	"sync"
-	"time"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/itertool"
-	"github.com/tychoish/fun/seq"
-	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/message"
-	"github.com/tychoish/jasper"
 )
 
 // BuildRevision stores the commit in the git repository at build time
@@ -54,11 +46,7 @@ func WithEvironment(ctx context.Context, env Environment) context.Context {
 
 type Environment interface {
 	Configuration() *Configuration
-	Jasper() jasper.Manager
-	Close(context.Context) error
 }
-
-type CloserFunc func(context.Context) error
 
 func NewEnvironment(ctx context.Context, conf *Configuration) (Environment, error) {
 	env := &appServicesCache{}
@@ -79,9 +67,6 @@ type appServicesCache struct {
 	mutex sync.RWMutex
 
 	conf *Configuration
-	jpm  jasper.Manager
-
-	closers seq.List[fun.WorkerFunc]
 }
 
 func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) error {
@@ -91,73 +76,9 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 	if c.conf != nil {
 		return errors.New("cannot reconfigure the environment")
 	}
-
-	catcher := &erc.Collector{}
 	var err error
 	c.conf = conf
-	c.jpm, err = jasper.NewSynchronizedManager(false)
-	catcher.Add(err)
-
-	catcher.Add(conf.Validate())
-
-	c.appendCloser("close-jasper", c.jpm.Close)
-
-	return catcher.Resolve()
-}
-
-func (c *appServicesCache) Jasper() jasper.Manager {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	return c.jpm
-}
-
-func (c *appServicesCache) addError(name string, err error) {
-	if err == nil {
-		return
-	}
-
-	c.appendCloser(name, func(_ context.Context) error { return err })
-}
-
-func (c *appServicesCache) Close(ctx context.Context) error {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	start := time.Now()
-
-	catcher := &erc.Collector{}
-	itertool.ParallelForEach(ctx,
-		seq.ListValues(c.closers.Iterator()),
-		func(ctx context.Context, wf fun.WorkerFunc) error { return wf.Run(ctx) },
-		itertool.Options{
-			ContinueOnPanic: true,
-			ContinueOnError: true,
-			NumWorkers:      runtime.NumCPU(),
-		},
-	)
-
-	grip.Debug(message.Fields{
-		"op":       "run all closers",
-		"num":      c.closers.Len(),
-		"duration": time.Since(start),
-	})
-
-	return catcher.Resolve()
-}
-
-func (c *appServicesCache) appendCloser(name string, fn CloserFunc) {
-	c.closers.PushBack(func(ctx context.Context) error {
-		startAt := time.Now()
-		err := fn(ctx)
-		msg := message.Fields{
-			"name":    name,
-			"op":      "ran closer",
-			"runtime": time.Since(startAt),
-		}
-
-		grip.DebugWhen(err == nil, msg)
-		grip.Notice(message.WrapError(err, msg))
-		return err
-	})
+	return err
 }
 
 func (c *appServicesCache) Configuration() *Configuration {

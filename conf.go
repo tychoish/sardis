@@ -198,6 +198,9 @@ func LoadConfiguration(fn string) (*Configuration, error) {
 	if err := util.UnmarshalFile(fn, out); err != nil {
 		return nil, fmt.Errorf("problem unmarshaling config data: %w", err)
 	}
+	if err := out.Validate(); err != nil {
+		return nil, err
+	}
 
 	return out, nil
 }

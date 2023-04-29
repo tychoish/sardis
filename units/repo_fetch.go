@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 )
 
@@ -79,7 +80,7 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 	}
 	env := sardis.GetEnvironment(ctx)
 	conf := env.Configuration()
-	cmd := env.Jasper().CreateCommand(ctx)
+	cmd := jasper.Context(ctx).CreateCommand(ctx)
 
 	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
 		"job":  j.ID(),

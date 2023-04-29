@@ -7,10 +7,12 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/grip/x/system"
+	"github.com/tychoish/jasper"
 	jaspercli "github.com/tychoish/jasper/x/cli"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/operations"
@@ -88,6 +90,9 @@ func buildApp() *cli.App {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+
+	ctx = srv.WithOrchestrator(ctx)
+	ctx = srv.WithCleanup(ctx)
 	setCommands(ctx)
 
 	app.Before = func(c *cli.Context) error {
@@ -117,6 +122,14 @@ func buildApp() *cli.App {
 		}
 
 		ctx = sardis.WithEvironment(ctx, env)
+		jpm, err := jasper.NewSynchronizedManager(false)
+		if err != nil {
+			srv.AddCleanupError(ctx, err)
+		} else {
+			ctx = jasper.WithManager(ctx, jpm)
+			srv.AddCleanup(ctx, jpm.Close)
+		}
+
 		// reset now so we give things the right context
 		setCommands(ctx)
 
@@ -124,9 +137,8 @@ func buildApp() *cli.App {
 	}
 
 	app.After = func(c *cli.Context) error {
-		err := sardis.GetEnvironment(ctx).Close(ctx)
 		cancel()
-		return err
+		return srv.GetOrchestrator(ctx).Wait()
 	}
 
 	return app

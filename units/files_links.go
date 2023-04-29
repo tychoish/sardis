@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 )
 
@@ -62,7 +63,7 @@ func (j *symlinkCreateJob) Run(ctx context.Context) {
 		return
 	}
 
-	jpm := sardis.GetEnvironment(ctx).Jasper()
+	jpm := jasper.Context(ctx)
 
 	if _, err := os.Stat(j.Conf.Path); !os.IsNotExist(err) {
 		if !j.Conf.Update {

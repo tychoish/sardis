@@ -85,6 +85,7 @@ func DMenu(ctx context.Context) cli.Command {
 			env := sardis.GetEnvironment(ctx)
 			name := c.String(commandFlagName)
 			conf := env.Configuration()
+			ctx = sardis.WithRemoteNotify(ctx, conf)
 			others := []string{}
 
 			cmdGrp := conf.ExportCommandGroups()
@@ -114,6 +115,8 @@ func DMenu(ctx context.Context) cli.Command {
 				return runConfiguredCommand(ctx, env, []string{cmd})
 			}
 
+			notify := sardis.RemoteNotify(ctx)
+
 			for _, menu := range conf.Menus {
 				if menu.Name == name {
 					items := len(menu.Selections) + len(menu.Aliases)
@@ -142,10 +145,10 @@ func DMenu(ctx context.Context) cli.Command {
 					err = env.Jasper().CreateCommand(ctx).Append(cmd).
 						SetCombinedSender(level.Notice, grip.Sender()).Run(ctx)
 					if err != nil {
-						env.Logger().Errorf("%s running %s failed: %s", name, output, err.Error())
+						notify.Errorf("%s running %s failed: %s", name, output, err.Error())
 						return err
 					}
-					env.Logger().Noticef("%s running %s completed", name, output)
+					notify.Noticef("%s running %s completed", name, output)
 					return nil
 				}
 				others = append(others, menu.Name)
@@ -155,6 +158,7 @@ func DMenu(ctx context.Context) cli.Command {
 			if err != nil {
 				return err
 			}
+
 			// don't notify here let the inner one do that
 			return env.Jasper().CreateCommand(ctx).Append(fmt.Sprintf("%s %s", "sardis dmenu", output)).
 				SetCombinedSender(level.Notice, grip.Sender()).Run(ctx)

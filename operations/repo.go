@@ -82,9 +82,9 @@ func repoUpdate(ctx context.Context) cli.Command {
 			tags := c.StringSlice(repoTagFlagName)
 
 			env := sardis.GetEnvironment(ctx)
-
-			notify := env.Logger()
 			conf := env.Configuration()
+			ctx = sardis.WithRemoteNotify(ctx, conf)
+			notify := sardis.RemoteNotify(ctx)
 
 			repos := conf.GetTaggedRepos(tags...)
 			if len(repos) == 0 {

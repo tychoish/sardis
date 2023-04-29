@@ -17,8 +17,6 @@ package sardis
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -28,10 +26,7 @@ import (
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/seq"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
-	"github.com/tychoish/grip/send"
-	"github.com/tychoish/grip/x/xmpp"
 	"github.com/tychoish/jasper"
 )
 
@@ -60,9 +55,6 @@ func WithEvironment(ctx context.Context, env Environment) context.Context {
 type Environment interface {
 	Configuration() *Configuration
 	Jasper() jasper.Manager
-
-	Logger() grip.Logger
-
 	Close(context.Context) error
 }
 
@@ -86,9 +78,8 @@ func NewEnvironment(ctx context.Context, conf *Configuration) (Environment, erro
 type appServicesCache struct {
 	mutex sync.RWMutex
 
-	conf       *Configuration
-	notifySend grip.Logger
-	jpm        jasper.Manager
+	conf *Configuration
+	jpm  jasper.Manager
 
 	closers seq.List[fun.WorkerFunc]
 }
@@ -112,51 +103,6 @@ func (c *appServicesCache) Configure(ctx context.Context, conf *Configuration) e
 	c.appendCloser("close-jasper", c.jpm.Close)
 
 	return catcher.Resolve()
-}
-
-func (c *appServicesCache) initSender() error {
-	root := grip.Sender()
-
-	var loggers []send.Sender
-	defer func() {
-		loggers = append(loggers, root)
-		c.notifySend = grip.NewLogger(send.MakeMulti(loggers...))
-	}()
-	sender, err := xmpp.NewSender(
-		c.conf.Settings.Notification.Target,
-		xmpp.ConnectionInfo{
-			Hostname:             c.conf.Settings.Notification.Host,
-			Username:             c.conf.Settings.Notification.User,
-			Password:             c.conf.Settings.Notification.Password,
-			DisableTLS:           true,
-			AllowUnencryptedAuth: true,
-		})
-	if err != nil {
-		return fmt.Errorf("problem creating sender: %w", err)
-	}
-	sender.SetPriority(level.Info)
-	sender.SetName(c.conf.Settings.Notification.Name)
-	loggers = append(loggers, sender)
-	c.appendCloser("sender-notify", func(ctx context.Context) error {
-		catcher := &erc.Collector{}
-		catcher.Add(sender.Flush(ctx))
-		catcher.Add(sender.Close())
-		return catcher.Resolve()
-	})
-
-	host, err := os.Hostname()
-	if err != nil {
-		return fmt.Errorf("problem finding hostname: %w", err)
-	}
-
-	sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
-	sender.SetFormatter(func(m message.Composer) (string, error) {
-		return fmt.Sprintf("[%s:%s] %s", c.conf.Settings.Notification.Name, host, m.String()), nil
-	})
-
-	c.notifySend = grip.NewLogger(send.NewMulti("sardis", loggers))
-
-	return nil
 }
 
 func (c *appServicesCache) Jasper() jasper.Manager {
@@ -227,18 +173,4 @@ func (c *appServicesCache) Configuration() *Configuration {
 	out = *c.conf
 
 	return &out
-}
-
-func (c *appServicesCache) Logger() grip.Logger {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	if c.notifySend.Sender() != nil {
-		return c.notifySend
-	}
-	err := c.initSender()
-
-	grip.Critical(message.WrapError(err, "problem configuring notification sender"))
-	c.addError("notify-constructor", err)
-	return c.notifySend
 }

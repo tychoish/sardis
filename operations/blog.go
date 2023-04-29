@@ -39,9 +39,10 @@ func blogPublish(ctx context.Context) cli.Command {
 		Before: mergeBeforeFuncs(requireConfig(ctx), requireStringOrFirstArgSet(blogNameFlag)),
 		Action: func(c *cli.Context) error {
 			env := sardis.GetEnvironment(ctx)
-
 			conf := env.Configuration()
-			notify := env.Logger()
+
+			ctx = sardis.WithRemoteNotify(ctx, conf)
+			notify := sardis.RemoteNotify(ctx)
 
 			if conf == nil || len(conf.Blog) == 0 {
 				return errors.New("no blog configured")

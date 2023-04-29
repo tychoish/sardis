@@ -7,10 +7,14 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/level"
+	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/grip/x/desktop"
 	"github.com/tychoish/grip/x/jira"
 	"github.com/tychoish/grip/x/twitter"
+	"github.com/tychoish/grip/x/xmpp"
+	"github.com/tychoish/sardis/util"
 )
 
 func Twitter(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "twitter") }
@@ -47,8 +51,61 @@ func WithDesktopNotify(ctx context.Context) context.Context {
 	})
 }
 
+func RemoteNotify(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "remote-notify") }
+func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Context) {
+	out = ctx
+
+	root := grip.Sender()
+
+	var loggers []send.Sender
+
+	defer func() {
+		loggers = append(loggers, root)
+		out = grip.WithContextLogger(ctx, "remote-notify", grip.NewLogger(send.MakeMulti(loggers...)))
+	}()
+
+	sender, err := xmpp.NewSender(conf.Settings.Notification.Target,
+		xmpp.ConnectionInfo{
+			Hostname:             conf.Settings.Notification.Host,
+			Username:             conf.Settings.Notification.User,
+			Password:             conf.Settings.Notification.Password,
+			DisableTLS:           true,
+			AllowUnencryptedAuth: true,
+		})
+
+	if err != nil {
+		err = erc.Wrap(err, "setting up notify send issue logger")
+		grip.Alert(err)
+		srv.AddCleanupError(ctx, err)
+		return
+	}
+
+	host := util.GetHostname()
+
+	sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
+
+	sender.SetFormatter(func(m message.Composer) (string, error) {
+		return fmt.Sprintf("[%s:%s] %s", conf.Settings.Notification.Name, host, m.String()), nil
+	})
+
+	sender.SetPriority(level.Info)
+	sender.SetName(conf.Settings.Notification.Name)
+
+	loggers = append(loggers, sender)
+
+	srv.AddCleanup(ctx, func(ctx context.Context) error {
+		catcher := &erc.Collector{}
+		catcher.Add(sender.Flush(ctx))
+		catcher.Add(sender.Close())
+		return erc.Wrap(catcher.Resolve(), "remote-notify")
+	})
+
+	return
+}
+
 func JiraIssue(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "jira-issue") }
 func WithJiraIssue(ctx context.Context, conf *Configuration) (out context.Context) {
+	out = ctx
 	root := grip.Sender()
 	loggers := []send.Sender{}
 	defer func() {
@@ -71,11 +128,11 @@ func WithJiraIssue(ctx context.Context, conf *Configuration) (out context.Contex
 		},
 	})
 	if err != nil {
-		erc.Wrap(err, "setting up jira issue logger")
+		err = erc.Wrap(err, "setting up jira issue logger")
 		grip.Alert(err)
+		srv.AddCleanupError(ctx, err)
 		return
 	}
-	srv.AddCleanupError(ctx, err)
 
 	sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
 	srv.AddCleanup(ctx, func(context.Context) error { return sender.Close() })

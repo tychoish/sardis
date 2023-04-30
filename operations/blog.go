@@ -37,10 +37,10 @@ func blogPublish(ctx context.Context) cli.Command {
 				Value: "blog",
 			},
 		},
-		Before: mergeBeforeFuncs(requireConfig(ctx), requireStringOrFirstArgSet(blogNameFlag)),
+		Before: mergeBeforeFuncs(requireConfig(ctx),
+			requireStringOrFirstArgSet(blogNameFlag)),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-			conf := env.Configuration()
+			conf := sardis.AppConfiguration(ctx)
 
 			ctx = sardis.WithRemoteNotify(ctx, conf)
 			notify := sardis.RemoteNotify(ctx)

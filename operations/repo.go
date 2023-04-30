@@ -41,13 +41,13 @@ func repoList(ctx context.Context) cli.Command {
 		Usage:  "return a list of configured repos",
 		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
+			conf := sardis.AppConfiguration(ctx)
 
 			homedir, _ := homedir.Expand("~/")
 
 			table := tabby.New()
 			table.AddHeader("Name", "Path", "Local", "Enabled", "Tags")
-			for _, repo := range env.Configuration().Repo {
+			for _, repo := range conf.Repo {
 				_, err := os.Stat(repo.Path)
 				fileExists := !os.IsNotExist(err)
 				table.AddLine(
@@ -81,8 +81,7 @@ func repoUpdate(ctx context.Context) cli.Command {
 		Action: func(c *cli.Context) error {
 			tags := c.StringSlice(repoTagFlagName)
 
-			env := sardis.GetEnvironment(ctx)
-			conf := env.Configuration()
+			conf := sardis.AppConfiguration(ctx)
 			ctx = sardis.WithRemoteNotify(ctx, conf)
 			notify := sardis.RemoteNotify(ctx)
 
@@ -153,8 +152,7 @@ func repoCleanup(ctx context.Context) cli.Command {
 		Action: func(c *cli.Context) error {
 			tags := c.StringSlice(repoFlagName)
 
-			env := sardis.GetEnvironment(ctx)
-			repos := env.Configuration().GetTaggedRepos(tags...)
+			repos := sardis.AppConfiguration(ctx).GetTaggedRepos(tags...)
 
 			jobs, run := units.SetupQueue(amboy.RunJob)
 
@@ -181,8 +179,7 @@ func repoClone(ctx context.Context) cli.Command {
 		Action: func(c *cli.Context) error {
 			name := c.String(nameFlagName)
 
-			env := sardis.GetEnvironment(ctx)
-			conf := env.Configuration()
+			conf := sardis.AppConfiguration(ctx)
 
 			repos := conf.GetTaggedRepos(name)
 			jobs, run := units.SetupQueue(amboy.RunJob)
@@ -221,12 +218,12 @@ func repoStatus(ctx context.Context) cli.Command {
 		Action: func(c *cli.Context) error {
 			tags := c.StringSlice(repoFlagName)
 
-			env := sardis.GetEnvironment(ctx)
+			conf := sardis.AppConfiguration(ctx)
 
 			catcher := &erc.Collector{}
 
 			catcher.Add(fun.Observe(ctx,
-				itertool.Slice(env.Configuration().GetTaggedRepos(tags...)),
+				itertool.Slice(conf.GetTaggedRepos(tags...)),
 				func(conf sardis.RepoConf) {
 					grip.Info(conf.Name)
 					catcher.Add(units.WorkerJob(units.NewRepoStatusJob(conf.Path)).Run(ctx))
@@ -252,9 +249,7 @@ func repoFetch(ctx context.Context) cli.Command {
 		Action: func(c *cli.Context) error {
 			names := c.StringSlice(repoFlagName)
 
-			env := sardis.GetEnvironment(ctx)
-
-			repos := env.Configuration().GetTaggedRepos(names...)
+			repos := sardis.AppConfiguration(ctx).GetTaggedRepos(names...)
 
 			jobs, run := units.SetupQueue(amboy.RunJob)
 			for idx := range repos {

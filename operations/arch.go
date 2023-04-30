@@ -108,8 +108,7 @@ func setupArchLinux(ctx context.Context) cli.Command {
 		Flags:  []cli.Flag{},
 		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig(ctx)),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-			conf := env.Configuration()
+			conf := sardis.AppConfiguration(ctx)
 			catcher := &erc.Collector{}
 
 			pkgs := []string{}

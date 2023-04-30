@@ -71,8 +71,7 @@ func (j *repoCloneJob) Run(ctx context.Context) {
 		return
 	}
 
-	env := sardis.GetEnvironment(ctx)
-	conf := env.Configuration()
+	conf := sardis.AppConfiguration(ctx)
 	cmd := jasper.Context(ctx).CreateCommand(ctx)
 
 	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{

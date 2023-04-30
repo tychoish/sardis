@@ -41,16 +41,15 @@ func RunCommand(ctx context.Context) cli.Command {
 			requireCommandsSet(commandFlagName),
 		),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
 			ops := c.StringSlice(commandFlagName)
+			conf := sardis.AppConfiguration(ctx)
 
-			return runConfiguredCommand(ctx, env, ops)
+			return runConfiguredCommand(ctx, conf, ops)
 		},
 	}
 }
 
-func runConfiguredCommand(ctx context.Context, env sardis.Environment, ops []string) error {
-	conf := env.Configuration()
+func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops []string) error {
 	cmds := conf.ExportAllCommands()
 
 	notify := sardis.DesktopNotify(ctx)
@@ -97,8 +96,7 @@ func listCommands(ctx context.Context) cli.Command {
 		Usage:  "return a list of defined commands",
 		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-			conf := env.Configuration()
+			conf := sardis.AppConfiguration(ctx)
 			homedir := util.GetHomeDir()
 
 			table := tabby.New()
@@ -139,9 +137,7 @@ func dmenuListCmds(ctx context.Context, kind dmenuListCommandTypes) cli.Command 
 		Usage:  "return a list of defined commands",
 		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-
-			conf := env.Configuration()
+			conf := sardis.AppConfiguration(ctx)
 			var cmds []sardis.CommandConf
 
 			switch kind {
@@ -180,7 +176,7 @@ func dmenuListCmds(ctx context.Context, kind dmenuListCommandTypes) cli.Command 
 				return err
 			}
 
-			return runConfiguredCommand(ctx, env, []string{cmd})
+			return runConfiguredCommand(ctx, conf, []string{cmd})
 		},
 	}
 }

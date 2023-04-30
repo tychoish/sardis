@@ -71,8 +71,7 @@ func setupLinks(ctx context.Context) cli.Command {
 		Name:  "setup-links",
 		Usage: "setup all configured links",
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-			conf := env.Configuration()
+			conf := sardis.AppConfiguration(ctx)
 
 			jobs, worker := units.SetupQueue(amboy.RunJob)
 			for _, link := range conf.Links {

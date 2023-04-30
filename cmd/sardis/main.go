@@ -99,13 +99,14 @@ func buildApp() *cli.App {
 		path := c.String("conf")
 		conf, err := sardis.LoadConfiguration(path)
 		if err != nil {
-			grip.Warning(fmt.Errorf("problem loading config: %w", err))
-			return nil
+			return err
 		}
 
 		conf.Settings.Logging.DisableStandardOutput = c.Bool(disableFlag)
 		conf.Settings.Logging.EnableJSONFormating = c.Bool(jsonFormatingFlag)
 		conf.Settings.Logging.Priority = level.FromString(c.String(levelFlag))
+
+		ctx = sardis.WithConfiguration(ctx, conf)
 
 		loggingSetup(conf.Settings.Logging)
 		output := send.MakeWriter(grip.Sender())
@@ -116,12 +117,6 @@ func buildApp() *cli.App {
 		errOut.Set(level.Error)
 		app.ErrWriter = errOut
 
-		env, err := sardis.NewEnvironment(ctx, conf)
-		if err != nil {
-			return fmt.Errorf("problem configuring app: %w", err)
-		}
-
-		ctx = sardis.WithEvironment(ctx, env)
 		jpm, err := jasper.NewSynchronizedManager(false)
 		if err != nil {
 			srv.AddCleanupError(ctx, err)

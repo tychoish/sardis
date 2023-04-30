@@ -38,9 +38,8 @@ func bulkCreateTickets(ctx context.Context) cli.Command {
 		),
 		Action: func(c *cli.Context) error {
 			path := c.String(pathFlagName)
-			env := sardis.GetEnvironment(ctx)
+			conf := sardis.AppConfiguration(ctx)
 
-			conf := env.Configuration()
 			if conf.Settings.Credentials.Jira.URL == "" {
 				return errors.New("cannot create jira tickets with empty config")
 			}

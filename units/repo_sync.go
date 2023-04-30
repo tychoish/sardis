@@ -102,8 +102,8 @@ func (j *repoSyncJob) Run(ctx context.Context) {
 		"op": "running",
 	})
 
-	env := sardis.GetEnvironment(ctx)
-	conf := env.Configuration()
+	conf := sardis.AppConfiguration(ctx)
+
 	cmd := jasper.Context(ctx).CreateCommand(ctx)
 
 	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{

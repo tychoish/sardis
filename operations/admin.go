@@ -28,7 +28,7 @@ func configCheck(ctx context.Context) cli.Command {
 		Usage:  "validated configuration",
 		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			conf := sardis.GetEnvironment(ctx).Configuration()
+			conf := sardis.AppConfiguration(ctx)
 			err := conf.Validate()
 			if err == nil {
 				grip.Info("configuration is valid")
@@ -44,8 +44,7 @@ func nightly(ctx context.Context) cli.Command {
 		Usage:  "run nightly config operation",
 		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-			conf := env.Configuration()
+			conf := sardis.AppConfiguration(ctx)
 
 			jobs, run := units.SetupQueue(amboy.RunJob)
 

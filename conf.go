@@ -1,6 +1,7 @@
 package sardis
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -203,6 +204,21 @@ func LoadConfiguration(fn string) (*Configuration, error) {
 	}
 
 	return out, nil
+}
+
+const confCtxKey = "sardis-conf"
+
+func WithConfiguration(ctx context.Context, conf *Configuration) context.Context {
+	return context.WithValue(ctx, confCtxKey, *conf)
+}
+
+func AppConfiguration(ctx context.Context) *Configuration {
+	val, ok := ctx.Value(confCtxKey).(Configuration)
+	if !ok {
+		grip.Critical("configuration not loaded in context")
+		return nil
+	}
+	return &val
 }
 
 type validatable interface {
@@ -437,7 +453,7 @@ func (conf *Configuration) mapReposByTags() {
 
 func (conf *Settings) Validate() error {
 	catcher := &erc.Collector{}
-	for _, c := range []validatable{
+	for _, c := range []interface{ Validate() error }{
 		&conf.Notification,
 		&conf.Queue,
 		&conf.Credentials,

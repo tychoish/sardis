@@ -78,8 +78,9 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 		j.AddError(errors.New("repo-fetch requires defined remote name and branch for the repo"))
 		return
 	}
-	env := sardis.GetEnvironment(ctx)
-	conf := env.Configuration()
+
+	conf := sardis.AppConfiguration(ctx)
+
 	cmd := jasper.Context(ctx).CreateCommand(ctx)
 
 	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{

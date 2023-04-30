@@ -32,8 +32,9 @@ func notifyPipe(ctx context.Context) cli.Command {
 		Usage:  "send the contents of standard input over xmpp",
 		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-			ctx = sardis.WithRemoteNotify(ctx, env.Configuration())
+			conf := sardis.AppConfiguration(ctx)
+
+			ctx = sardis.WithRemoteNotify(ctx, conf)
 			logger := sardis.RemoteNotify(ctx)
 
 			scanner := bufio.NewScanner(os.Stdin)
@@ -51,8 +52,9 @@ func notifySend(ctx context.Context) cli.Command {
 		Usage:  "send the remaining arguments over xmpp",
 		Before: requireConfig(ctx),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-			ctx = sardis.WithRemoteNotify(ctx, env.Configuration())
+			conf := sardis.AppConfiguration(ctx)
+
+			ctx = sardis.WithRemoteNotify(ctx, conf)
 			sardis.RemoteNotify(ctx).Notice(strings.Join(c.Args(), " "))
 			return nil
 		},

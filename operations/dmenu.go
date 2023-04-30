@@ -18,8 +18,7 @@ func listMenus(ctx context.Context) cli.Command {
 	return cli.Command{
 		Name: "list",
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
-			conf := env.Configuration()
+			conf := sardis.AppConfiguration(ctx)
 
 			table := tabby.New()
 			table.AddHeader("Name", "Selections")
@@ -83,9 +82,8 @@ func DMenu(ctx context.Context) cli.Command {
 		},
 		Before: setFirstArgWhenStringUnset(commandFlagName),
 		Action: func(c *cli.Context) error {
-			env := sardis.GetEnvironment(ctx)
 			name := c.String(commandFlagName)
-			conf := env.Configuration()
+			conf := sardis.AppConfiguration(ctx)
 
 			ctx = sardis.WithRemoteNotify(ctx, conf)
 			others := []string{}
@@ -114,7 +112,7 @@ func DMenu(ctx context.Context) cli.Command {
 					return err
 				}
 
-				return runConfiguredCommand(ctx, env, []string{cmd})
+				return runConfiguredCommand(ctx, conf, []string{cmd})
 			}
 
 			notify := sardis.RemoteNotify(ctx)

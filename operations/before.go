@@ -35,11 +35,7 @@ func addRemanderToStringSliceFlag(name string) cli.BeforeFunc {
 
 func requireConfig(ctx context.Context) cli.BeforeFunc {
 	return func(c *cli.Context) error {
-		env := sardis.GetEnvironment(ctx)
-		if env == nil {
-			return errors.New("nil environment")
-		}
-		conf := env.Configuration()
+		conf := sardis.AppConfiguration(ctx)
 		if conf == nil {
 			return errors.New("conf is nil")
 		}

@@ -37,7 +37,7 @@ func fetchAur(ctx context.Context) cli.Command {
 				Usage: "specify the name of a package",
 			},
 		},
-		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig(ctx)),
+		Before: addRemanderToStringSliceFlag(nameFlagName),
 		Action: func(c *cli.Context) error {
 			catcher := &erc.Collector{}
 
@@ -60,7 +60,7 @@ func buildPkg(ctx context.Context) cli.Command {
 				Usage: "specify the name of a package",
 			},
 		},
-		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig(ctx)),
+		Before: addRemanderToStringSliceFlag(nameFlagName),
 		Action: func(c *cli.Context) error {
 			catcher := &erc.Collector{}
 
@@ -83,7 +83,7 @@ func installAur(ctx context.Context) cli.Command {
 				Usage: "specify the name of a package",
 			},
 		},
-		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig(ctx)),
+		Before: addRemanderToStringSliceFlag(nameFlagName),
 		Action: func(c *cli.Context) error {
 			catcher := &erc.Collector{}
 
@@ -106,7 +106,7 @@ func setupArchLinux(ctx context.Context) cli.Command {
 		Name:   "setup",
 		Usage:  "bootstrap/setup system according to packages described",
 		Flags:  []cli.Flag{},
-		Before: mergeBeforeFuncs(addRemanderToStringSliceFlag(nameFlagName), requireConfig(ctx)),
+		Before: addRemanderToStringSliceFlag(nameFlagName),
 		Action: func(c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 			catcher := &erc.Collector{}

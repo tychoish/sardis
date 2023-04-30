@@ -37,9 +37,8 @@ func Repo(ctx context.Context) cli.Command {
 
 func repoList(ctx context.Context) cli.Command {
 	return cli.Command{
-		Name:   "list",
-		Usage:  "return a list of configured repos",
-		Before: requireConfig(ctx),
+		Name:  "list",
+		Usage: "return a list of configured repos",
 		Action: func(c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 
@@ -77,7 +76,7 @@ func repoUpdate(ctx context.Context) cli.Command {
 				Usage: "specify tag of repos to update",
 			},
 		},
-		Before: mergeBeforeFuncs(requireConfig(ctx), setAllTailArguements(repoTagFlagName)),
+		Before: setAllTailArguements(repoTagFlagName),
 		Action: func(c *cli.Context) error {
 			tags := c.StringSlice(repoTagFlagName)
 

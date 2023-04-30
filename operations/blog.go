@@ -37,8 +37,7 @@ func blogPublish(ctx context.Context) cli.Command {
 				Value: "blog",
 			},
 		},
-		Before: mergeBeforeFuncs(requireConfig(ctx),
-			requireStringOrFirstArgSet(blogNameFlag)),
+		Before: requireStringOrFirstArgSet(blogNameFlag),
 		Action: func(c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 

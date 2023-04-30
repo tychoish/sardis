@@ -32,10 +32,7 @@ func bulkCreateTickets(ctx context.Context) cli.Command {
 				Usage: "specify the name of a file that holds jira tickets",
 			},
 		},
-		Before: mergeBeforeFuncs(
-			requirePathExists(pathFlagName),
-			requireConfig(ctx),
-		),
+		Before: requirePathExists(pathFlagName),
 		Action: func(c *cli.Context) error {
 			path := c.String(pathFlagName)
 			conf := sardis.AppConfiguration(ctx)

@@ -24,9 +24,8 @@ func Admin(ctx context.Context) cli.Command {
 
 func configCheck(ctx context.Context) cli.Command {
 	return cli.Command{
-		Name:   "config",
-		Usage:  "validated configuration",
-		Before: requireConfig(ctx),
+		Name:  "config",
+		Usage: "validated configuration",
 		Action: func(c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 			err := conf.Validate()
@@ -40,9 +39,8 @@ func configCheck(ctx context.Context) cli.Command {
 
 func nightly(ctx context.Context) cli.Command {
 	return cli.Command{
-		Name:   "nightly",
-		Usage:  "run nightly config operation",
-		Before: requireConfig(ctx),
+		Name:  "nightly",
+		Usage: "run nightly config operation",
 		Action: func(c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 

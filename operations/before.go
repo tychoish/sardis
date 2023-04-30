@@ -1,13 +1,11 @@
 package operations
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
 
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/sardis"
 	"github.com/urfave/cli"
 )
 
@@ -30,16 +28,6 @@ func addRemanderToStringSliceFlag(name string) cli.BeforeFunc {
 			catcher.Add(c.Set(name, v))
 		}
 		return catcher.Resolve()
-	}
-}
-
-func requireConfig(ctx context.Context) cli.BeforeFunc {
-	return func(c *cli.Context) error {
-		conf := sardis.AppConfiguration(ctx)
-		if conf == nil {
-			return errors.New("conf is nil")
-		}
-		return nil
 	}
 }
 

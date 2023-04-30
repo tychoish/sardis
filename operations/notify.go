@@ -28,9 +28,8 @@ func Notify(ctx context.Context) cli.Command {
 
 func notifyPipe(ctx context.Context) cli.Command {
 	return cli.Command{
-		Name:   "pipe",
-		Usage:  "send the contents of standard input over xmpp",
-		Before: requireConfig(ctx),
+		Name:  "pipe",
+		Usage: "send the contents of standard input over xmpp",
 		Action: func(c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 
@@ -48,9 +47,8 @@ func notifyPipe(ctx context.Context) cli.Command {
 
 func notifySend(ctx context.Context) cli.Command {
 	return cli.Command{
-		Name:   "send",
-		Usage:  "send the remaining arguments over xmpp",
-		Before: requireConfig(ctx),
+		Name:  "send",
+		Usage: "send the remaining arguments over xmpp",
 		Action: func(c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 
@@ -62,9 +60,8 @@ func notifySend(ctx context.Context) cli.Command {
 }
 func notifyDesktop(ctx context.Context) cli.Command {
 	return cli.Command{
-		Name:   "desktop",
-		Usage:  "send the remaining arguments over xmpp",
-		Before: requireConfig(ctx),
+		Name:  "desktop",
+		Usage: "send the remaining arguments over xmpp",
 		Action: func(c *cli.Context) error {
 			sardis.DesktopNotify(ctx).Notice(strings.Join(c.Args(), " "))
 			return nil

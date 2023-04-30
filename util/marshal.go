@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
@@ -46,7 +46,7 @@ func UnmarshalFile(fn string, out interface{}) error {
 	}
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("problem reading data from %s: %w", fn, err)
 	}

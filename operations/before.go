@@ -9,18 +9,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-func mergeBeforeFuncs(ops ...func(c *cli.Context) error) cli.BeforeFunc {
-	return func(c *cli.Context) error {
-		catcher := &erc.Collector{}
-
-		for _, op := range ops {
-			catcher.Add(op(c))
-		}
-
-		return catcher.Resolve()
-	}
-}
-
 func addRemanderToStringSliceFlag(name string) cli.BeforeFunc {
 	return func(c *cli.Context) error {
 		catcher := &erc.Collector{}

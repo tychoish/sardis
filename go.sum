@@ -259,6 +259,8 @@ github.com/tychoish/birch/x/mrpc v0.0.0-20230413052020-46068f63d7bb h1:l6yzSrJbt
 github.com/tychoish/birch/x/mrpc v0.0.0-20230413052020-46068f63d7bb/go.mod h1:SyMVnkunrAoJF8VRylz3OpeTS6IxJ2kgQW3dfzoF+O4=
 github.com/tychoish/cmdr v0.1.0 h1:SbANwUsBjLUncY0czJGCip0LiUUm520eRo++cDAyylI=
 github.com/tychoish/cmdr v0.1.0/go.mod h1:QiN8+MEolkYTIf49deT8NwTXLOybaLcg4Vb3GNWBBnA=
+github.com/tychoish/cmdr v0.1.1-0.20230428170527-8a1c2f62e629 h1:vRKL6jTQVX4RqSQa9LFsP9pKOV4DO0BvDwOV4gkNLXE=
+github.com/tychoish/cmdr v0.1.1-0.20230428170527-8a1c2f62e629/go.mod h1:JuncBXCZpDol6UI0tLNFYpL6tshskIBY90aTCChxWVE=
 github.com/tychoish/emt v0.0.0-20220306153139-74b97c67f209/go.mod h1:KMhVWIsL98Q8AoorphjsOQWabcNOoYqMSpODR/rtRb4=
 github.com/tychoish/fun v0.1.0/go.mod h1:84A+BwGecz23UotmbB4mtvVS5ZcsZpspecduxpwF/XM=
 github.com/tychoish/fun v0.3.3/go.mod h1:84A+BwGecz23UotmbB4mtvVS5ZcsZpspecduxpwF/XM=

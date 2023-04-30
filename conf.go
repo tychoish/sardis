@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -206,7 +205,9 @@ func LoadConfiguration(fn string) (*Configuration, error) {
 	return out, nil
 }
 
-const confCtxKey = "sardis-conf"
+type ctxKey string
+
+const confCtxKey ctxKey = "sardis-conf"
 
 func WithConfiguration(ctx context.Context, conf *Configuration) context.Context {
 	return context.WithValue(ctx, confCtxKey, *conf)
@@ -219,10 +220,6 @@ func AppConfiguration(ctx context.Context) *Configuration {
 		return nil
 	}
 	return &val
-}
-
-type validatable interface {
-	Validate() error
 }
 
 func (conf *MenuConf) Validate() error {
@@ -381,7 +378,7 @@ func (conf *Configuration) expandLinks(catcher *erc.Collector) []LinkConf {
 		}
 
 		if lnk.DirectoryContents {
-			files, err := ioutil.ReadDir(lnk.Target)
+			files, err := os.ReadDir(lnk.Target)
 			if err != nil {
 				catcher.Add(err)
 				continue

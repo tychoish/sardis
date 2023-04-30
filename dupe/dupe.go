@@ -1,7 +1,7 @@
 package dupe
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -48,7 +48,7 @@ func readTree(root string) (state, error) {
 		}
 		defer file.Close()
 
-		content, err := ioutil.ReadAll(file)
+		content, err := io.ReadAll(file)
 		if err != nil {
 			return err
 		}
@@ -63,15 +63,6 @@ func readTree(root string) (state, error) {
 	}
 
 	return out, nil
-}
-
-type comparsioPayload struct {
-	targetName    string
-	targetContent string
-	targetExists  bool
-	mirrorName    string
-	mirrorContent string
-	mirrorExists  bool
 }
 
 // desired cases:

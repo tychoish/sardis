@@ -82,7 +82,8 @@ func main() {
 			return jasper.WithManager(ctx, jpm)
 		})
 
-	cmdr.AddOperation(cmd, resolveConfiguration,
+	cmdr.AddOperation(cmd,
+		resolveConfiguration,
 		func(ctx context.Context, conf *sardis.Configuration) error {
 			logger := grip.Context(ctx)
 			logger.Notice("hello world")

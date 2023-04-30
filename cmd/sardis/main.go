@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/coreos/go-systemd/journal"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -98,17 +99,15 @@ func buildApp() *cli.App {
 	app.Before = func(c *cli.Context) error {
 		path := c.String("conf")
 		conf, err := sardis.LoadConfiguration(path)
-		if err != nil {
-			return err
-		}
 
 		conf.Settings.Logging.DisableStandardOutput = c.Bool(disableFlag)
 		conf.Settings.Logging.EnableJSONFormating = c.Bool(jsonFormatingFlag)
 		conf.Settings.Logging.Priority = level.FromString(c.String(levelFlag))
 
+		loggingSetup(conf.Settings.Logging)
+
 		ctx = sardis.WithConfiguration(ctx, conf)
 
-		loggingSetup(conf.Settings.Logging)
 		output := send.MakeWriter(grip.Sender())
 		output.Set(level.Info)
 		app.Writer = output
@@ -143,31 +142,32 @@ func buildApp() *cli.App {
 // logging setup is separate to make it unit testable
 func loggingSetup(conf sardis.LoggingConf) {
 	sender := grip.Sender()
-	sender.SetName(os.Args[0])
-	sender.SetPriority(conf.Priority)
-	grip.SetGlobalLogger(grip.NewLogger(sender))
+
+	if runtime.GOOS == "linux" {
+		var syslog send.Sender
+		var err error
+		if journal.Enabled() {
+			syslog, err = system.MakeSystemdSender()
+			if err != nil {
+				return
+			}
+			return
+		} else {
+			syslog = system.MakeLocalSyslog()
+		}
+
+		if !conf.DisableStandardOutput {
+			sender = send.MakeMulti(syslog, sender)
+		} else {
+			sender = syslog
+		}
+	}
 
 	if conf.EnableJSONFormating {
 		sender.SetFormatter(send.MakeJSONFormatter())
 	}
 
-	if runtime.GOOS == "linux" {
-		sys, err := system.MakeDefault()
-		if err != nil {
-			return
-		}
-
-		if conf.EnableJSONFormating {
-			sys.SetFormatter(send.MakeJSONFormatter())
-		}
-
-		if !conf.DisableStandardOutput {
-			sender = send.MakeMulti(sys, sender)
-		} else {
-			sender = sys
-		}
-
-		sender.SetPriority(conf.Priority)
-		grip.SetGlobalLogger(grip.NewLogger(sender))
-	}
+	sender.SetName(os.Args[0])
+	sender.SetPriority(conf.Priority)
+	grip.SetGlobalLogger(grip.NewLogger(sender))
 }

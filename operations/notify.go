@@ -12,8 +12,6 @@ import (
 )
 
 func Notify(ctx context.Context) cli.Command {
-	ctx = sardis.WithDesktopNotify(ctx)
-
 	return cli.Command{
 		Name:    "notify",
 		Aliases: []string{"xmpp"},
@@ -34,6 +32,7 @@ func notifyPipe(ctx context.Context) cli.Command {
 			conf := sardis.AppConfiguration(ctx)
 
 			ctx = sardis.WithRemoteNotify(ctx, conf)
+
 			logger := sardis.RemoteNotify(ctx)
 
 			scanner := bufio.NewScanner(os.Stdin)
@@ -53,7 +52,10 @@ func notifySend(ctx context.Context) cli.Command {
 			conf := sardis.AppConfiguration(ctx)
 
 			ctx = sardis.WithRemoteNotify(ctx, conf)
-			sardis.RemoteNotify(ctx).Notice(strings.Join(c.Args(), " "))
+
+			notify := sardis.RemoteNotify(ctx)
+			notify.Notice(strings.Join(c.Args(), " "))
+
 			return nil
 		},
 	}
@@ -63,6 +65,7 @@ func notifyDesktop(ctx context.Context) cli.Command {
 		Name:  "desktop",
 		Usage: "send the remaining arguments over xmpp",
 		Action: func(c *cli.Context) error {
+			ctx = sardis.WithDesktopNotify(ctx)
 			sardis.DesktopNotify(ctx).Notice(strings.Join(c.Args(), " "))
 			return nil
 		},

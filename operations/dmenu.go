@@ -85,7 +85,7 @@ func DMenu(ctx context.Context) cli.Command {
 			name := c.String(commandFlagName)
 			conf := sardis.AppConfiguration(ctx)
 
-			ctx = sardis.WithRemoteNotify(ctx, conf)
+			ctx = sardis.WithDesktopNotify(ctx)
 			others := []string{}
 
 			cmdGrp := conf.ExportCommandGroups()
@@ -115,7 +115,7 @@ func DMenu(ctx context.Context) cli.Command {
 				return runConfiguredCommand(ctx, conf, []string{cmd})
 			}
 
-			notify := sardis.RemoteNotify(ctx)
+			notify := sardis.DesktopNotify(ctx)
 
 			for _, menu := range conf.Menus {
 				if menu.Name == name {

@@ -44,11 +44,8 @@ func WithTwitterLogger(ctx context.Context, conf *Configuration) context.Context
 
 func DesktopNotify(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "desktop") }
 func WithDesktopNotify(ctx context.Context) context.Context {
-	return grip.WithNewContextLogger(ctx, "desktop", func() send.Sender {
-		desktop := desktop.MakeSender()
-		desktop.SetName(grip.Sender().Name())
-		return desktop
-	})
+	sender := send.MakeMulti(desktop.MakeSender(), grip.Sender())
+	return grip.WithContextLogger(ctx, "desktop", grip.NewLogger(sender))
 }
 
 func RemoteNotify(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "remote-notify") }
@@ -60,8 +57,10 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 	var loggers []send.Sender
 
 	defer func() {
-		loggers = append(loggers, desktop.MakeSender())
-		out = grip.WithContextLogger(ctx, "remote-notify", grip.NewLogger(send.MakeMulti(loggers...)))
+		loggers = append(loggers, desktop.MakeSender(), root)
+		sender := send.MakeMulti(loggers...)
+		sender.SetName(util.GetHostname())
+		out = grip.WithContextLogger(ctx, "remote-notify", grip.NewLogger(sender))
 	}()
 
 	sender, err := xmpp.NewSender(conf.Settings.Notification.Target,

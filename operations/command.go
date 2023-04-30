@@ -20,8 +20,6 @@ import (
 const commandFlagName = "command"
 
 func RunCommand(ctx context.Context) cli.Command {
-	ctx = sardis.WithDesktopNotify(ctx)
-
 	return cli.Command{
 		Name:  "run",
 		Usage: "runs a predefined command",
@@ -75,8 +73,8 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops [
 					notify.Error(message.WrapError(err, name))
 					return err
 				}
-
-				notify.Noticeln(name, "completed")
+				notify.Sender().SetName(name)
+				notify.Notice("completed")
 				return nil
 			}).
 			Run(ctx)

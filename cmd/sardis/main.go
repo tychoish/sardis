@@ -143,7 +143,7 @@ func buildApp() *cli.App {
 // logging setup is separate to make it unit testable
 func loggingSetup(conf sardis.LoggingConf) {
 	sender := grip.Sender()
-	sender.SetName("sardis")
+	sender.SetName(os.Args[0])
 	sender.SetPriority(conf.Priority)
 	grip.SetGlobalLogger(grip.NewLogger(sender))
 

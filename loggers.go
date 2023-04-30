@@ -60,7 +60,7 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 	var loggers []send.Sender
 
 	defer func() {
-		loggers = append(loggers, root)
+		loggers = append(loggers, desktop.MakeSender())
 		out = grip.WithContextLogger(ctx, "remote-notify", grip.NewLogger(send.MakeMulti(loggers...)))
 	}()
 
@@ -80,9 +80,9 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 		return
 	}
 
-	host := util.GetHostname()
-
 	sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
+
+	host := util.GetHostname()
 
 	sender.SetFormatter(func(m message.Composer) (string, error) {
 		return fmt.Sprintf("[%s:%s] %s", conf.Settings.Notification.Name, host, m.String()), nil

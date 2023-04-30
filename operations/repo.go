@@ -101,8 +101,9 @@ func repoUpdate() cli.Command {
 				if repo.Notify {
 					shouldNotify = true
 				}
-				jobs.PushBack(func(ctx context.Context) error { return units.SyncRepo(ctx, repo).Run(ctx) })
+				jobs.PushBack(units.SyncRepo(repo))
 			}
+
 			grip.Info(message.Fields{
 				"op":      "repo sync",
 				"message": "waiting for jobs to complete",
@@ -181,7 +182,7 @@ func repoClone() cli.Command {
 			conf := sardis.AppConfiguration(ctx)
 
 			repos := conf.GetTaggedRepos(name)
-			jobs, run := units.SetupQueue(amboy.RunJob)
+			jobs, run := units.SetupWorkers()
 
 			for idx := range repos {
 				if _, err := os.Stat(repos[idx].Path); !os.IsNotExist(err) {

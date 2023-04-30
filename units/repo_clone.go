@@ -2,14 +2,13 @@ package units
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/tychoish/amboy"
-	"github.com/tychoish/amboy/dependency"
-	"github.com/tychoish/amboy/job"
-	"github.com/tychoish/amboy/registry"
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -18,81 +17,49 @@ import (
 	"github.com/tychoish/sardis"
 )
 
-type repoCloneJob struct {
-	Conf     sardis.RepoConf `bson:"conf" json:"conf" yaml:"conf"`
-	job.Base `bson:"metadata" json:"metadata" yaml:"metadata"`
-}
+func NewRepoCloneJob(rconf sardis.RepoConf) fun.WorkerFunc {
+	return func(ctx context.Context) (err error) {
+		ec := &erc.Collector{}
+		defer func() { err = ec.Resolve() }()
 
-const repoCloneJobName = "repo-clone"
+		if _, err := os.Stat(rconf.Path); !os.IsNotExist(err) {
+			if rconf.LocalSync {
+				ec.Add(amboy.RunJob(ctx, NewLocalRepoSyncJob(rconf.Path, rconf.Branch, nil, nil)))
+			} else if rconf.Fetch {
+				ec.Add(amboy.RunJob(ctx, NewRepoFetchJob(rconf)))
+			}
 
-func init() { registry.AddJobType(repoCloneJobName, func() amboy.Job { return repoCloneFactory() }) }
-
-func repoCloneFactory() *repoCloneJob {
-	j := &repoCloneJob{
-		Base: job.Base{
-			JobType: amboy.JobType{
-				Name:    repoCloneJobName,
-				Version: 1,
-			},
-		},
-	}
-	j.SetDependency(dependency.NewAlways())
-	return j
-}
-
-func NewRepoCloneJob(conf sardis.RepoConf) amboy.Job {
-	j := repoCloneFactory()
-
-	j.Conf = conf
-	j.SetID(fmt.Sprintf("%s.%d.%s", repoCloneJobName, job.GetNumber(), j.Conf.Path))
-	return j
-}
-
-func (j *repoCloneJob) Run(ctx context.Context) {
-	defer j.MarkComplete()
-
-	if _, err := os.Stat(j.Conf.Path); !os.IsNotExist(err) {
-		if j.Conf.LocalSync {
-			job := NewLocalRepoSyncJob(j.Conf.Path, j.Conf.Branch, nil, nil)
-			job.Run(ctx)
-			j.AddError(job.Error())
-		} else if j.Conf.Fetch {
-			job := NewRepoFetchJob(j.Conf)
-			job.Run(ctx)
-			j.AddError(job.Error())
+			grip.Notice(message.Fields{
+				"path": rconf.Path,
+				"repo": rconf.Remote,
+				"op":   "exists, skipping clone",
+			})
 		}
 
+		conf := sardis.AppConfiguration(ctx)
+		cmd := jasper.Context(ctx).CreateCommand(ctx)
+
+		sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
+			"repo": rconf.Name,
+		})
+
+		ec.Add(cmd.ID(strings.Join([]string{rconf.Name, "clone"}, ".")).
+			Priority(level.Debug).
+			AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
+			Directory(filepath.Dir(rconf.Path)).
+			SetOutputSender(level.Info, sender).
+			SetErrorSender(level.Warning, sender).
+			AppendArgs("git", "clone", rconf.Remote, rconf.Path).
+			AddWhen(len(rconf.Post) > 0, rconf.Post).
+			Run(ctx))
+
 		grip.Notice(message.Fields{
-			"path": j.Conf.Path,
-			"repo": j.Conf.Remote,
-			"op":   "exists, skipping clone",
+			"path":   rconf.Path,
+			"repo":   rconf.Remote,
+			"errors": ec.HasErrors(),
+			"op":     "repo clone",
 		})
 
 		return
 	}
-
-	conf := sardis.AppConfiguration(ctx)
-	cmd := jasper.Context(ctx).CreateCommand(ctx)
-
-	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
-		"job":  j.ID(),
-		"repo": j.Conf.Name,
-	})
-
-	j.AddError(cmd.ID(j.ID()).
-		Priority(level.Debug).
-		AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
-		Directory(filepath.Dir(j.Conf.Path)).
-		SetOutputSender(level.Info, sender).
-		SetErrorSender(level.Warning, sender).
-		AppendArgs("git", "clone", j.Conf.Remote, j.Conf.Path).
-		AddWhen(len(j.Conf.Post) > 0, j.Conf.Post).
-		Run(ctx))
-
-	grip.Notice(message.Fields{
-		"path":   j.Conf.Path,
-		"repo":   j.Conf.Remote,
-		"errors": j.HasErrors(),
-		"op":     "repo clone",
-	})
 }

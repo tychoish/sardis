@@ -68,9 +68,7 @@ func (j *repoFetchJob) Run(ctx context.Context) {
 			"op":   "repo doesn't exist; cloning",
 		})
 
-		job := NewRepoCloneJob(j.Conf)
-		job.Run(ctx)
-		j.AddError(job.Error())
+		j.AddError(NewRepoCloneJob(j.Conf)(ctx))
 		return
 	}
 

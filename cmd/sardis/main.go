@@ -89,28 +89,25 @@ func buildApp() *cli.App {
 		},
 	}
 
-	setCommands := func(ctx context.Context) {
-		app.Commands = []cli.Command{
-			operations.Notify(),
-			operations.Tweet(),
-			operations.Version(),
-			operations.DMenu(),
-			operations.Admin(),
-			operations.ArchLinux(),
-			operations.Repo(),
-			operations.Jira(),
-			operations.RunCommand(),
-			operations.Blog(),
-			operations.Utilities(),
-			jaspercli.Jasper(),
-		}
+	app.Commands = []cli.Command{
+		operations.Notify(),
+		operations.Tweet(),
+		operations.Version(),
+		operations.DMenu(),
+		operations.Admin(),
+		operations.ArchLinux(),
+		operations.Repo(),
+		operations.Jira(),
+		operations.RunCommand(),
+		operations.Blog(),
+		operations.Utilities(),
+		jaspercli.Jasper(),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ctx = srv.WithOrchestrator(ctx)
 	ctx = srv.WithCleanup(ctx)
-	setCommands(ctx)
 
 	app.Before = func(c *cli.Context) error {
 		path := c.String("conf")

@@ -11,11 +11,12 @@ import (
 	"github.com/tychoish/sardis/util"
 )
 
-func SyncRepo(ctx context.Context, repo sardis.RepoConf) fun.WorkerFunc {
+func SyncRepo(repo sardis.RepoConf) fun.WorkerFunc {
 	hostname := util.GetHostname()
+	hasMirrors := false
 
 	workerList, runWorkers := SetupWorkers()
-	hasMirrors := false
+
 	for _, mirror := range repo.Mirrors {
 		if strings.Contains(mirror, hostname) {
 			grip.Infof("skipping mirror %s->%s because it's probably local (%s)",
@@ -27,10 +28,8 @@ func SyncRepo(ctx context.Context, repo sardis.RepoConf) fun.WorkerFunc {
 		workerList.PushBack(WorkerJob(NewRepoSyncJob(mirror, repo.Path, repo.Branch, repo.Pre, nil)))
 	}
 
-	err := runWorkers(ctx)
-
 	return func(ctx context.Context) error {
-		if err != nil {
+		if err := runWorkers(ctx); err != nil {
 			return err
 		}
 

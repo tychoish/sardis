@@ -11,24 +11,24 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Notify(ctx context.Context) cli.Command {
+func Notify() cli.Command {
 	return cli.Command{
 		Name:    "notify",
 		Aliases: []string{"xmpp"},
 		Usage:   "send an xmpp message",
 		Subcommands: []cli.Command{
-			notifyPipe(ctx),
-			notifySend(ctx),
-			notifyDesktop(ctx),
+			notifyPipe(),
+			notifySend(),
+			notifyDesktop(),
 		},
 	}
 }
 
-func notifyPipe(ctx context.Context) cli.Command {
+func notifyPipe() cli.Command {
 	return cli.Command{
 		Name:  "pipe",
 		Usage: "send the contents of standard input over xmpp",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 
 			ctx = sardis.WithRemoteNotify(ctx, conf)
@@ -44,11 +44,11 @@ func notifyPipe(ctx context.Context) cli.Command {
 	}
 }
 
-func notifySend(ctx context.Context) cli.Command {
+func notifySend() cli.Command {
 	return cli.Command{
 		Name:  "send",
 		Usage: "send the remaining arguments over xmpp",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 
 			ctx = sardis.WithRemoteNotify(ctx, conf)
@@ -60,11 +60,11 @@ func notifySend(ctx context.Context) cli.Command {
 		},
 	}
 }
-func notifyDesktop(ctx context.Context) cli.Command {
+func notifyDesktop() cli.Command {
 	return cli.Command{
 		Name:  "desktop",
 		Usage: "send the remaining arguments over xmpp",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			ctx = sardis.WithDesktopNotify(ctx)
 			sardis.DesktopNotify(ctx).Notice(strings.Join(c.Args(), " "))
 			return nil

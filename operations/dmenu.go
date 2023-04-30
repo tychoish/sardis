@@ -14,10 +14,10 @@ import (
 	"github.com/urfave/cli"
 )
 
-func listMenus(ctx context.Context) cli.Command {
+func listMenus() cli.Command {
 	return cli.Command{
 		Name: "list",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 
 			table := tabby.New()
@@ -63,15 +63,15 @@ func listMenus(ctx context.Context) cli.Command {
 	}
 }
 
-func DMenu(ctx context.Context) cli.Command {
-	cmds := dmenuListCmds(ctx, dmenuListCommandRun)
+func DMenu() cli.Command {
+	cmds := dmenuListCmds(dmenuListCommandRun)
 	cmds.Name = "all"
 
 	return cli.Command{
 		Name: "dmenu",
 		Subcommands: []cli.Command{
 			cmds,
-			listMenus(ctx),
+			listMenus(),
 		},
 		Flags: []cli.Flag{
 			cli.StringSliceFlag{
@@ -81,7 +81,7 @@ func DMenu(ctx context.Context) cli.Command {
 			},
 		},
 		Before: setFirstArgWhenStringUnset(commandFlagName),
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			name := c.String(commandFlagName)
 			conf := sardis.AppConfiguration(ctx)
 

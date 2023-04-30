@@ -8,7 +8,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Tweet(ctx context.Context) cli.Command {
+func Tweet() cli.Command {
 	return cli.Command{
 		Name:  "tweet",
 		Usage: "send a tweet",
@@ -18,7 +18,7 @@ func Tweet(ctx context.Context) cli.Command {
 				Usage: "message to tweet",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			msg := c.String("message")
 
 			if len(msg) > 280 {

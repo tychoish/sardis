@@ -19,7 +19,7 @@ import (
 
 const commandFlagName = "command"
 
-func RunCommand(ctx context.Context) cli.Command {
+func RunCommand() cli.Command {
 	return cli.Command{
 		Name:  "run",
 		Usage: "runs a predefined command",
@@ -30,12 +30,12 @@ func RunCommand(ctx context.Context) cli.Command {
 			},
 		},
 		Subcommands: []cli.Command{
-			listCommands(ctx),
-			dmenuListCmds(ctx, dmenuListCommandAll),
-			qrCode(ctx),
+			listCommands(),
+			dmenuListCmds(dmenuListCommandAll),
+			qrCode(),
 		},
 		Before: requireCommandsSet(commandFlagName),
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			ops := c.StringSlice(commandFlagName)
 			conf := sardis.AppConfiguration(ctx)
 
@@ -85,11 +85,11 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops [
 	return nil
 }
 
-func listCommands(ctx context.Context) cli.Command {
+func listCommands() cli.Command {
 	return cli.Command{
 		Name:  "list",
 		Usage: "return a list of defined commands",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 			homedir := util.GetHomeDir()
 
@@ -125,11 +125,11 @@ const (
 	dmenuListCommandRun
 )
 
-func dmenuListCmds(ctx context.Context, kind dmenuListCommandTypes) cli.Command {
+func dmenuListCmds(kind dmenuListCommandTypes) cli.Command {
 	return cli.Command{
 		Name:  "dmenu",
 		Usage: "return a list of defined commands",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 			var cmds []sardis.CommandConf
 
@@ -180,11 +180,11 @@ type bufCloser struct {
 
 func (b bufCloser) Close() error { return nil }
 
-func qrCode(ctx context.Context) cli.Command {
+func qrCode() cli.Command {
 	return cli.Command{
 		Name:  "qr",
 		Usage: "gets qrcode from x11 clipboard and renders it on the terminal",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			buf := &bufCloser{}
 
 			err := jasper.Context(ctx).CreateCommand(ctx).

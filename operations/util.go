@@ -12,19 +12,19 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Utilities(ctx context.Context) cli.Command {
+func Utilities() cli.Command {
 	return cli.Command{
 		Name:    "util",
 		Aliases: []string{"utility"},
 		Usage:   "short utility commands",
 		Subcommands: []cli.Command{
-			setupLinks(ctx),
-			diffTrees(ctx),
+			setupLinks(),
+			diffTrees(),
 		},
 	}
 }
 
-func diffTrees(ctx context.Context) cli.Command {
+func diffTrees() cli.Command {
 	return cli.Command{
 		Name:  "tree-diff",
 		Usage: "Compare two trees of files",
@@ -43,7 +43,7 @@ func diffTrees(ctx context.Context) cli.Command {
 			},
 		},
 		Before: setMultiPositionalArgs("target", "mirror"),
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			shouldDelete := c.Bool("deleteMatching")
 			opts := dupe.Options{
 				Target: c.String("target"),
@@ -66,11 +66,11 @@ func diffTrees(ctx context.Context) cli.Command {
 	}
 }
 
-func setupLinks(ctx context.Context) cli.Command {
+func setupLinks() cli.Command {
 	return cli.Command{
 		Name:  "setup-links",
 		Usage: "setup all configured links",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 
 			jobs, worker := units.SetupQueue(amboy.RunJob)

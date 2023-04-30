@@ -10,23 +10,23 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Admin(ctx context.Context) cli.Command {
+func Admin() cli.Command {
 	return cli.Command{
 		Name:  "admin",
 		Usage: "local sysadmin scripts",
 		Subcommands: []cli.Command{
-			configCheck(ctx),
-			nightly(ctx),
-			setupLinks(ctx),
+			configCheck(),
+			nightly(),
+			setupLinks(),
 		},
 	}
 }
 
-func configCheck(ctx context.Context) cli.Command {
+func configCheck() cli.Command {
 	return cli.Command{
 		Name:  "config",
 		Usage: "validated configuration",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 			err := conf.Validate()
 			if err == nil {
@@ -37,11 +37,11 @@ func configCheck(ctx context.Context) cli.Command {
 	}
 }
 
-func nightly(ctx context.Context) cli.Command {
+func nightly() cli.Command {
 	return cli.Command{
 		Name:  "nightly",
 		Usage: "run nightly config operation",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 
 			jobs, run := units.SetupQueue(amboy.RunJob)

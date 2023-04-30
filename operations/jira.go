@@ -10,17 +10,17 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Jira(ctx context.Context) cli.Command {
+func Jira() cli.Command {
 	return cli.Command{
 		Name:  "jira",
 		Usage: "a collections of commands for jira management",
 		Subcommands: []cli.Command{
-			bulkCreateTickets(ctx),
+			bulkCreateTickets(),
 		},
 	}
 }
 
-func bulkCreateTickets(ctx context.Context) cli.Command {
+func bulkCreateTickets() cli.Command {
 	const pathFlagName = "path"
 
 	return cli.Command{
@@ -33,7 +33,7 @@ func bulkCreateTickets(ctx context.Context) cli.Command {
 			},
 		},
 		Before: requirePathExists(pathFlagName),
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			path := c.String(pathFlagName)
 			conf := sardis.AppConfiguration(ctx)
 

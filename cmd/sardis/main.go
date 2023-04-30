@@ -35,6 +35,22 @@ func main() {
 	}
 }
 
+func reformCommands(ctx context.Context, cmds []cli.Command) {
+	for _, cmd := range cmds {
+		switch cc := cmd.Action.(type) {
+		case func(*cli.Context) error, nil:
+			continue
+		case func(context.Context, *cli.Context) error:
+			cmd.Action = func(clictx *cli.Context) error {
+				return cc(ctx, clictx)
+			}
+		default:
+			grip.Warningf("command has malformed action %s [%T]", cmd.Name, cmd)
+		}
+		reformCommands(ctx, cmd.Subcommands)
+	}
+}
+
 func buildApp() *cli.App {
 	app := cli.NewApp()
 	app.Usage = "a personal automation tool"
@@ -75,17 +91,17 @@ func buildApp() *cli.App {
 
 	setCommands := func(ctx context.Context) {
 		app.Commands = []cli.Command{
-			operations.Notify(ctx),
-			operations.Tweet(ctx),
-			operations.Version(ctx),
-			operations.DMenu(ctx),
-			operations.Admin(ctx),
-			operations.ArchLinux(ctx),
-			operations.Repo(ctx),
-			operations.Jira(ctx),
-			operations.RunCommand(ctx),
-			operations.Blog(ctx),
-			operations.Utilities(ctx),
+			operations.Notify(),
+			operations.Tweet(),
+			operations.Version(),
+			operations.DMenu(),
+			operations.Admin(),
+			operations.ArchLinux(),
+			operations.Repo(),
+			operations.Jira(),
+			operations.RunCommand(),
+			operations.Blog(),
+			operations.Utilities(),
 			jaspercli.Jasper(),
 		}
 	}
@@ -108,14 +124,6 @@ func buildApp() *cli.App {
 
 		ctx = sardis.WithConfiguration(ctx, conf)
 
-		output := send.MakeWriter(grip.Sender())
-		output.Set(level.Info)
-		app.Writer = output
-
-		errOut := send.MakeWriter(grip.Sender())
-		errOut.Set(level.Error)
-		app.ErrWriter = errOut
-
 		jpm, err := jasper.NewSynchronizedManager(false)
 		if err != nil {
 			srv.AddCleanupError(ctx, err)
@@ -125,7 +133,7 @@ func buildApp() *cli.App {
 		}
 
 		// reset now so we give things the right context
-		setCommands(ctx)
+		reformCommands(ctx, app.Commands)
 
 		return nil
 	}

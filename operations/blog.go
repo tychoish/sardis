@@ -15,17 +15,17 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Blog(ctx context.Context) cli.Command {
+func Blog() cli.Command {
 	return cli.Command{
 		Name:  "blog",
 		Usage: "publish/manage blogging",
 		Subcommands: []cli.Command{
-			blogPublish(ctx),
+			blogPublish(),
 		},
 	}
 }
 
-func blogPublish(ctx context.Context) cli.Command {
+func blogPublish() cli.Command {
 	const blogNameFlag = "blog"
 	return cli.Command{
 		Name:  "publish",
@@ -38,7 +38,7 @@ func blogPublish(ctx context.Context) cli.Command {
 			},
 		},
 		Before: requireStringOrFirstArgSet(blogNameFlag),
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 
 			ctx = sardis.WithRemoteNotify(ctx, conf)

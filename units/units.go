@@ -31,14 +31,5 @@ func WorkerJob(job amboy.Job) fun.WorkerFunc {
 }
 
 func SetupWorkers() (*seq.List[fun.WorkerFunc], fun.WorkerFunc) {
-	list := &seq.List[fun.WorkerFunc]{}
-	return list, func(ctx context.Context) error {
-		err := itertool.ParallelForEach(ctx, seq.ListValues(list.Iterator()),
-			func(ctx context.Context, fn fun.WorkerFunc) error { return fn(ctx) },
-			DefaultPoolOpts())
-		if err != nil {
-			return err
-		}
-		return ctx.Err()
-	}
+	return SetupQueue(func(ctx context.Context, fn fun.WorkerFunc) error { return fn(ctx) })
 }

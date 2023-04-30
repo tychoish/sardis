@@ -3,6 +3,7 @@ package sardis
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/srv"
@@ -12,6 +13,7 @@ import (
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/grip/x/desktop"
 	"github.com/tychoish/grip/x/jira"
+	"github.com/tychoish/grip/x/telegram"
 	"github.com/tychoish/grip/x/twitter"
 	"github.com/tychoish/grip/x/xmpp"
 	"github.com/tychoish/sardis/util"
@@ -44,7 +46,9 @@ func WithTwitterLogger(ctx context.Context, conf *Configuration) context.Context
 
 func DesktopNotify(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "desktop") }
 func WithDesktopNotify(ctx context.Context) context.Context {
-	sender := send.MakeMulti(desktop.MakeSender(), grip.Sender())
+	s := desktop.MakeSender()
+	s.SetName("sardis")
+	sender := send.MakeMulti(s, grip.Sender())
 	return grip.WithContextLogger(ctx, "desktop", grip.NewLogger(sender))
 }
 
@@ -56,48 +60,68 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 
 	var loggers []send.Sender
 
+	host := util.GetHostname()
+
 	defer func() {
-		loggers = append(loggers, desktop.MakeSender(), root)
+		desktop := desktop.MakeSender()
+		desktop.SetName("sardis")
+
+		loggers = append(loggers, desktop, root)
 		sender := send.MakeMulti(loggers...)
-		sender.SetName(util.GetHostname())
+		sender.SetPriority(level.Info)
 		out = grip.WithContextLogger(ctx, "remote-notify", grip.NewLogger(sender))
 	}()
 
-	sender, err := xmpp.NewSender(conf.Settings.Notification.Target,
-		xmpp.ConnectionInfo{
-			Hostname:             conf.Settings.Notification.Host,
-			Username:             conf.Settings.Notification.User,
-			Password:             conf.Settings.Notification.Password,
-			DisableTLS:           true,
-			AllowUnencryptedAuth: true,
+	if conf.Settings.Notification.Target != "" && !conf.Settings.Notification.Disabled {
+		sender, err := xmpp.NewSender(conf.Settings.Notification.Target,
+			xmpp.ConnectionInfo{
+				Hostname:             conf.Settings.Notification.Host,
+				Username:             conf.Settings.Notification.User,
+				Password:             conf.Settings.Notification.Password,
+				DisableTLS:           true,
+				AllowUnencryptedAuth: true,
+			})
+
+		if err != nil {
+			err = erc.Wrap(err, "setting up notify send issue logger")
+			srv.AddCleanupError(ctx, err)
+			return
+		}
+
+		sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
+
+		sender.SetFormatter(func(m message.Composer) (string, error) {
+			return fmt.Sprintf("[%s] %s", host, m.String()), nil
 		})
 
-	if err != nil {
-		err = erc.Wrap(err, "setting up notify send issue logger")
-		grip.Alert(err)
-		srv.AddCleanupError(ctx, err)
-		return
+		loggers = append(loggers, sender)
+
+		srv.AddCleanup(ctx, func(ctx context.Context) error {
+			catcher := &erc.Collector{}
+			catcher.Add(sender.Flush(ctx))
+			catcher.Add(sender.Close())
+			return erc.Wrapf(catcher.Resolve(), "xmpp [%s]", conf.Settings.Notification.Name)
+		})
 	}
 
-	sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
+	if conf.Settings.Telegram.Target != "" {
+		sender := send.MakeBuffered(telegram.New(conf.Settings.Telegram), time.Second, 10)
 
-	host := util.GetHostname()
+		sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
+		sender.SetFormatter(func(m message.Composer) (string, error) {
+			return fmt.Sprintf("[%s] %s", host, m.String()), nil
+		})
 
-	sender.SetFormatter(func(m message.Composer) (string, error) {
-		return fmt.Sprintf("[%s:%s] %s", conf.Settings.Notification.Name, host, m.String()), nil
-	})
+		loggers = append(loggers, sender)
 
-	sender.SetPriority(level.Info)
-	sender.SetName(conf.Settings.Notification.Name)
+		srv.AddCleanup(ctx, func(ctx context.Context) error {
+			catcher := &erc.Collector{}
+			catcher.Add(sender.Flush(ctx))
+			catcher.Add(sender.Close())
+			return erc.Wrapf(catcher.Resolve(), "telegram [%s]", conf.Settings.Telegram.Name)
+		})
 
-	loggers = append(loggers, sender)
-
-	srv.AddCleanup(ctx, func(ctx context.Context) error {
-		catcher := &erc.Collector{}
-		catcher.Add(sender.Flush(ctx))
-		catcher.Add(sender.Close())
-		return erc.Wrap(catcher.Resolve(), "remote-notify")
-	})
+	}
 
 	return
 }
@@ -128,7 +152,6 @@ func WithJiraIssue(ctx context.Context, conf *Configuration) (out context.Contex
 	})
 	if err != nil {
 		err = erc.Wrap(err, "setting up jira issue logger")
-		grip.Alert(err)
 		srv.AddCleanupError(ctx, err)
 		return
 	}

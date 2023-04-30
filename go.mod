@@ -7,6 +7,7 @@ replace github.com/nutmegdevelopment/sumologic => github.com/tychoish/sumologic 
 require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
 	github.com/cheynewallace/tabby v1.1.1
+	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
 	github.com/go-git/go-git/v5 v5.2.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/tychoish/amboy v0.0.0-20230414135238-247e579b3b94
@@ -18,6 +19,7 @@ require (
 	github.com/tychoish/grip/x/desktop v0.0.0-20230427110835-c9728a14310e
 	github.com/tychoish/grip/x/jira v0.0.0-20230427110835-c9728a14310e
 	github.com/tychoish/grip/x/system v0.0.0-20230427110835-c9728a14310e
+	github.com/tychoish/grip/x/telegram v0.0.0-20230430192632-9a70cb893120
 	github.com/tychoish/grip/x/twitter v0.0.0-20230427110835-c9728a14310e
 	github.com/tychoish/grip/x/xmpp v0.0.0-20230427110835-c9728a14310e
 	github.com/tychoish/jasper v0.0.0-20230428170340-74877eeb5a0d
@@ -32,7 +34,6 @@ require (
 	github.com/andygrunwald/go-jira v1.15.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/containerd/cgroups/v3 v3.0.1 // indirect
-	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/dghubble/go-twitter v0.0.0-20220626024101-68c0170dc641 // indirect

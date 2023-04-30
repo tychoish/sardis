@@ -39,13 +39,13 @@ func fetchAur(ctx context.Context) cli.Command {
 		},
 		Before: addRemanderToStringSliceFlag(nameFlagName),
 		Action: func(c *cli.Context) error {
-			catcher := &erc.Collector{}
+			queue, run := units.SetupQueue(amboy.RunJob)
 
 			for _, name := range c.StringSlice(nameFlagName) {
-				catcher.Add(amboy.RunJob(ctx, units.NewArchFetchAurJob(name, true)))
+				queue.PushBack(units.NewArchFetchAurJob(name, true))
 			}
 
-			return catcher.Resolve()
+			return run(ctx)
 		},
 	}
 }
@@ -121,9 +121,8 @@ func setupArchLinux(ctx context.Context) cli.Command {
 				"packages": len(pkgs),
 				"aur":      len(conf.System.Arch.AurPackages),
 			})
-			job := units.NewArchInstallPackageJob(pkgs)
-			job.Run(ctx)
-			catcher.Add(job.Error())
+
+			catcher.Add(amboy.RunJob(ctx, units.NewArchInstallPackageJob(pkgs)))
 
 			for _, pkg := range conf.System.Arch.AurPackages {
 				grip.Info(message.Fields{
@@ -131,17 +130,12 @@ func setupArchLinux(ctx context.Context) cli.Command {
 					"update": pkg.Update,
 				})
 
-				job := units.NewArchFetchAurJob(pkg.Name, pkg.Update)
-				job.Run(ctx)
-
-				if err := job.Error(); err != nil {
+				if err := amboy.RunJob(ctx, units.NewArchFetchAurJob(pkg.Name, pkg.Update)); err != nil {
 					catcher.Add(err)
 					continue
 				}
 
-				job = units.NewArchAbsBuildJob(pkg.Name)
-				job.Run(ctx)
-				catcher.Add(job.Error())
+				catcher.Add(amboy.RunJob(ctx, units.NewArchAbsBuildJob(pkg.Name)))
 			}
 
 			return catcher.Resolve()

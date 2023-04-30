@@ -257,8 +257,6 @@ github.com/tychoish/birch/x/ftdc v0.0.0-20230413052020-46068f63d7bb h1:JR4j9XakB
 github.com/tychoish/birch/x/ftdc v0.0.0-20230413052020-46068f63d7bb/go.mod h1:SRDvs3W1BrVdppcRAjFRAJ04WHz49dGmJTy08BP2UuU=
 github.com/tychoish/birch/x/mrpc v0.0.0-20230413052020-46068f63d7bb h1:l6yzSrJbtMY0J55C3bp2knBnVmiEEINiKsvGnZ67OeA=
 github.com/tychoish/birch/x/mrpc v0.0.0-20230413052020-46068f63d7bb/go.mod h1:SyMVnkunrAoJF8VRylz3OpeTS6IxJ2kgQW3dfzoF+O4=
-github.com/tychoish/cmdr v0.1.0 h1:SbANwUsBjLUncY0czJGCip0LiUUm520eRo++cDAyylI=
-github.com/tychoish/cmdr v0.1.0/go.mod h1:QiN8+MEolkYTIf49deT8NwTXLOybaLcg4Vb3GNWBBnA=
 github.com/tychoish/cmdr v0.1.1-0.20230428170527-8a1c2f62e629 h1:vRKL6jTQVX4RqSQa9LFsP9pKOV4DO0BvDwOV4gkNLXE=
 github.com/tychoish/cmdr v0.1.1-0.20230428170527-8a1c2f62e629/go.mod h1:JuncBXCZpDol6UI0tLNFYpL6tshskIBY90aTCChxWVE=
 github.com/tychoish/emt v0.0.0-20220306153139-74b97c67f209/go.mod h1:KMhVWIsL98Q8AoorphjsOQWabcNOoYqMSpODR/rtRb4=
@@ -283,6 +281,8 @@ github.com/tychoish/grip/x/splunk v0.0.0-20230427110835-c9728a14310e h1:rwbBimjv
 github.com/tychoish/grip/x/splunk v0.0.0-20230427110835-c9728a14310e/go.mod h1:4Sze7D67VFvGQiq2492XC39v6K7H63po09Licw0/dPQ=
 github.com/tychoish/grip/x/system v0.0.0-20230427110835-c9728a14310e h1:uvDiOFpCeb/qHvqQSILRkbxBDPSQpUoYAH22s8d//rw=
 github.com/tychoish/grip/x/system v0.0.0-20230427110835-c9728a14310e/go.mod h1:BsvN8ha1hOAfHS8OO0VmLyUC3XdETChY5EjN+WDJpt0=
+github.com/tychoish/grip/x/telegram v0.0.0-20230430192632-9a70cb893120 h1:5nRHEcGc3ecnYN+gVhOv7sRrg3AcZqdRinoYIYm0hRA=
+github.com/tychoish/grip/x/telegram v0.0.0-20230430192632-9a70cb893120/go.mod h1:VPnarwj+MKP/ivbxCBg8+wUprRWBP+fiGtVcuBgj0zc=
 github.com/tychoish/grip/x/twitter v0.0.0-20230427110835-c9728a14310e h1:Ndjoiiu0m018uXwVR29HI9AEfQjChbCLrZhuFBS9Nc8=
 github.com/tychoish/grip/x/twitter v0.0.0-20230427110835-c9728a14310e/go.mod h1:3HWj4nZbdkkT5bZOZ6jAqN3wqJzhRZK6wt5JnxCSCW8=
 github.com/tychoish/grip/x/xmpp v0.0.0-20230427110835-c9728a14310e h1:CM76GJeEvk2gpEmSizc6/O5SXnEUd3X0OYPOp5yLIRQ=

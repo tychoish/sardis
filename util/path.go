@@ -13,6 +13,7 @@ import (
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
 )
 
 func FileExists(path string) bool {
@@ -20,24 +21,38 @@ func FileExists(path string) bool {
 	return !os.IsNotExist(err)
 }
 
-func GetHomeDir() string {
-	userHome, err := homedir.Dir()
-	if err != nil {
-		// workaround for cygwin if we're on windows but couldn't get a homedir
-		if runtime.GOOS == "windows" && len(os.Getenv("HOME")) > 0 {
-			userHome = os.Getenv("HOME")
-		}
-	}
+var (
+	hostNameCache *adt.Once[string]
+	homeDirCache  *adt.Once[string]
+)
 
-	return userHome
+func init() {
+	hostNameCache = &adt.Once[string]{}
+	homeDirCache = &adt.Once[string]{}
+}
+
+func GetHomeDir() string {
+	return homeDirCache.Do(func() string {
+		userHome, err := homedir.Dir()
+		if err != nil {
+			// workaround for cygwin if we're on windows but couldn't get a homedir
+			if runtime.GOOS == "windows" && len(os.Getenv("HOME")) > 0 {
+				userHome = os.Getenv("HOME")
+			}
+		}
+
+		return userHome
+	})
 }
 
 func GetHostname() string {
-	name, err := os.Hostname()
-	if err != nil {
-		return "UNKNOWN_HOSTNAME"
-	}
-	return name
+	return hostNameCache.Do(func() string {
+		name, err := os.Hostname()
+		if err != nil {
+			return "UNKNOWN_HOSTNAME"
+		}
+		return name
+	})
 }
 
 func TryExpandHomeDirs(in []string) []string {
@@ -60,17 +75,17 @@ func TryExpandHomeDirs(in []string) []string {
 }
 
 func CollapseHomeDir(in string) string {
-	dir, err := homedir.Dir()
-	if err != nil {
-		return in
-	}
+	dir := GetHomeDir()
+
 	if !strings.Contains(in, dir) {
 		return in
 	}
+
 	in = strings.Replace(in, dir, "~", 1)
 	if strings.HasSuffix(in, "~") {
 		in = fmt.Sprint(in, string(filepath.Separator))
 	}
+
 	return in
 }
 

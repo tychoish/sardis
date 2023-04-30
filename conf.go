@@ -17,6 +17,7 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
+	"github.com/tychoish/grip/x/telegram"
 	"github.com/tychoish/grip/x/xmpp"
 	"github.com/tychoish/sardis/util"
 )
@@ -102,6 +103,7 @@ type NotifyConf struct {
 	Host     string `bson:"host" json:"host" yaml:"host"`
 	User     string `bson:"user" json:"user" yaml:"user"`
 	Password string `bson:"password" json:"password" yaml:"password"`
+	Disabled bool   `bson:"disabled" json:"disabled" yaml:"disabled"`
 }
 
 type LinkConf struct {
@@ -114,12 +116,13 @@ type LinkConf struct {
 }
 
 type Settings struct {
-	Notification       NotifyConf      `bson:"notify" json:"notify" yaml:"notify"`
-	Queue              AmboyConf       `bson:"amboy" json:"amboy" yaml:"amboy"`
-	Credentials        CredentialsConf `bson:"credentials" json:"credentials" yaml:"credentials"`
-	SSHAgentSocketPath string          `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
-	Logging            LoggingConf     `bson:"logging" json:"logging" yaml:"logging"`
-	ConfigPaths        []string        `bson:"config_files" json:"config_files" yaml:"config_files"`
+	Notification       NotifyConf       `bson:"notify" json:"notify" yaml:"notify"`
+	Telegram           telegram.Options `bson:"telegram" json:"telegram" yaml:"telegram"`
+	Queue              AmboyConf        `bson:"amboy" json:"amboy" yaml:"amboy"`
+	Credentials        CredentialsConf  `bson:"credentials" json:"credentials" yaml:"credentials"`
+	SSHAgentSocketPath string           `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
+	Logging            LoggingConf      `bson:"logging" json:"logging" yaml:"logging"`
+	ConfigPaths        []string         `bson:"config_files" json:"config_files" yaml:"config_files"`
 }
 
 type LoggingConf struct {
@@ -454,13 +457,25 @@ func (conf *Settings) Validate() error {
 		&conf.Notification,
 		&conf.Queue,
 		&conf.Credentials,
+		&conf.Telegram,
 	} {
+		if z, ok := c.(interface{ IsZero() bool }); ok && z.IsZero() {
+			continue
+		}
+
 		if err := c.Validate(); err != nil {
 			catcher.Add(fmt.Errorf("%T is not valid: %w", c, err))
 		}
 	}
 
 	return catcher.Resolve()
+}
+
+func (conf *NotifyConf) IsZero() bool {
+	if conf == nil || (conf.Target == "" && os.Getenv("SARDIS_NOTIFY_TARGET") == "") {
+		return true
+	}
+	return false
 }
 
 func (conf *NotifyConf) Validate() error {

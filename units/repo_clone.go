@@ -26,7 +26,7 @@ func NewRepoCloneJob(rconf sardis.RepoConf) fun.WorkerFunc {
 			if rconf.LocalSync {
 				ec.Add(amboy.RunJob(ctx, NewLocalRepoSyncJob(rconf.Path, rconf.Branch, nil, nil)))
 			} else if rconf.Fetch {
-				ec.Add(amboy.RunJob(ctx, NewRepoFetchJob(rconf)))
+				ec.Add(NewRepoFetchJob(rconf)(ctx))
 			}
 
 			grip.Notice(message.Fields{

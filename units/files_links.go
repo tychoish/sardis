@@ -2,14 +2,11 @@ package units
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/tychoish/amboy"
-	"github.com/tychoish/amboy/dependency"
-	"github.com/tychoish/amboy/job"
-	"github.com/tychoish/amboy/registry"
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -17,114 +14,85 @@ import (
 	"github.com/tychoish/sardis"
 )
 
-type symlinkCreateJob struct {
-	Conf     sardis.LinkConf `bson:"conf" json:"conf" yaml:"conf"`
-	job.Base `bson:"metadata" json:"metadata" yaml:"metadata"`
-}
+func NewSymlinkCreateJob(conf sardis.LinkConf) fun.WorkerFunc {
+	return func(ctx context.Context) (err error) {
+		ec := &erc.Collector{}
+		defer func() { err = ec.Resolve() }()
 
-const symlinkCreateJobName = "symlink-create"
+		dst := filepath.Join(conf.Path, conf.Name)
 
-func init() {
-	registry.AddJobType(symlinkCreateJobName, func() amboy.Job { return symlinkCreateFactory() })
-}
+		if _, err = os.Stat(conf.Target); os.IsNotExist(err) {
+			grip.Notice(message.Fields{
+				"message": "missing target",
+				"name":    conf.Name,
+				"target":  conf.Target,
+			})
+			return
+		}
 
-func symlinkCreateFactory() *symlinkCreateJob {
-	j := &symlinkCreateJob{
-		Base: job.Base{
-			JobType: amboy.JobType{
-				Name:    symlinkCreateJobName,
-				Version: 1,
-			},
-		},
-	}
-	j.SetDependency(dependency.NewAlways())
-	return j
-}
+		jpm := jasper.Context(ctx)
 
-func NewSymlinkCreateJob(conf sardis.LinkConf) amboy.Job {
-	j := symlinkCreateFactory()
+		if _, err = os.Stat(conf.Path); !os.IsNotExist(err) {
+			if !conf.Update {
+				return
+			}
 
-	j.Conf = conf
-	j.SetID(fmt.Sprintf("%s.%d.%s", symlinkCreateJobName, job.GetNumber(), j.Conf.Target))
-	return j
-}
+			var target string
+			target, err = filepath.EvalSymlinks(conf.Path)
+			if err != nil {
+				ec.Add(err)
+				return
+			}
 
-func (j *symlinkCreateJob) Run(ctx context.Context) {
-	defer j.MarkComplete()
-	dst := filepath.Join(j.Conf.Path, j.Conf.Name)
+			if target != conf.Target {
+				if conf.RequireSudo {
+					ec.Add(jpm.CreateCommand(ctx).Sudo(true).
+						SetCombinedSender(level.Info, grip.Sender()).
+						AppendArgs("rm", dst).Run(ctx))
+				} else {
+					ec.Add(os.Remove(dst))
+				}
 
-	if _, err := os.Stat(j.Conf.Target); os.IsNotExist(err) {
-		grip.Notice(message.Fields{
-			"message": "missing target",
-			"name":    j.Conf.Name,
-			"target":  j.Conf.Target,
-			"id":      j.ID(),
+				grip.Info(message.Fields{
+					"op":         "removed incorrect link target",
+					"old_target": target,
+					"name":       conf.Name,
+					"target":     conf.Target,
+					"err":        ec.HasErrors(),
+				})
+			} else {
+				return
+			}
+
+		}
+
+		linkDir := filepath.Dir(conf.Target)
+		if conf.RequireSudo {
+			cmd := jpm.CreateCommand(ctx).Sudo(true).
+				SetCombinedSender(level.Info, grip.Sender())
+
+			if _, err := os.Stat(linkDir); os.IsNotExist(err) {
+				cmd.AppendArgs("mkdir", "-p", linkDir)
+			}
+
+			cmd.AppendArgs("ln", "-s", conf.Target, conf.Path)
+
+			ec.Add(cmd.Run(ctx))
+
+		} else {
+			if _, err := os.Stat(linkDir); os.IsNotExist(err) {
+				ec.Add(os.MkdirAll(linkDir, 0755))
+			}
+
+			ec.Add(os.Symlink(conf.Target, conf.Path))
+		}
+
+		grip.Info(message.Fields{
+			"op":  "created new symbolic link",
+			"src": conf.Path,
+			"dst": conf.Target,
+			"err": ec.HasErrors(),
 		})
 		return
 	}
-
-	jpm := jasper.Context(ctx)
-
-	if _, err := os.Stat(j.Conf.Path); !os.IsNotExist(err) {
-		if !j.Conf.Update {
-			return
-		}
-
-		target, err := filepath.EvalSymlinks(j.Conf.Path)
-		if err != nil {
-			j.AddError(err)
-			return
-		}
-
-		if target != j.Conf.Target {
-			if j.Conf.RequireSudo {
-				j.AddError(jpm.CreateCommand(ctx).Sudo(true).
-					SetCombinedSender(level.Info, grip.Sender()).
-					AppendArgs("rm", dst).Run(ctx))
-			} else {
-				j.AddError(os.Remove(dst))
-			}
-
-			grip.Info(message.Fields{
-				"id":         j.ID(),
-				"op":         "removed incorrect link target",
-				"old_target": target,
-				"name":       j.Conf.Name,
-				"target":     j.Conf.Target,
-				"err":        j.HasErrors(),
-			})
-		} else {
-			return
-		}
-
-	}
-
-	linkDir := filepath.Dir(j.Conf.Target)
-	if j.Conf.RequireSudo {
-		cmd := jpm.CreateCommand(ctx).Sudo(true).
-			SetCombinedSender(level.Info, grip.Sender())
-
-		if _, err := os.Stat(linkDir); os.IsNotExist(err) {
-			cmd.AppendArgs("mkdir", "-p", linkDir)
-		}
-
-		cmd.AppendArgs("ln", "-s", j.Conf.Target, j.Conf.Path)
-
-		j.AddError(cmd.Run(ctx))
-
-	} else {
-		if _, err := os.Stat(linkDir); os.IsNotExist(err) {
-			j.AddError(os.MkdirAll(linkDir, 0755))
-		}
-
-		j.AddError(os.Symlink(j.Conf.Target, j.Conf.Path))
-	}
-
-	grip.Info(message.Fields{
-		"op":  "created new symbolic link",
-		"id":  j.ID(),
-		"src": j.Conf.Path,
-		"dst": j.Conf.Target,
-		"err": j.HasErrors(),
-	})
 }

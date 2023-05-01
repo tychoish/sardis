@@ -3,7 +3,6 @@ package operations
 import (
 	"context"
 
-	"github.com/tychoish/amboy"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
@@ -44,7 +43,7 @@ func nightly() cli.Command {
 		Action: func(ctx context.Context, c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 
-			jobs, run := units.SetupQueue(amboy.RunJob)
+			jobs, run := units.SetupWorkers()
 
 			for idx := range conf.Links {
 				jobs.PushBack(units.NewSymlinkCreateJob(conf.Links[idx]))

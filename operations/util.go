@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 
-	"github.com/tychoish/amboy"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/dupe"
@@ -73,7 +72,7 @@ func setupLinks() cli.Command {
 		Action: func(ctx context.Context, c *cli.Context) error {
 			conf := sardis.AppConfiguration(ctx)
 
-			jobs, worker := units.SetupQueue(amboy.RunJob)
+			jobs, worker := units.SetupWorkers()
 			for _, link := range conf.Links {
 				jobs.PushBack(units.NewSymlinkCreateJob(link))
 			}

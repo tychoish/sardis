@@ -6,80 +6,45 @@ import (
 	"os"
 	"time"
 
-	"github.com/tychoish/amboy"
-	"github.com/tychoish/amboy/dependency"
-	"github.com/tychoish/amboy/job"
-	"github.com/tychoish/amboy/registry"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
-	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper"
 )
 
-type repoCleanupJob struct {
-	Path     string `bson:"path" json:"path" yaml:"path"`
-	job.Base `bson:"metadata" json:"metadata" yaml:"metadata"`
-}
+func NewRepoCleanupJob(path string) fun.WorkerFunc {
+	return func(ctx context.Context) error {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return fmt.Errorf("cannot cleanup %s, no repository exists", path)
+		}
 
-const repoCleanupJobName = "repo-gc"
+		grip.Info(message.Fields{
+			"job":  "repo-cleanup",
+			"path": path,
+			"op":   "running",
+		})
 
-func init() {
-	registry.AddJobType(repoCleanupJobName, func() amboy.Job { return repoCleanupJobFactory() })
-}
+		cmd := jasper.Context(ctx)
 
-func repoCleanupJobFactory() *repoCleanupJob {
-	j := &repoCleanupJob{
-		Base: job.Base{
-			JobType: amboy.JobType{
-				Name:    repoCleanupJobName,
-				Version: 0,
-			},
-		},
+		startAt := time.Now()
+		sender := grip.Context(ctx).Sender()
+
+		err := cmd.CreateCommand(ctx).Priority(level.Debug).
+			Directory(path).
+			SetOutputSender(level.Info, sender).
+			SetErrorSender(level.Warning, sender).
+			AppendArgs("git", "gc").
+			AppendArgs("git", "prune").
+			Run(ctx)
+
+		grip.Notice(message.Fields{
+			"op":    "repo-cleanup",
+			"repo":  path,
+			"secs":  time.Since(startAt).Seconds(),
+			"error": err != nil,
+		})
+
+		return err
 	}
-	j.SetDependency(dependency.NewAlways())
-	return j
-}
-
-func NewRepoCleanupJob(path string) amboy.Job {
-	j := repoCleanupJobFactory()
-	j.Path = path
-	j.SetID(fmt.Sprintf("%s.%s.%d", repoCleanupJobName, path, job.GetNumber()))
-	return j
-}
-
-func (j *repoCleanupJob) Run(ctx context.Context) {
-	defer j.MarkComplete()
-	if _, err := os.Stat(j.Path); os.IsNotExist(err) {
-		j.AddError(fmt.Errorf("cannot cleanup %s, no repository exists", j.Path))
-		return
-	}
-
-	grip.Info(message.Fields{
-		"id": j.ID(),
-		"op": "running",
-	})
-
-	cmd := jasper.Context(ctx)
-
-	startAt := time.Now()
-	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
-		"job":  j.ID(),
-		"path": j.Path,
-	})
-
-	j.AddError(cmd.CreateCommand(ctx).Priority(level.Debug).
-		ID(j.ID()).Directory(j.Path).
-		SetOutputSender(level.Info, sender).
-		SetErrorSender(level.Warning, sender).
-		AppendArgs("git", "gc").
-		AppendArgs("git", "prune").
-		Run(ctx))
-
-	grip.Notice(message.Fields{
-		"op":     "git gc",
-		"repo":   j.Path,
-		"secs":   time.Since(startAt).Seconds(),
-		"errors": j.HasErrors(),
-	})
 }

@@ -9,7 +9,6 @@ import (
 
 	"github.com/cheynewallace/tabby"
 	"github.com/mitchellh/go-homedir"
-	"github.com/tychoish/amboy"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
@@ -154,7 +153,7 @@ func repoCleanup() cli.Command {
 
 			repos := sardis.AppConfiguration(ctx).GetTaggedRepos(tags...)
 
-			jobs, run := units.SetupQueue(amboy.RunJob)
+			jobs, run := units.SetupWorkers()
 
 			for _, repo := range repos {
 				jobs.PushBack(units.NewRepoCleanupJob(repo.Path))
@@ -251,7 +250,8 @@ func repoFetch() cli.Command {
 
 			repos := sardis.AppConfiguration(ctx).GetTaggedRepos(names...)
 
-			jobs, run := units.SetupQueue(amboy.RunJob)
+			jobs, run := units.SetupWorkers()
+
 			for idx := range repos {
 				repo := repos[idx]
 

@@ -42,11 +42,11 @@ func SyncRepo(repo sardis.RepoConf) fun.WorkerFunc {
 			if changes {
 				return amboy.RunJob(ctx, NewLocalRepoSyncJob(repo.Path, repo.Branch, repo.Pre, repo.Post))
 			}
-			return amboy.RunJob(ctx, NewRepoFetchJob(repo))
+			return NewRepoFetchJob(repo)(ctx)
 		}
 
 		if repo.Fetch || hasMirrors {
-			return amboy.RunJob(ctx, NewRepoFetchJob(repo))
+			return NewRepoFetchJob(repo)(ctx)
 		}
 
 		return nil

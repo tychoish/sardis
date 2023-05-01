@@ -262,8 +262,8 @@ github.com/tychoish/cmdr v0.1.1-0.20230428170527-8a1c2f62e629/go.mod h1:JuncBXCZ
 github.com/tychoish/emt v0.0.0-20220306153139-74b97c67f209/go.mod h1:KMhVWIsL98Q8AoorphjsOQWabcNOoYqMSpODR/rtRb4=
 github.com/tychoish/fun v0.1.0/go.mod h1:84A+BwGecz23UotmbB4mtvVS5ZcsZpspecduxpwF/XM=
 github.com/tychoish/fun v0.3.3/go.mod h1:84A+BwGecz23UotmbB4mtvVS5ZcsZpspecduxpwF/XM=
-github.com/tychoish/fun v0.9.0 h1:HVDvKrJUB66AenwxyAIqVj9elySwbW45XC7YTuhtzHQ=
-github.com/tychoish/fun v0.9.0/go.mod h1:84A+BwGecz23UotmbB4mtvVS5ZcsZpspecduxpwF/XM=
+github.com/tychoish/fun v0.9.1 h1:rYoEVgEUyV/6eY/QJBYMhRNf6+J3xJhXjETqzEvK8ys=
+github.com/tychoish/fun v0.9.1/go.mod h1:84A+BwGecz23UotmbB4mtvVS5ZcsZpspecduxpwF/XM=
 github.com/tychoish/gimlet v0.0.0-20230130001449-8987c96bb886 h1:IFXT3WhVVHQf2dvMoS/DvV+HbKnfSYjnsNkPbyduLWQ=
 github.com/tychoish/gimlet v0.0.0-20230130001449-8987c96bb886/go.mod h1:aASKQIwBm4fuab/YfyM1du1JYt4ehlFU48WkNA8LvvY=
 github.com/tychoish/godmenu v0.1.0 h1:JfFaQRsOOql9XKlgjrcPCaluUryxZXUoEtr4KMfFa68=

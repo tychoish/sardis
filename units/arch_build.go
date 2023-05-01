@@ -7,63 +7,30 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/tychoish/amboy"
-	"github.com/tychoish/amboy/job"
-	"github.com/tychoish/amboy/registry"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 )
 
-type archAbsBuildJob struct {
-	Name     string `bson:"name" json:"name" yaml:"name"`
-	job.Base `bson:"metadata" json:"metadata" yaml:"metadata"`
-}
+func NewArchAbsBuildJob(name string) fun.WorkerFunc {
+	return func(ctx context.Context) error {
+		if name == "" {
+			return errors.New("name is not specified")
+		}
 
-const archAbsBuildJobName = "arch-abs-build"
+		conf := sardis.AppConfiguration(ctx)
+		dir := filepath.Join(conf.System.Arch.BuildPath, name)
+		pkgbuild := filepath.Join(dir, "PKGBUILD")
 
-func init() {
-	registry.AddJobType(archAbsBuildJobName, func() amboy.Job { return archAbsBuildFactory() })
-}
+		if _, err := os.Stat(pkgbuild); os.IsNotExist(err) {
+			return fmt.Errorf("%s does not exist", pkgbuild)
+		}
 
-func archAbsBuildFactory() *archAbsBuildJob {
-	j := &archAbsBuildJob{
-		Base: job.Base{
-			JobType: amboy.JobType{
-				Name:    archAbsBuildJobName,
-				Version: 1,
-			},
-		},
+		return jasper.Context(ctx).CreateCommand(ctx).Priority(level.Info).
+			AppendArgs("makepkg", "--syncdeps", "--force", "--install", "--noconfirm").
+			SetOutputSender(level.Info, grip.Sender()).Directory(dir).Run(ctx)
+
 	}
-	return j
-}
-
-func NewArchAbsBuildJob(name string) amboy.Job {
-	j := archAbsBuildFactory()
-	j.Name = name
-	j.SetID(fmt.Sprintf("%s.%d.%s", archAbsBuildJobName, job.GetNumber(), name))
-	return j
-}
-
-func (j *archAbsBuildJob) Run(ctx context.Context) {
-	defer j.MarkComplete()
-
-	if j.Name == "" {
-		j.AddError(errors.New("name is not specified"))
-		return
-	}
-
-	conf := sardis.AppConfiguration(ctx)
-	dir := filepath.Join(conf.System.Arch.BuildPath, j.Name)
-	pkgbuild := filepath.Join(dir, "PKGBUILD")
-
-	if _, err := os.Stat(pkgbuild); os.IsNotExist(err) {
-		j.AddError(fmt.Errorf("%s does not exist", pkgbuild))
-		return
-	}
-
-	j.AddError(jasper.Context(ctx).CreateCommand(ctx).ID(j.ID()).Priority(level.Info).
-		AppendArgs("makepkg", "--syncdeps", "--force", "--install", "--noconfirm").
-		SetOutputSender(level.Info, grip.Sender()).ID(j.ID()).Directory(dir).Run(ctx))
 }

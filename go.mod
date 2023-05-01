@@ -10,7 +10,6 @@ require (
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
 	github.com/go-git/go-git/v5 v5.2.0
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/tychoish/amboy v0.0.0-20230414135238-247e579b3b94
 	github.com/tychoish/birch v0.2.3-0.20230413052020-46068f63d7bb
 	github.com/tychoish/cmdr v0.1.1-0.20230428170527-8a1c2f62e629
 	github.com/tychoish/fun v0.9.1

@@ -3,7 +3,6 @@ package operations
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
@@ -41,10 +40,7 @@ func bulkCreateTickets() cli.Command {
 				return errors.New("cannot create jira tickets with empty config")
 			}
 
-			job := units.NewBulkCreateJiraTicketJob(path)
-			job.Run(ctx)
-
-			return fmt.Errorf("problem running job: %w", job.Error())
+			return units.NewBulkCreateJiraTicketJob(path).Run(ctx)
 		},
 	}
 }

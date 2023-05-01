@@ -8,84 +8,51 @@ import (
 	"time"
 
 	git "github.com/go-git/go-git/v5"
-	"github.com/tychoish/amboy"
-	"github.com/tychoish/amboy/dependency"
-	"github.com/tychoish/amboy/job"
-	"github.com/tychoish/amboy/registry"
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
-	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper"
 )
 
-type repoStatusJob struct {
-	Path     string `bson:"path" json:"path" yaml:"path"`
-	job.Base `bson:"metadata" json:"metadata" yaml:"metadata"`
-}
+func NewRepoStatusJob(path string) fun.WorkerFunc {
+	return erc.WithCollector(func(ctx context.Context, ec *erc.Collector) error {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return fmt.Errorf("cannot check status %s, no repository exists", path)
+		}
 
-const repoStatusJobName = "repo-status"
+		cmd := jasper.Context(ctx)
 
-func init() {
-	registry.AddJobType(repoStatusJobName, func() amboy.Job { return repoStatusJobFactory() })
-}
+		startAt := time.Now()
 
-func repoStatusJobFactory() *repoStatusJob {
-	j := &repoStatusJob{
-		Base: job.Base{
-			JobType: amboy.JobType{
-				Name:    repoStatusJobName,
-				Version: 0,
-			},
-		},
-	}
-	j.SetDependency(dependency.NewAlways())
-	return j
-}
+		logger := grip.Context(ctx)
+		sender := logger.Sender()
 
-func NewRepoStatusJob(path string) amboy.Job {
-	j := repoStatusJobFactory()
-	j.Path = path
-	j.SetID(fmt.Sprintf("%s.%s.%d", repoStatusJobName, path, job.GetNumber()))
-	return j
-}
+		ec.Add(cmd.CreateCommand(ctx).Priority(level.Debug).
+			Directory(path).
+			SetOutputSender(level.Debug, sender).
+			SetErrorSender(level.Debug, sender).
+			Add(getStatusCommandArgs(path)).
+			AppendArgs("git", "status", "--short", "--branch").
+			Run(ctx))
 
-func (j *repoStatusJob) Run(ctx context.Context) {
-	defer j.MarkComplete()
-	if _, err := os.Stat(j.Path); os.IsNotExist(err) {
-		j.AddError(fmt.Errorf("cannot check status %s, no repository exists", j.Path))
-		return
-	}
+		ec.Add(doOtherStat(path, logger))
 
-	cmd := jasper.Context(ctx)
+		logger.Debug(message.Fields{
+			"op":     "git status",
+			"path":   path,
+			"secs":   time.Since(startAt).Seconds(),
+			"errors": ec.HasErrors(),
+		})
 
-	startAt := time.Now()
-	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
-		"repo": j.Path,
+		return nil
 	})
-	sender.SetName(fmt.Sprintf("sardis.%s", repoStatusJobName))
-	sender.SetFormatter(send.MakeJSONFormatter())
-	logger := grip.NewLogger(sender)
 
-	j.AddError(cmd.CreateCommand(ctx).Priority(level.Debug).
-		ID(j.ID()).Directory(j.Path).
-		SetOutputSender(level.Debug, sender).
-		SetErrorSender(level.Debug, sender).
-		Add(getStatusCommandArgs(j.Path)).
-		AppendArgs("git", "status", "--short", "--branch").
-		Run(ctx))
-
-	j.AddError(j.doOtherStat(logger))
-
-	logger.Debug(message.Fields{
-		"op":     "git status",
-		"secs":   time.Since(startAt).Seconds(),
-		"errors": j.HasErrors(),
-	})
 }
 
-func (j *repoStatusJob) doOtherStat(logger grip.Logger) error {
-	repo, err := git.PlainOpen(j.Path)
+func doOtherStat(path string, logger grip.Logger) error {
+	repo, err := git.PlainOpen(path)
 	if err != nil {
 		return err
 	}

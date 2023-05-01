@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/tychoish/amboy"
-	"github.com/tychoish/amboy/dependency"
-	"github.com/tychoish/amboy/job"
-	"github.com/tychoish/amboy/registry"
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -17,92 +15,67 @@ import (
 )
 
 type jiraBulkCreateJob struct {
-	Path     string `bson:"path" json:"path" yaml:"path"`
-	job.Base `bson:"metadata" json:"metadata" yaml:"metadata"`
+	Path string `bson:"path" json:"path" yaml:"path"`
 }
 
-const jiraBulkCreateJobName = "jira-bulk-create"
+func NewBulkCreateJiraTicketJob(path string) fun.WorkerFunc {
+	return erc.WithCollector(func(ctx context.Context, ec *erc.Collector) error {
+		data := struct {
+			Priority level.Priority `bson:"priority" json:"priority" yaml:"priority"`
+			Tickets  []jira.Issue   `bson:"tickets" json:"tickets" yaml:"tickets"`
+		}{}
 
-func init() {
-	registry.AddJobType(jiraBulkCreateJobName, func() amboy.Job { return jiraBulkCreateFactory() })
-}
-func jiraBulkCreateFactory() *jiraBulkCreateJob {
-	j := &jiraBulkCreateJob{
-		Base: job.Base{
-			JobType: amboy.JobType{
-				Name:    jiraBulkCreateJobName,
-				Version: 1,
-			},
-		},
-	}
-	j.SetDependency(dependency.NewAlways())
-	return j
-}
-
-func NewBulkCreateJiraTicketJob(path string) amboy.Job {
-	j := jiraBulkCreateFactory()
-	j.Path = path
-	j.SetID(fmt.Sprintf("%s.%d.%s", jiraBulkCreateJobName, job.GetNumber(), j.Path))
-	return j
-}
-
-func (j *jiraBulkCreateJob) Run(ctx context.Context) {
-	data := struct {
-		Priority level.Priority `bson:"priority" json:"priority" yaml:"priority"`
-		Tickets  []jira.Issue   `bson:"tickets" json:"tickets" yaml:"tickets"`
-	}{}
-
-	err := util.UnmarshalFile(j.Path, &data)
-	if err != nil {
-		j.AddError(err)
-		return
-	}
-
-	data.Priority = level.Info
-
-	conf := sardis.AppConfiguration(ctx)
-	ctx = sardis.WithJiraIssue(ctx, conf)
-	logger := sardis.JiraIssue(ctx)
-
-	msgs := make([]message.Composer, len(data.Tickets))
-	for idx := range data.Tickets {
-		msg := jira.MakeIssue(&data.Tickets[idx])
-		msg.SetPriority(data.Priority)
-		msgs[idx] = msg
-		if !msg.Loggable() {
-			j.AddError(fmt.Errorf("invalid/unlogable message at index %d, '%s'", idx, msg.String()))
+		err := util.UnmarshalFile(path, &data)
+		if err != nil {
+			return err
 		}
-	}
 
-	if j.HasErrors() {
-		return
-	}
+		data.Priority = level.Info
 
-	for idx, msg := range msgs {
-		if ctx.Err() != nil {
-			grip.Warning(message.Fields{
-				"message":   "ticket creation aborted",
-				"processed": idx - 1,
-				"total":     len(msgs),
-				"id":        j.ID(),
+		conf := sardis.AppConfiguration(ctx)
+		ctx = sardis.WithJiraIssue(ctx, conf)
+		logger := sardis.JiraIssue(ctx)
+
+		msgs := make([]message.Composer, len(data.Tickets))
+		for idx := range data.Tickets {
+			msg := jira.MakeIssue(&data.Tickets[idx])
+			msg.SetPriority(data.Priority)
+			msgs[idx] = msg
+			if !msg.Loggable() {
+				ec.Add(fmt.Errorf("invalid/unlogable message at index %d, '%s'", idx, msg.String()))
+			}
+		}
+
+		if ec.HasErrors() {
+			return nil
+		}
+
+		for idx, msg := range msgs {
+			if ctx.Err() != nil {
+				grip.Warning(message.Fields{
+					"message":   "ticket creation aborted",
+					"processed": idx - 1,
+					"total":     len(msgs),
+				})
+				break
+			}
+
+			logger.Log(data.Priority, msg)
+
+			grip.Info(message.Fields{
+				"op":  "created jira issue",
+				"idx": idx,
+				"num": len(msgs),
+				"str": msg.String(),
+				"key": data.Tickets[idx].IssueKey,
 			})
 		}
 
-		logger.Log(data.Priority, msg)
-
 		grip.Info(message.Fields{
-			"op":  "created jira issue",
-			"idx": idx,
-			"num": len(msgs),
-			"str": msg.String(),
-			"key": data.Tickets[idx].IssueKey,
-			"id":  j.ID(),
+			"op":     "bulk crate tickets",
+			"num":    len(data.Tickets),
+			"errors": ec.HasErrors(),
 		})
-	}
-
-	grip.Info(message.Fields{
-		"op":  "bulk crate tickets",
-		"id":  j.ID(),
-		"num": len(data.Tickets),
+		return nil
 	})
 }

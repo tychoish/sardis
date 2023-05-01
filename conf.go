@@ -118,7 +118,6 @@ type LinkConf struct {
 type Settings struct {
 	Notification       NotifyConf       `bson:"notify" json:"notify" yaml:"notify"`
 	Telegram           telegram.Options `bson:"telegram" json:"telegram" yaml:"telegram"`
-	Queue              AmboyConf        `bson:"amboy" json:"amboy" yaml:"amboy"`
 	Credentials        CredentialsConf  `bson:"credentials" json:"credentials" yaml:"credentials"`
 	SSHAgentSocketPath string           `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
 	Logging            LoggingConf      `bson:"logging" json:"logging" yaml:"logging"`
@@ -158,11 +157,6 @@ type CredentialsAWS struct {
 	Key     string `bson:"key" json:"key" yaml:"key"`
 	Secret  string `bson:"secret" json:"secret" yaml:"secret"`
 	Token   string `bson:"token" json:"token" yaml:"token"`
-}
-
-type AmboyConf struct {
-	Workers int `bson:"workers" json:"workers" yaml:"workers"`
-	Size    int `bson:"size" json:"size" yaml:"size"`
 }
 
 type CommandGroupConf struct {
@@ -455,7 +449,6 @@ func (conf *Settings) Validate() error {
 	catcher := &erc.Collector{}
 	for _, c := range []interface{ Validate() error }{
 		&conf.Notification,
-		&conf.Queue,
 		&conf.Credentials,
 		&conf.Telegram,
 	} {
@@ -506,22 +499,6 @@ func (conf *NotifyConf) Validate() error {
 		if v == "" {
 			catcher.Add(fmt.Errorf("missing value for '%s'", k))
 		}
-	}
-
-	return catcher.Resolve()
-}
-
-func (conf *AmboyConf) Validate() error {
-	catcher := &erc.Collector{}
-
-	if conf.Workers <= 1 {
-		conf.Workers = 1
-	} else if conf.Workers < 2 {
-		grip.Debug("should specify more workers")
-	}
-
-	if conf.Size < conf.Workers {
-		conf.Size = 2 * conf.Workers
 	}
 
 	return catcher.Resolve()

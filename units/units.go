@@ -4,7 +4,6 @@ import (
 	"context"
 	"runtime"
 
-	"github.com/tychoish/amboy"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/seq"
@@ -24,10 +23,6 @@ func SetupQueue[T any](op func(context.Context, T) error) (*seq.List[T], fun.Wor
 	return list, func(ctx context.Context) error {
 		return itertool.ParallelForEach(ctx, seq.ListValues(list.Iterator()), op, DefaultPoolOpts())
 	}
-}
-
-func WorkerJob(job amboy.Job) fun.WorkerFunc {
-	return func(ctx context.Context) error { return amboy.RunJob(ctx, job) }
 }
 
 func SetupWorkers() (*seq.List[fun.WorkerFunc], fun.WorkerFunc) {

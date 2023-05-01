@@ -3,7 +3,6 @@ package operations
 import (
 	"context"
 
-	"github.com/tychoish/amboy"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
@@ -65,7 +64,7 @@ func buildPkg() cli.Command {
 			catcher := &erc.Collector{}
 
 			for _, name := range c.StringSlice(nameFlagName) {
-				catcher.Add(amboy.RunJob(ctx, units.NewArchAbsBuildJob(name)))
+				catcher.Add(units.NewArchAbsBuildJob(name)(ctx))
 			}
 
 			return catcher.Resolve()
@@ -94,7 +93,7 @@ func installAur() cli.Command {
 					continue
 				}
 
-				catcher.Add(amboy.RunJob(ctx, units.NewArchAbsBuildJob(name)))
+				catcher.Add(units.NewArchAbsBuildJob(name)(ctx))
 			}
 
 			return catcher.Resolve()
@@ -123,7 +122,7 @@ func setupArchLinux() cli.Command {
 				"aur":      len(conf.System.Arch.AurPackages),
 			})
 
-			catcher.Add(amboy.RunJob(ctx, units.NewArchInstallPackageJob(pkgs)))
+			catcher.Add(units.NewArchInstallPackageJob(pkgs)(ctx))
 
 			for _, pkg := range conf.System.Arch.AurPackages {
 				grip.Info(message.Fields{
@@ -136,7 +135,7 @@ func setupArchLinux() cli.Command {
 					continue
 				}
 
-				catcher.Add(amboy.RunJob(ctx, units.NewArchAbsBuildJob(pkg.Name)))
+				catcher.Add(units.NewArchAbsBuildJob(pkg.Name)(ctx))
 			}
 
 			return catcher.Resolve()

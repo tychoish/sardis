@@ -225,7 +225,7 @@ func repoStatus() cli.Command {
 				itertool.Slice(conf.GetTaggedRepos(tags...)),
 				func(conf sardis.RepoConf) {
 					grip.Info(conf.Name)
-					catcher.Add(units.WorkerJob(units.NewRepoStatusJob(conf.Path)).Run(ctx))
+					catcher.Add(units.NewRepoStatusJob(conf.Path).Run(ctx))
 				}))
 
 			return catcher.Resolve()

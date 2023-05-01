@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tychoish/amboy"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -80,7 +79,7 @@ func blogPublish() cli.Command {
 				return nil
 			}
 
-			if err := amboy.RunJob(ctx, units.NewLocalRepoSyncJob(repo.Path, repo.Branch, repo.Pre, repo.Post)); err != nil {
+			if err := units.NewLocalRepoSyncJob(repo.Path, repo.Branch, repo.Pre, repo.Post)(ctx); err != nil {
 				return fmt.Errorf("problem syncing blog repo: %w", err)
 			}
 

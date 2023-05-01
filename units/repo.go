@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/tychoish/amboy"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
@@ -25,7 +24,7 @@ func SyncRepo(repo sardis.RepoConf) fun.WorkerFunc {
 		}
 
 		hasMirrors = true
-		workerList.PushBack(WorkerJob(NewRepoSyncJob(mirror, repo.Path, repo.Branch, repo.Pre, nil)))
+		workerList.PushBack(NewRepoSyncJob(mirror, repo.Path, repo.Branch, repo.Pre, nil))
 	}
 
 	return func(ctx context.Context) error {
@@ -40,7 +39,7 @@ func SyncRepo(repo sardis.RepoConf) fun.WorkerFunc {
 			}
 
 			if changes {
-				return amboy.RunJob(ctx, NewLocalRepoSyncJob(repo.Path, repo.Branch, repo.Pre, repo.Post))
+				return NewLocalRepoSyncJob(repo.Path, repo.Branch, repo.Pre, repo.Post)(ctx)
 			}
 			return NewRepoFetchJob(repo)(ctx)
 		}

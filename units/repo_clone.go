@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tychoish/amboy"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
@@ -24,7 +23,7 @@ func NewRepoCloneJob(rconf sardis.RepoConf) fun.WorkerFunc {
 
 		if _, err := os.Stat(rconf.Path); !os.IsNotExist(err) {
 			if rconf.LocalSync {
-				ec.Add(amboy.RunJob(ctx, NewLocalRepoSyncJob(rconf.Path, rconf.Branch, nil, nil)))
+				ec.Add(NewLocalRepoSyncJob(rconf.Path, rconf.Branch, nil, nil)(ctx))
 			} else if rconf.Fetch {
 				ec.Add(NewRepoFetchJob(rconf)(ctx))
 			}

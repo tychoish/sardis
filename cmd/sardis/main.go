@@ -36,18 +36,18 @@ func main() {
 }
 
 func reformCommands(ctx context.Context, cmds []cli.Command) {
-	for _, cmd := range cmds {
-		switch cc := cmd.Action.(type) {
-		case func(*cli.Context) error, nil:
-			continue
+	for idx := range cmds {
+		switch cc := cmds[idx].Action.(type) {
+		case nil:
+		case func(*cli.Context) error:
 		case func(context.Context, *cli.Context) error:
-			cmd.Action = func(clictx *cli.Context) error {
+			cmds[idx].Action = func(clictx *cli.Context) error {
 				return cc(ctx, clictx)
 			}
 		default:
-			grip.Warningf("command has malformed action %s [%T]", cmd.Name, cmd)
+			grip.Warningf("command has malformed action %s [%T]", cmds[idx].Name, cmds[idx])
 		}
-		reformCommands(ctx, cmd.Subcommands)
+		reformCommands(ctx, cmds[idx].Subcommands)
 	}
 }
 

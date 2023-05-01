@@ -7,73 +7,39 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/tychoish/amboy"
-	"github.com/tychoish/amboy/job"
-	"github.com/tychoish/amboy/registry"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 )
 
-type archAurFetchJob struct {
-	Name     string `bson:"name" json:"name" yaml:"name"`
-	Update   bool   `bson:"update" json:"update" yaml:"update"`
-	job.Base `bson:"metadata" json:"metadata" yaml:"metadata"`
-}
+func NewArchFetchAurJob(name string, update bool) fun.WorkerFunc {
+	return func(ctx context.Context) error {
+		if name == "" {
+			return errors.New("name is not specified")
+		}
 
-const archAurFetchJobName = "arch-aur-fetch"
+		conf := sardis.AppConfiguration(ctx)
 
-func init() {
-	registry.AddJobType(archAurFetchJobName, func() amboy.Job { return archAurFetchFactory() })
-}
+		dir := filepath.Join(conf.System.Arch.BuildPath, name)
 
-func archAurFetchFactory() *archAurFetchJob {
-	j := &archAurFetchJob{
-		Base: job.Base{
-			JobType: amboy.JobType{
-				Name:    archAurFetchJobName,
-				Version: 1,
-			},
-		},
+		args := []string{}
+
+		if stat, err := os.Stat(dir); os.IsNotExist(err) {
+			args = append(args, "git", "clone", fmt.Sprintf("https://aur.archlinux.org/%s.git", name))
+			dir = filepath.Dir(dir)
+		} else if !stat.IsDir() {
+			return fmt.Errorf("%s exists and is not a directory", dir)
+		} else if update {
+			args = append(args, "git", "pull", "origin", "master")
+		} else {
+			grip.Infof("fetch package for '%s' is a noop", name)
+			return nil
+		}
+
+		return jasper.Context(ctx).CreateCommand(ctx).Directory(dir).
+			Priority(level.Info).SetOutputSender(level.Debug, grip.Sender()).
+			AppendArgs(args...).Run(ctx)
 	}
-	return j
-}
-
-func NewArchFetchAurJob(name string, update bool) amboy.Job {
-	j := archAurFetchFactory()
-	j.Name = name
-	j.Update = update
-	j.SetID(fmt.Sprintf("%s.%d.%s", archAurFetchJobName, job.GetNumber(), name))
-	return j
-}
-
-func (j *archAurFetchJob) Run(ctx context.Context) {
-	defer j.MarkComplete()
-
-	if j.Name == "" {
-		j.AddError(errors.New("name is not specified"))
-		return
-	}
-
-	conf := sardis.AppConfiguration(ctx)
-	dir := filepath.Join(conf.System.Arch.BuildPath, j.Name)
-	args := []string{}
-
-	if stat, err := os.Stat(dir); os.IsNotExist(err) {
-		args = append(args, "git", "clone", fmt.Sprintf("https://aur.archlinux.org/%s.git", j.Name))
-		dir = filepath.Dir(dir)
-	} else if !stat.IsDir() {
-		j.AddError(fmt.Errorf("%s exists and is not a directory", dir))
-		return
-	} else if j.Update {
-		args = append(args, "git", "pull", "origin", "master")
-	} else {
-		grip.Infof("fetch package for '%s' is a noop", j.Name)
-		return
-	}
-
-	j.AddError(jasper.Context(ctx).CreateCommand(ctx).ID(j.ID()).Directory(dir).
-		Priority(level.Info).SetOutputSender(level.Debug, grip.Sender()).
-		AppendArgs(args...).Run(ctx))
 }

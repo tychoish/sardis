@@ -39,7 +39,7 @@ func fetchAur() cli.Command {
 		},
 		Before: addRemanderToStringSliceFlag(nameFlagName),
 		Action: func(ctx context.Context, c *cli.Context) error {
-			queue, run := units.SetupQueue(amboy.RunJob)
+			queue, run := units.SetupWorkers()
 
 			for _, name := range c.StringSlice(nameFlagName) {
 				queue.PushBack(units.NewArchFetchAurJob(name, true))
@@ -88,7 +88,8 @@ func installAur() cli.Command {
 			catcher := &erc.Collector{}
 
 			for _, name := range c.StringSlice(nameFlagName) {
-				if err := amboy.RunJob(ctx, units.NewArchFetchAurJob(name, true)); err != nil {
+				job := units.NewArchFetchAurJob(name, true)
+				if err := job(ctx); err != nil {
 					catcher.Add(err)
 					continue
 				}
@@ -130,7 +131,7 @@ func setupArchLinux() cli.Command {
 					"update": pkg.Update,
 				})
 
-				if err := amboy.RunJob(ctx, units.NewArchFetchAurJob(pkg.Name, pkg.Update)); err != nil {
+				if err := units.NewArchFetchAurJob(pkg.Name, pkg.Update)(ctx); err != nil {
 					catcher.Add(err)
 					continue
 				}

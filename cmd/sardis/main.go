@@ -5,14 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 
-	"github.com/coreos/go-systemd/journal"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
-	"github.com/tychoish/grip/send"
-	"github.com/tychoish/grip/x/system"
 	"github.com/tychoish/jasper"
 	jaspercli "github.com/tychoish/jasper/x/cli"
 	"github.com/tychoish/sardis"
@@ -120,7 +116,9 @@ func buildApp() *cli.App {
 		conf.Settings.Logging.EnableJSONFormating = c.Bool(jsonFormatingFlag)
 		conf.Settings.Logging.Priority = level.FromString(c.String(levelFlag))
 
-		loggingSetup(conf.Settings.Logging)
+		if err := sardis.SetupLogging(conf); err != nil {
+			return err
+		}
 
 		ctx = sardis.WithConfiguration(ctx, conf)
 
@@ -141,37 +139,4 @@ func buildApp() *cli.App {
 
 	return app
 
-}
-
-// logging setup is separate to make it unit testable
-func loggingSetup(conf sardis.LoggingConf) {
-	sender := grip.Sender()
-
-	if runtime.GOOS == "linux" {
-		var syslog send.Sender
-		var err error
-		if journal.Enabled() {
-			syslog, err = system.MakeSystemdSender()
-			if err != nil {
-				return
-			}
-			return
-		} else {
-			syslog = system.MakeLocalSyslog()
-		}
-
-		if !conf.DisableStandardOutput {
-			sender = send.MakeMulti(syslog, sender)
-		} else {
-			sender = syslog
-		}
-	}
-
-	if conf.EnableJSONFormating {
-		sender.SetFormatter(send.MakeJSONFormatter())
-	}
-
-	sender.SetName(os.Args[0])
-	sender.SetPriority(conf.Priority)
-	grip.SetGlobalLogger(grip.NewLogger(sender))
 }

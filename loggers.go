@@ -3,6 +3,9 @@ package sardis
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/tychoish/fun/erc"
@@ -13,11 +16,39 @@ import (
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/grip/x/desktop"
 	"github.com/tychoish/grip/x/jira"
+	"github.com/tychoish/grip/x/system"
 	"github.com/tychoish/grip/x/telegram"
 	"github.com/tychoish/grip/x/twitter"
 	"github.com/tychoish/grip/x/xmpp"
 	"github.com/tychoish/sardis/util"
 )
+
+func SetupLogging(ctx context.Context, conf *Configuration) error {
+	sender := grip.Sender()
+
+	if runtime.GOOS == "linux" {
+		syslog, err := system.MakeDefault()
+		if err != nil {
+			return err
+		}
+
+		if conf.Settings.Logging.DisableStandardOutput {
+			sender = syslog
+		} else {
+			sender = send.MakeMulti(syslog, sender)
+		}
+	}
+
+	if conf.Settings.Logging.EnableJSONFormating {
+		sender.SetFormatter(send.MakeJSONFormatter())
+	}
+
+	sender.SetName(filepath.Base(os.Args[0]))
+	sender.SetPriority(conf.Settings.Logging.Priority)
+	grip.SetGlobalLogger(grip.NewLogger(sender))
+
+	return nil
+}
 
 func Twitter(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "twitter") }
 func WithTwitterLogger(ctx context.Context, conf *Configuration) context.Context {

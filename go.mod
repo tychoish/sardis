@@ -21,9 +21,9 @@ require (
 	github.com/tychoish/grip/x/telegram v0.0.0-20230430192632-9a70cb893120
 	github.com/tychoish/grip/x/twitter v0.0.0-20230427110835-c9728a14310e
 	github.com/tychoish/grip/x/xmpp v0.0.0-20230427110835-c9728a14310e
-	github.com/tychoish/jasper v0.0.0-20230428170340-74877eeb5a0d
-	github.com/tychoish/jasper/x/cli v0.0.0-20230428164510-eed82f369905
-	github.com/tychoish/jasper/x/remote v0.0.0-20230428165720-cb453b83a84b
+	github.com/tychoish/jasper v0.1.0
+	github.com/tychoish/jasper/x/cli v0.0.0-20230503013204-8c9b0970f9d1
+	github.com/tychoish/jasper/x/remote v0.0.0-20230503013204-8c9b0970f9d1
 	github.com/urfave/cli v1.22.12
 	go.mongodb.org/mongo-driver v1.11.1
 	gopkg.in/yaml.v2 v2.4.0
@@ -43,6 +43,7 @@ require (
 	github.com/emirpasic/gods v1.12.0 // indirect
 	github.com/evergreen-ci/service v1.0.1-0.20200225230430-d9382e39d768 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
+	github.com/frankban/quicktest v1.14.5 // indirect
 	github.com/fuyufjh/splunk-hec-go v0.4.0 // indirect
 	github.com/gen2brain/beeep v0.0.0-20220518085355-d7852edf42fc // indirect
 	github.com/go-chi/chi v4.1.2+incompatible // indirect
@@ -83,9 +84,10 @@ require (
 	github.com/tychoish/birch/x/ftdc v0.0.0-20230413052020-46068f63d7bb // indirect
 	github.com/tychoish/birch/x/mrpc v0.0.0-20230413052020-46068f63d7bb // indirect
 	github.com/tychoish/gimlet v0.0.0-20230130001449-8987c96bb886 // indirect
-	github.com/tychoish/grip/x/metrics v0.0.0-20230414135146-97625602a7ee // indirect
-	github.com/tychoish/grip/x/splunk v0.0.0-20230427110835-c9728a14310e // indirect
-	github.com/tychoish/jasper/x/splunk v0.0.0-20230428164510-eed82f369905 // indirect
+	github.com/tychoish/grip/x/metrics v0.0.0-20230430204648-ccdad1e4b419 // indirect
+	github.com/tychoish/grip/x/splunk v0.0.0-20230430204648-ccdad1e4b419 // indirect
+	github.com/tychoish/jasper/x/splunk v0.0.0-20230503013204-8c9b0970f9d1 // indirect
+	github.com/tychoish/jasper/x/track v0.0.0-20230502230321-07d6256076b2 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect

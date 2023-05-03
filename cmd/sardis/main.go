@@ -112,6 +112,9 @@ func buildApp() *cli.App {
 	app.Before = func(c *cli.Context) error {
 		path := c.String("conf")
 		conf, err := sardis.LoadConfiguration(path)
+		if err != nil {
+			return err
+		}
 
 		conf.Settings.Logging.DisableStandardOutput = c.Bool(disableFlag)
 		conf.Settings.Logging.EnableJSONFormating = c.Bool(jsonFormatingFlag)
@@ -121,13 +124,9 @@ func buildApp() *cli.App {
 
 		ctx = sardis.WithConfiguration(ctx, conf)
 
-		jpm, err := jasper.NewSynchronizedManager(false)
-		if err != nil {
-			srv.AddCleanupError(ctx, err)
-		} else {
-			ctx = jasper.WithManager(ctx, jpm)
-			srv.AddCleanup(ctx, jpm.Close)
-		}
+		jpm := jasper.NewManager(jasper.ManagerOptions{Synchronized: true})
+		ctx = jasper.WithManager(ctx, jpm)
+		srv.AddCleanup(ctx, jpm.Close)
 
 		// reset now so we give things the right context
 		reformCommands(ctx, app.Commands)

@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -47,7 +47,7 @@ func resolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configu
 		sender.SetFormatter(send.MakeJSONFormatter())
 	}
 
-	sender.SetName("sardis")
+	sender.SetName(os.Args[0])
 	sender.SetPriority(conf.Settings.Logging.Priority)
 	grip.SetGlobalLogger(grip.NewLogger(sender))
 
@@ -77,7 +77,7 @@ func main() {
 		AddFlag(cmdr.MakeFlag(cmdr.FlagOptions[bool]{Name: "quietStdOut", Usage: "don't log to standard out"})).
 		AddMiddleware(sardis.WithDesktopNotify).
 		AddMiddleware(func(ctx context.Context) context.Context {
-			jpm := fun.Must(jasper.NewSynchronizedManager(false))
+			jpm := jasper.NewManager(jasper.ManagerOptions{Synchronized: true})
 			srv.AddCleanup(ctx, jpm.Close)
 			return jasper.WithManager(ctx, jpm)
 		})

@@ -11,7 +11,7 @@ require (
 	github.com/go-git/go-git/v5 v5.2.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/tychoish/birch v0.2.3-0.20230413052020-46068f63d7bb
-	github.com/tychoish/cmdr v0.1.1-0.20230428170527-8a1c2f62e629
+	github.com/tychoish/cmdr v0.1.1-0.20230503021149-8e9bcec4676b
 	github.com/tychoish/fun v0.9.1
 	github.com/tychoish/godmenu v0.1.0
 	github.com/tychoish/grip v0.2.8

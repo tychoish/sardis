@@ -107,6 +107,10 @@ func GetDirectoryContents(path string) (fun.Iterator[string], error) {
 }
 
 func GetSSHAgentPath() (out string, err error) {
+	if path, ok := os.LookupEnv("SSH_AUTH_SOCK"); ok {
+		return path, nil
+	}
+
 	usr, err := user.Current()
 	if err != nil {
 		return "", err

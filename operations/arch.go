@@ -2,7 +2,9 @@ package operations
 
 import (
 	"context"
+	"errors"
 
+	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
@@ -13,80 +15,88 @@ import (
 
 const nameFlagName = "name"
 
-func ArchLinux() cli.Command {
-	return cli.Command{
-		Name:  "arch",
-		Usage: "arch linux management options",
-		Subcommands: []cli.Command{
+func ArchLinux() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("arch").
+		SetUsage("arch linux management options").
+		Subcommanders(
 			fetchAur(),
 			buildPkg(),
 			installAur(),
 			setupArchLinux(),
-		},
-	}
+		)
 }
 
-func fetchAur() cli.Command {
-	return cli.Command{
-		Name:  "fetch",
-		Usage: "donwload source to build directory",
-		Flags: []cli.Flag{
-			cli.StringSliceFlag{
-				Name:  joinFlagNames(nameFlagName, "n"),
-				Usage: "specify the name of a package",
-			},
-		},
-		Before: addRemanderToStringSliceFlag(nameFlagName),
-		Action: func(ctx context.Context, c *cli.Context) error {
+func fetchAur() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("fetch").
+		SetUsage("donwload source to build directory").
+		Flags(cmdr.FlagBuilder([]string{}).
+			SetName(nameFlagName, "n").
+			SetUsage("specify the name of a package").
+			Flag()).
+		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) ([]string, error) {
+			packages := append(cc.StringSlice(nameFlagName), cc.Args()...)
+			if len(packages) == 0 {
+				return nil, errors.New("must specify one package to fetch")
+			}
+
+			return packages, nil
+		}).SetAction(func(ctx context.Context, packages []string) error {
 			queue, run := units.SetupWorkers()
 
-			for _, name := range c.StringSlice(nameFlagName) {
+			for _, name := range packages {
 				queue.PushBack(units.NewArchFetchAurJob(name, true))
 			}
 
 			return run(ctx)
-		},
-	}
+		}).Add)
 }
 
-func buildPkg() cli.Command {
-	return cli.Command{
-		Name:  "build",
-		Usage: "donwload source to build directory",
-		Flags: []cli.Flag{
-			cli.StringSliceFlag{
-				Name:  joinFlagNames(nameFlagName, "n"),
-				Usage: "specify the name of a package",
-			},
-		},
-		Before: addRemanderToStringSliceFlag(nameFlagName),
-		Action: func(ctx context.Context, c *cli.Context) error {
-			catcher := &erc.Collector{}
-
-			for _, name := range c.StringSlice(nameFlagName) {
-				catcher.Add(units.NewArchAbsBuildJob(name)(ctx))
+func buildPkg() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("build").
+		SetUsage("download and build package").
+		Flags(cmdr.FlagBuilder([]string{}).
+			SetName(nameFlagName, "n").
+			SetUsage("specify the name of a package").
+			Flag()).
+		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) ([]string, error) {
+			packages := append(cc.StringSlice(nameFlagName), cc.Args()...)
+			if len(packages) == 0 {
+				return nil, errors.New("must specify one package to fetch")
 			}
 
-			return catcher.Resolve()
-		},
-	}
+			return packages, nil
+		}).SetAction(func(ctx context.Context, packages []string) error {
+			queue, run := units.SetupWorkers()
+
+			for _, name := range packages {
+				queue.PushBack(units.NewArchAbsBuildJob(name))
+			}
+
+			return run(ctx)
+		}).Add)
 }
 
-func installAur() cli.Command {
-	return cli.Command{
-		Name:  "install",
-		Usage: "combination download+build+install",
-		Flags: []cli.Flag{
-			cli.StringSliceFlag{
-				Name:  joinFlagNames(nameFlagName, "n"),
-				Usage: "specify the name of a package",
-			},
-		},
-		Before: addRemanderToStringSliceFlag(nameFlagName),
-		Action: func(ctx context.Context, c *cli.Context) error {
+func installAur() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("install").
+		SetUsage("combination build download and install").
+		Flags(cmdr.FlagBuilder([]string{}).
+			SetName(nameFlagName, "n").
+			SetUsage("specify the name of a package").
+			Flag()).
+		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) ([]string, error) {
+			packages := append(cc.StringSlice(nameFlagName), cc.Args()...)
+			if len(packages) == 0 {
+				return nil, errors.New("must specify one package to fetch")
+			}
+			return packages, nil
+		}).SetAction(func(ctx context.Context, packages []string) error {
 			catcher := &erc.Collector{}
 
-			for _, name := range c.StringSlice(nameFlagName) {
+			for _, name := range packages {
 				job := units.NewArchFetchAurJob(name, true)
 				if err := job(ctx); err != nil {
 					catcher.Add(err)
@@ -97,18 +107,16 @@ func installAur() cli.Command {
 			}
 
 			return catcher.Resolve()
-		},
-	}
+		}).Add)
 }
 
-func setupArchLinux() cli.Command {
-	return cli.Command{
-		Name:   "setup",
-		Usage:  "bootstrap/setup system according to packages described",
-		Flags:  []cli.Flag{},
-		Before: addRemanderToStringSliceFlag(nameFlagName),
-		Action: func(ctx context.Context, c *cli.Context) error {
-			conf := sardis.AppConfiguration(ctx)
+func setupArchLinux() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("setup").
+		SetUsage("bootstrap/setup system according to packages described").
+		With(cmdr.SpecBuilder(
+			ResolveConfiguration,
+		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 			catcher := &erc.Collector{}
 
 			pkgs := []string{}
@@ -139,6 +147,5 @@ func setupArchLinux() cli.Command {
 			}
 
 			return catcher.Resolve()
-		},
-	}
+		}).Add)
 }

@@ -9,16 +9,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-func addRemanderToStringSliceFlag(name string) cli.BeforeFunc {
-	return func(c *cli.Context) error {
-		catcher := &erc.Collector{}
-		for _, v := range c.Args() {
-			catcher.Add(c.Set(name, v))
-		}
-		return catcher.Resolve()
-	}
-}
-
 func requirePathExists(flagName string) cli.BeforeFunc {
 	return func(c *cli.Context) error {
 		path := c.String(flagName)

@@ -3,46 +3,63 @@ package operations
 import (
 	"context"
 
+	"github.com/tychoish/cmdr"
 	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/level"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
 	"github.com/urfave/cli"
 )
 
-func Admin() cli.Command {
-	return cli.Command{
-		Name:  "admin",
-		Usage: "local sysadmin scripts",
-		Subcommands: []cli.Command{
+func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configuration, error) {
+	conf, err := sardis.LoadConfiguration(cc.GlobalString("conf"))
+
+	if err != nil {
+		return nil, err
+	}
+
+	conf.Settings.Logging.EnableJSONFormating = cc.GlobalBool("jsonLog")
+	conf.Settings.Logging.DisableStandardOutput = cc.GlobalBool("quietStdOut")
+	conf.Settings.Logging.Priority = level.FromString(cc.GlobalString("level"))
+
+	return conf, nil
+}
+
+func Admin() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("admin").
+		SetUsage("local systems administration scripts").
+		Subcommanders(
 			configCheck(),
 			nightly(),
 			setupLinks(),
-		},
-	}
+		)
 }
 
-func configCheck() cli.Command {
-	return cli.Command{
-		Name:  "config",
-		Usage: "validated configuration",
-		Action: func(ctx context.Context, c *cli.Context) error {
-			conf := sardis.AppConfiguration(ctx)
+func configCheck() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("config").
+		SetUsage("validated configuration").
+		With(cmdr.SpecBuilder(
+			ResolveConfiguration,
+		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
+			// this is redundant, as the resolve
+			// configuration does this correctly.
 			err := conf.Validate()
 			if err == nil {
 				grip.Info("configuration is valid")
 			}
 			return err
-		},
-	}
+		}).Add)
 }
 
-func nightly() cli.Command {
-	return cli.Command{
-		Name:  "nightly",
-		Usage: "run nightly config operation",
-		Action: func(ctx context.Context, c *cli.Context) error {
-			conf := sardis.AppConfiguration(ctx)
-
+func nightly() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("nightly").
+		SetUsage("run nightly config operation").
+		With(cmdr.SpecBuilder(
+			ResolveConfiguration,
+		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 			jobs, run := units.SetupWorkers()
 
 			for idx := range conf.Links {
@@ -58,6 +75,5 @@ func nightly() cli.Command {
 			}
 
 			return run(ctx)
-		},
-	}
+		}).Add)
 }

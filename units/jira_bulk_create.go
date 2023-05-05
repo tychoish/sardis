@@ -14,10 +14,6 @@ import (
 	"github.com/tychoish/sardis/util"
 )
 
-type jiraBulkCreateJob struct {
-	Path string `bson:"path" json:"path" yaml:"path"`
-}
-
 func NewBulkCreateJiraTicketJob(path string) fun.WorkerFunc {
 	return erc.WithCollector(func(ctx context.Context, ec *erc.Collector) error {
 		data := struct {

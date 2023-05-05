@@ -45,6 +45,7 @@ func SetupLogging(ctx context.Context, conf *Configuration) error {
 
 	sender.SetName(filepath.Base(os.Args[0]))
 	sender.SetPriority(conf.Settings.Logging.Priority)
+
 	grip.SetGlobalLogger(grip.NewLogger(sender))
 
 	return nil

@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/cheynewallace/tabby"
@@ -37,6 +38,7 @@ func listMenus() cli.Command {
 						cmds = append(cmds, cmd.Command)
 					}
 				}
+				sort.Strings(cmds)
 				table.AddLine(name, strings.Join(cmds, "; "))
 			}
 
@@ -92,6 +94,7 @@ func DMenu() cli.Command {
 			for group := range cmdGrp {
 				others = append(others, group)
 			}
+			sort.Strings(others)
 
 			if group, ok := cmdGrp[name]; ok {
 				cmds := group.ExportCommands()
@@ -103,6 +106,8 @@ func DMenu() cli.Command {
 
 					opts = append(opts, name)
 				}
+
+				sort.Strings(opts)
 
 				cmd, err := godmenu.RunDMenu(ctx, godmenu.Options{
 					Selections: opts,

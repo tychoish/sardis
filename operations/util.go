@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/tychoish/cmdr"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/dupe"
@@ -11,16 +12,12 @@ import (
 	"github.com/urfave/cli"
 )
 
-func Utilities() cli.Command {
-	return cli.Command{
-		Name:    "util",
-		Aliases: []string{"utility"},
-		Usage:   "short utility commands",
-		Subcommands: []cli.Command{
-			setupLinks(),
-			diffTrees(),
-		},
-	}
+func Utilities() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("utility").
+		SetUsage("short utility commands").
+		Subcommanders(setupLinks()).
+		UrfaveCommands(diffTrees())
 }
 
 func diffTrees() cli.Command {
@@ -65,20 +62,18 @@ func diffTrees() cli.Command {
 	}
 }
 
-func setupLinks() cli.Command {
-	return cli.Command{
-		Name:  "setup-links",
-		Usage: "setup all configured links",
-		Action: func(ctx context.Context, c *cli.Context) error {
-			conf := sardis.AppConfiguration(ctx)
-
+func setupLinks() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("setup-links").
+		SetUsage("setup all configured links").
+		With(cmdr.SpecBuilder(
+			ResolveConfiguration,
+		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 			jobs, worker := units.SetupWorkers()
 			for _, link := range conf.Links {
 				jobs.PushBack(units.NewSymlinkCreateJob(link))
 			}
 
 			return worker(ctx)
-		},
-	}
-
+		}).Add)
 }

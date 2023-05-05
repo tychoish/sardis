@@ -35,13 +35,18 @@ func reformCommands(ctx context.Context, cmds []cli.Command) {
 	for idx := range cmds {
 		switch cc := cmds[idx].Action.(type) {
 		case nil:
+			// top level commands often don't have actions
+			// of their own. That's fine.
 		case func(*cli.Context) error:
+			// this is the correct form but we should
+			// recurse through subcommands later
 		case func(context.Context, *cli.Context) error:
 			cmds[idx].Action = func(clictx *cli.Context) error {
 				return cc(ctx, clictx)
 			}
 		default:
-			grip.Warningf("command has malformed action %s [%T]", cmds[idx].Name, cmds[idx])
+			// malformed, there's nothing to do except it
+			// error later.
 		}
 		reformCommands(ctx, cmds[idx].Subcommands)
 	}
@@ -85,25 +90,25 @@ func buildApp() *cli.App {
 		},
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
+	ctx = srv.WithOrchestrator(ctx)
+	ctx = srv.WithCleanup(ctx)
+
 	app.Commands = []cli.Command{
 		operations.Notify(),
 		operations.Tweet(),
 		operations.Version(),
 		operations.DMenu(),
-		operations.Admin(),
-		operations.ArchLinux(),
+		operations.Admin().SetContext(ctx).Command(),
+		operations.ArchLinux().SetContext(ctx).Command(),
 		operations.Repo(),
 		operations.Jira(),
 		operations.RunCommand(),
 		operations.Blog(),
-		operations.Utilities(),
+		operations.Utilities().SetContext(ctx).Command(),
 		jaspercli.Jasper(),
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	ctx = srv.WithOrchestrator(ctx)
-	ctx = srv.WithCleanup(ctx)
 
 	app.Before = func(c *cli.Context) error {
 		path := c.String("conf")
@@ -116,7 +121,7 @@ func buildApp() *cli.App {
 		conf.Settings.Logging.EnableJSONFormating = c.Bool(jsonFormatingFlag)
 		conf.Settings.Logging.Priority = level.FromString(c.String(levelFlag))
 
-		if err := sardis.SetupLogging(conf); err != nil {
+		if err := sardis.SetupLogging(ctx, conf); err != nil {
 			return err
 		}
 
@@ -125,6 +130,7 @@ func buildApp() *cli.App {
 		jpm := jasper.NewManager(jasper.ManagerOptions{Synchronized: true})
 		ctx = jasper.WithManager(ctx, jpm)
 		srv.AddCleanup(ctx, jpm.Close)
+		srv.AddCleanup(ctx, func(ctx context.Context) error { return grip.Sender().Close() })
 
 		// reset now so we give things the right context
 		reformCommands(ctx, app.Commands)

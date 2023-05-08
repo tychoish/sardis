@@ -8,15 +8,16 @@ import (
 	"os"
 	"strings"
 
-	"gopkg.in/yaml.v2"
+	"go.mongodb.org/mongo-driver/bson"
+	"gopkg.in/yaml.v3"
 )
 
 type Unmarshaler func([]byte, interface{}) error
 
 func GetUnmarshaler(fn string) Unmarshaler {
 	switch {
-	// case strings.HasSuffix(fn, ".bson"):
-	//	return bson.Unmarshal
+	case strings.HasSuffix(fn, ".bson"):
+		return bson.Unmarshal
 	case strings.HasSuffix(fn, ".json"):
 		return json.Unmarshal
 	case strings.HasSuffix(fn, ".yaml"), strings.HasSuffix(fn, ".yml"):

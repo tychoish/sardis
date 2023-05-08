@@ -8,19 +8,19 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configuration, error) {
-	conf, err := sardis.LoadConfiguration(cc.GlobalString("conf"))
+	conf, err := sardis.LoadConfiguration(cc.String("conf"))
 
 	if err != nil {
 		return nil, err
 	}
 
-	conf.Settings.Logging.EnableJSONFormating = cc.GlobalBool("jsonLog")
-	conf.Settings.Logging.DisableStandardOutput = cc.GlobalBool("quietStdOut")
-	conf.Settings.Logging.Priority = level.FromString(cc.GlobalString("level"))
+	conf.Settings.Logging.EnableJSONFormating = cc.Bool("jsonLog")
+	conf.Settings.Logging.DisableStandardOutput = cc.Bool("quietStdOut")
+	conf.Settings.Logging.Priority = level.FromString(cc.String("level"))
 
 	return conf, nil
 }

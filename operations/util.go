@@ -9,7 +9,7 @@ import (
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/dupe"
 	"github.com/tychoish/sardis/units"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 func Utilities() *cmdr.Commander {
@@ -20,26 +20,26 @@ func Utilities() *cmdr.Commander {
 		UrfaveCommands(diffTrees())
 }
 
-func diffTrees() cli.Command {
-	return cli.Command{
+func diffTrees() *cli.Command {
+	return &cli.Command{
 		Name:  "tree-diff",
 		Usage: "Compare two trees of files",
 		Flags: []cli.Flag{
-			cli.StringFlag{
+			&cli.StringFlag{
 				Name:  "target",
 				Usage: "path of (mutable) target directory",
 			},
-			cli.StringFlag{
+			&cli.StringFlag{
 				Name:  "mirror",
 				Usage: "path of imutable upstream copy",
 			},
-			cli.BoolFlag{
+			&cli.BoolFlag{
 				Name:  "deleteMatching",
 				Usage: "when specified delete files from the target that are the same in the mirror",
 			},
 		},
 		Before: setMultiPositionalArgs("target", "mirror"),
-		Action: func(ctx context.Context, c *cli.Context) error {
+		Action: func(c *cli.Context) error {
 			shouldDelete := c.Bool("deleteMatching")
 			opts := dupe.Options{
 				Target: c.String("target"),

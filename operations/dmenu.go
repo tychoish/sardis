@@ -7,87 +7,88 @@ import (
 	"strings"
 
 	"github.com/cheynewallace/tabby"
+	"github.com/tychoish/cmdr"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-func listMenus() cli.Command {
-	return cli.Command{
-		Name: "list",
-		Action: func(ctx context.Context, c *cli.Context) error {
-			conf := sardis.AppConfiguration(ctx)
+func listMenus() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("list").
+		With(cmdr.SpecBuilder(ResolveConfiguration).
+			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
+				table := tabby.New()
+				table.AddHeader("Name", "Selections")
 
-			table := tabby.New()
-			table.AddHeader("Name", "Selections")
+				groups := map[string][]string{}
 
-			groups := map[string][]string{}
+				for name, group := range conf.ExportCommandGroups() {
+					cmds := []string{}
+					for _, cmd := range group.Commands {
+						switch {
+						case cmd.Alias != "":
+							cmds = append(cmds, cmd.Alias)
+						case cmd.Name != "":
+							cmds = append(cmds, cmd.Name)
+						default:
+							cmds = append(cmds, cmd.Command)
+						}
+					}
+					sort.Strings(cmds)
+					table.AddLine(name, strings.Join(cmds, "; "))
+				}
 
-			for name, group := range conf.ExportCommandGroups() {
-				cmds := []string{}
-				for _, cmd := range group.Commands {
-					switch {
-					case cmd.Alias != "":
-						cmds = append(cmds, cmd.Alias)
-					case cmd.Name != "":
-						cmds = append(cmds, cmd.Name)
-					default:
-						cmds = append(cmds, cmd.Command)
+				for _, m := range conf.Menus {
+					out := make([]string, 0, len(m.Selections)+len(m.Aliases))
+					out = append(out, m.Selections...)
+					if len(m.Aliases) > 0 {
+						for _, p := range m.Aliases {
+							out = append(out, fmt.Sprintf("%s [%s]", p.Key, p.Value))
+						}
+					}
+					if len(out) > 0 {
+						table.AddLine(m.Name, strings.Join(out, "; "))
 					}
 				}
-				sort.Strings(cmds)
-				table.AddLine(name, strings.Join(cmds, "; "))
-			}
 
-			for _, m := range conf.Menus {
-				out := make([]string, 0, len(m.Selections)+len(m.Aliases))
-				out = append(out, m.Selections...)
-				if len(m.Aliases) > 0 {
-					for _, p := range m.Aliases {
-						out = append(out, fmt.Sprintf("%s [%s]", p.Key, p.Value))
-					}
+				for group, cmds := range groups {
+					table.AddLine(group, strings.Join(cmds, ", "))
 				}
-				if len(out) > 0 {
-					table.AddLine(m.Name, strings.Join(out, "; "))
-				}
-			}
 
-			for group, cmds := range groups {
-				table.AddLine(group, strings.Join(cmds, ", "))
-			}
-
-			table.Print()
-			return nil
-		},
-	}
+				table.Print()
+				return nil
+			}).Add)
 }
 
-func DMenu() cli.Command {
-	cmds := dmenuListCmds(dmenuListCommandRun)
-	cmds.Name = "all"
-
-	return cli.Command{
-		Name: "dmenu",
-		Subcommands: []cli.Command{
-			cmds,
+func DMenu() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("dmenu").
+		Subcommanders(
+			dmenuListCmds(dmenuListCommandRun).SetName("all"),
 			listMenus(),
-		},
-		Flags: []cli.Flag{
-			cli.StringSliceFlag{
-				Name:     joinFlagNames(commandFlagName, "c"),
-				Usage:    "specify a default flag name",
-				Required: false,
-			},
-		},
-		Before: setFirstArgWhenStringUnset(commandFlagName),
-		Action: func(ctx context.Context, c *cli.Context) error {
-			name := c.String(commandFlagName)
-			conf := sardis.AppConfiguration(ctx)
+		).
+		Flags((&cmdr.FlagOptions[[]string]{}).
+			SetName(commandFlagName, "c").
+			SetUsage("specify a default flag name").
+			Flag()).
+		With(cmdr.SpecBuilder(ResolveConfiguration).SetMiddleware(sardis.WithConfiguration).Add).
+		Middleware(sardis.WithDesktopNotify).
+		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (string, error) {
+			if name := cc.String(commandFlagName); name != "" {
+				return name, nil
+			}
 
-			ctx = sardis.WithDesktopNotify(ctx)
+			if cc.NArg() != 1 {
+				return "", fmt.Errorf("must specify %s", commandFlagName)
+			}
+
+			return cc.Args().First(), nil
+		}).SetAction(func(ctx context.Context, name string) error {
+			conf := sardis.AppConfiguration(ctx)
 			others := []string{}
 
 			cmdGrp := conf.ExportCommandGroups()
@@ -167,7 +168,5 @@ func DMenu() cli.Command {
 			// don't notify here let the inner one do that
 			return jasper.Context(ctx).CreateCommand(ctx).Append(fmt.Sprintf("%s %s", "sardis dmenu", output)).
 				SetCombinedSender(level.Notice, grip.Sender()).Run(ctx)
-
-		},
-	}
+		}).Add)
 }

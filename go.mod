@@ -23,7 +23,7 @@ require (
 	github.com/tychoish/jasper v0.1.0
 	github.com/tychoish/jasper/x/cli v0.0.0-20230503013204-8c9b0970f9d1
 	github.com/tychoish/jasper/x/remote v0.0.0-20230503013204-8c9b0970f9d1
-	github.com/urfave/cli v1.22.12
+	github.com/urfave/cli/v2 v2.25.3
 	go.mongodb.org/mongo-driver v1.11.1
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -89,9 +89,11 @@ require (
 	github.com/tychoish/jasper/x/splunk v0.0.0-20230503013204-8c9b0970f9d1 // indirect
 	github.com/tychoish/jasper/x/track v0.0.0-20230502230321-07d6256076b2 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
+	github.com/urfave/cli v1.22.12 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
+	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/crypto v0.8.0 // indirect
 	golang.org/x/net v0.9.0 // indirect

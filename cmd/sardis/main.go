@@ -10,11 +10,10 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/jasper"
-	jaspercli "github.com/tychoish/jasper/x/cli"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/operations"
 	"github.com/tychoish/sardis/util"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 func main() {
@@ -28,27 +27,6 @@ func main() {
 	grip.Error(err)
 	if err != nil {
 		os.Exit(1)
-	}
-}
-
-func reformCommands(ctx context.Context, cmds []cli.Command) {
-	for idx := range cmds {
-		switch cc := cmds[idx].Action.(type) {
-		case nil:
-			// top level commands often don't have actions
-			// of their own. That's fine.
-		case func(*cli.Context) error:
-			// this is the correct form but we should
-			// recurse through subcommands later
-		case func(context.Context, *cli.Context) error:
-			cmds[idx].Action = func(clictx *cli.Context) error {
-				return cc(ctx, clictx)
-			}
-		default:
-			// malformed, there's nothing to do except it
-			// error later.
-		}
-		reformCommands(ctx, cmds[idx].Subcommands)
 	}
 }
 
@@ -66,25 +44,25 @@ func buildApp() *cli.App {
 	// These are global options. Use this to configure logging or
 	// other options independent from specific sub commands.
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  levelFlag,
 			Value: "info",
 			Usage: fmt.Sprintln("Specify lowest visible loglevel as string: ",
 				"'emergency|alert|critical|error|warning|notice|info|debug'"),
 		},
-		cli.BoolFlag{
-			Name:   disableFlag,
-			EnvVar: "SARDIS_LOGGING_DISABLE_STD_OUT",
+		&cli.BoolFlag{
+			Name:    disableFlag,
+			EnvVars: []string{"SARDIS_LOGGING_DISABLE_STD_OUT"},
 			Usage: fmt.Sprintln("specify to disable output to standard output.",
 				"On non-linux systems this does nothing. ",
 			),
 		},
-		cli.BoolFlag{
-			Name:   jsonFormatingFlag,
-			EnvVar: "SARDIS_LOGGING_ENABLE_JSON_FORMATTING",
-			Usage:  "specify to enable json formating for log messages",
+		&cli.BoolFlag{
+			Name:    jsonFormatingFlag,
+			EnvVars: []string{"SARDIS_LOGGING_ENABLE_JSON_FORMATTING"},
+			Usage:   "specify to enable json formating for log messages",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "conf, c",
 			Value: filepath.Join(util.GetHomeDir(), ".sardis.yaml"),
 		},
@@ -95,19 +73,19 @@ func buildApp() *cli.App {
 	ctx = srv.WithOrchestrator(ctx)
 	ctx = srv.WithCleanup(ctx)
 
-	app.Commands = []cli.Command{
-		operations.Notify(),
-		operations.Tweet(),
-		operations.Version(),
-		operations.DMenu(),
+	app.Commands = []*cli.Command{
+		operations.Notify().SetContext(ctx).Command(),
+		operations.Tweet().SetContext(ctx).Command(),
+		operations.Version().SetContext(ctx).Command(),
+		operations.DMenu().SetContext(ctx).Command(),
 		operations.Admin().SetContext(ctx).Command(),
 		operations.ArchLinux().SetContext(ctx).Command(),
-		operations.Repo(),
-		operations.Jira(),
-		operations.RunCommand(),
-		operations.Blog(),
+		operations.Repo().SetContext(ctx).Command(),
+		operations.Jira().SetContext(ctx).Command(),
+		operations.RunCommand().SetContext(ctx).Command(),
+		operations.Blog().SetContext(ctx).Command(),
 		operations.Utilities().SetContext(ctx).Command(),
-		jaspercli.Jasper(),
+		// jaspercli.Jasper(),
 	}
 
 	app.Before = func(c *cli.Context) error {
@@ -131,9 +109,6 @@ func buildApp() *cli.App {
 		ctx = jasper.WithManager(ctx, jpm)
 		srv.AddCleanup(ctx, jpm.Close)
 		srv.AddCleanup(ctx, func(ctx context.Context) error { return grip.Sender().Close() })
-
-		// reset now so we give things the right context
-		reformCommands(ctx, app.Commands)
 
 		return nil
 	}

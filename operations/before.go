@@ -2,91 +2,14 @@ package operations
 
 import (
 	"errors"
-	"fmt"
-	"os"
 
-	"github.com/tychoish/fun/erc"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
-
-func requirePathExists(flagName string) cli.BeforeFunc {
-	return func(c *cli.Context) error {
-		path := c.String(flagName)
-		if path == "" {
-			if c.NArg() != 1 {
-				return errors.New("must specify the path to a configuration")
-			}
-			path = c.Args().Get(0)
-		}
-
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return fmt.Errorf("configuration file %s does not exist", path)
-		}
-
-		return c.Set(flagName, path)
-	}
-}
-
-func requireCommandsSet(flagName string) cli.BeforeFunc {
-	return func(c *cli.Context) error {
-		flg := c.StringSlice(flagName)
-		if len(flg) == 0 {
-			if c.NArg() == 0 {
-				return errors.New("must specify a command name")
-			}
-
-			catcher := &erc.Collector{}
-			catcher.Add(c.Set(flagName, c.Args().First()))
-			for _, it := range c.Args().Tail() {
-				catcher.Add(c.Set(flagName, it))
-			}
-			return catcher.Resolve()
-		}
-		return nil
-	}
-}
-
-func requireStringOrFirstArgSet(flagName string) cli.BeforeFunc {
-	return func(c *cli.Context) error {
-		value := c.String(flagName)
-		if value == "" {
-			if c.NArg() != 1 {
-				return fmt.Errorf("must specify a '%s'", flagName)
-			}
-			value = c.Args().Get(0)
-		}
-		return c.Set(flagName, value)
-	}
-}
-
-func setFirstArgWhenStringUnset(flagName string) cli.BeforeFunc {
-	return func(c *cli.Context) error {
-		value := c.String(flagName)
-		if value == "" {
-			if c.NArg() != 1 {
-				return nil
-			}
-			value = c.Args().Get(0)
-		}
-		return c.Set(flagName, value)
-	}
-}
-
-func setAllTailArguements(flagName string) cli.BeforeFunc {
-	return func(c *cli.Context) error {
-		for _, a := range c.Args() {
-			if err := c.Set(flagName, a); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-}
 
 func setMultiPositionalArgs(flags ...string) cli.BeforeFunc {
 	return func(c *cli.Context) error {
 		var lastUsed int
-		tail := c.Args()
+		tail := c.Args().Slice()
 		for _, f := range flags {
 			if c.IsSet(f) {
 				continue

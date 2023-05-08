@@ -9,6 +9,7 @@ import (
 
 	"github.com/cheynewallace/tabby"
 	"github.com/mitchellh/go-homedir"
+	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
@@ -16,31 +17,29 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-func Repo() cli.Command {
-	return cli.Command{
-		Name:  "repo",
-		Usage: "a collections of commands to manage repositories",
-		Subcommands: []cli.Command{
-			repoClone(),
+func Repo() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("repo").
+		SetUsage("a collections of commands to manage repositories").
+		Subcommanders(
+			repoList(),
 			repoUpdate(),
+			repoClone(),
 			repoCleanup(),
 			repoStatus(),
 			repoFetch(),
-			repoList(),
-		},
-	}
+		)
 }
 
-func repoList() cli.Command {
-	return cli.Command{
-		Name:  "list",
-		Usage: "return a list of configured repos",
-		Action: func(ctx context.Context, c *cli.Context) error {
-			conf := sardis.AppConfiguration(ctx)
-
+func repoList() *cmdr.Commander {
+	return cmdr.MakeCommander().SetName("list").
+		SetUsage("return a list of configured repos").
+		With(cmdr.SpecBuilder(
+			ResolveConfiguration,
+		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 			homedir, _ := homedir.Expand("~/")
 
 			table := tabby.New()
@@ -59,210 +58,170 @@ func repoList() cli.Command {
 			table.Print()
 
 			return nil
-		},
-	}
+		}).Add)
 }
 
-func repoUpdate() cli.Command {
-	const repoTagFlagName = "repo"
-	return cli.Command{
-		Name:    "update",
-		Aliases: []string{"sync"},
-		Usage:   "update a local and remote git repository according to the config",
-		Flags: []cli.Flag{
-			cli.StringSliceFlag{
-				Name:  repoTagFlagName,
-				Usage: "specify tag of repos to update",
-			},
-		},
-		Before: setAllTailArguements(repoTagFlagName),
-		Action: func(ctx context.Context, c *cli.Context) error {
-			tags := c.StringSlice(repoTagFlagName)
+type opsCmdArgs struct {
+	conf *sardis.Configuration
+	ops  []string
+}
 
-			conf := sardis.AppConfiguration(ctx)
-			ctx = sardis.WithRemoteNotify(ctx, conf)
-			notify := sardis.RemoteNotify(ctx)
+func addOpCommand(cmd *cmdr.Commander, name string, op func(ctx context.Context, args *opsCmdArgs) error) *cmdr.Commander {
+	return cmd.Flags(cmdr.FlagBuilder([]string{}).
+		SetName(name).
+		SetUsage(fmt.Sprintf("specify one or more configured %s", name)).
+		Flag(),
+	).With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (*opsCmdArgs, error) {
+		conf, err := ResolveConfiguration(ctx, cc)
+		if err != nil {
+			return nil, err
+		}
+		ops := append(cc.StringSlice(name), cc.Args().Slice()...)
 
-			repos := conf.GetTaggedRepos(tags...)
-			if len(repos) == 0 {
-				return fmt.Errorf("no tagged repository named '%v' configured", tags)
+		return &opsCmdArgs{conf: conf, ops: ops}, nil
+	}).SetMiddleware(func(ctx context.Context, args *opsCmdArgs) context.Context {
+		return sardis.WithRemoteNotify(ctx, args.conf)
+	}).SetAction(op).Add)
+}
+
+func repoUpdate() *cmdr.Commander {
+	cmd := cmdr.MakeCommander().
+		SetName("update").
+		Aliases("sync")
+
+	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
+		notify := sardis.RemoteNotify(ctx)
+		repos := args.conf.GetTaggedRepos(args.ops...)
+		if len(repos) == 0 {
+			return fmt.Errorf("no tagged repository named '%v' configured", args.ops)
+		}
+
+		shouldNotify := false
+
+		started := time.Now()
+		jobs, worker := units.SetupWorkers()
+		for idx := range repos {
+			repo := repos[idx]
+			if repo.Disabled {
+				continue
 			}
-
-			shouldNotify := false
-
-			started := time.Now()
-			jobs, worker := units.SetupWorkers()
-			for idx := range repos {
-				repo := repos[idx]
-				if repo.Disabled {
-					continue
-				}
-				if repo.Notify {
-					shouldNotify = true
-				}
-				jobs.PushBack(units.SyncRepo(repo))
+			if repo.Notify {
+				shouldNotify = true
 			}
+			jobs.PushBack(units.SyncRepo(repo))
+		}
 
-			grip.Info(message.Fields{
+		grip.Info(message.Fields{
+			"op":      "repo sync",
+			"message": "waiting for jobs to complete",
+			"tags":    args.ops,
+		})
+
+		if err := worker(ctx); err != nil {
+			return err
+		}
+
+		if shouldNotify {
+			notify.Notice(message.Fields{
+				"tag":     args.ops,
 				"op":      "repo sync",
-				"message": "waiting for jobs to complete",
-				"tags":    tags,
-			})
-
-			if err := worker(ctx); err != nil {
-				return err
-			}
-
-			if shouldNotify {
-				notify.Notice(message.Fields{
-					"tag":     tags,
-					"op":      "repo sync",
-					"dur_sec": time.Since(started).Seconds(),
-				})
-			}
-
-			// QUESTION: should we send notification here
-			grip.Notice(message.Fields{
-				"op":      "repo sync",
-				"code":    "success",
-				"tag":     tags,
 				"dur_sec": time.Since(started).Seconds(),
-				"repos":   len(repos),
 			})
+		}
 
-			return nil
-		},
-	}
+		// QUESTION: should we send notification here
+		grip.Notice(message.Fields{
+			"op":      "repo sync",
+			"code":    "success",
+			"tag":     args.ops,
+			"dur_sec": time.Since(started).Seconds(),
+			"repos":   len(repos),
+		})
+
+		return nil
+	})
 }
 
-func repoCleanup() cli.Command {
-	const repoFlagName = "repo"
-	return cli.Command{
-		Name:  "gc",
-		Usage: "run repository cleanup",
-		Flags: []cli.Flag{
+func repoCleanup() *cmdr.Commander {
+	cmd := cmdr.MakeCommander().
+		SetName("gc").
+		Aliases("cleanup").
+		SetUsage("run repository cleanup")
 
-			cli.StringSliceFlag{
-				Name:  repoFlagName,
-				Usage: "specify a local repository to cleanup",
-			},
-		},
-		Before: setAllTailArguements(repoFlagName),
-		Action: func(ctx context.Context, c *cli.Context) error {
-			tags := c.StringSlice(repoFlagName)
+	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
+		repos := args.conf.GetTaggedRepos(args.ops...)
 
-			repos := sardis.AppConfiguration(ctx).GetTaggedRepos(tags...)
+		jobs, run := units.SetupWorkers()
 
-			jobs, run := units.SetupWorkers()
+		for _, repo := range repos {
+			jobs.PushBack(units.NewRepoCleanupJob(repo.Path))
+		}
 
-			for _, repo := range repos {
-				jobs.PushBack(units.NewRepoCleanupJob(repo.Path))
+		return run(ctx)
+	})
+}
+
+func repoClone() *cmdr.Commander {
+	cmd := cmdr.MakeCommander().
+		SetName("clone").
+		SetUsage("clone a repository or all matching repositories")
+	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
+		repos := args.conf.GetTaggedRepos(args.ops...)
+		jobs, run := units.SetupWorkers()
+
+		for idx := range repos {
+			if _, err := os.Stat(repos[idx].Path); !os.IsNotExist(err) {
+				grip.Warning(message.Fields{
+					"path":    repos[idx].Path,
+					"op":      "clone",
+					"outcome": "skipping",
+				})
+				continue
 			}
 
-			return run(ctx)
-		},
-	}
+			jobs.PushBack(units.NewRepoCloneJob(repos[idx]))
+		}
+
+		return run(ctx)
+	})
 }
 
-func repoClone() cli.Command {
-	const nameFlagName = "name"
-	return cli.Command{
-		Name:  "clone",
-		Usage: "clone a repository or all matching repositories",
-		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name: nameFlagName,
-			},
-		},
-		Before: requireStringOrFirstArgSet(nameFlagName),
-		Action: func(ctx context.Context, c *cli.Context) error {
-			name := c.String(nameFlagName)
+func repoStatus() *cmdr.Commander {
+	cmd := cmdr.MakeCommander().
+		SetName("status").
+		SetUsage("report on the status of repos")
 
-			conf := sardis.AppConfiguration(ctx)
+	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
+		catcher := &erc.Collector{}
 
-			repos := conf.GetTaggedRepos(name)
-			jobs, run := units.SetupWorkers()
+		catcher.Add(fun.Observe(ctx,
+			itertool.Slice(args.conf.GetTaggedRepos(args.ops...)),
+			func(conf sardis.RepoConf) {
+				grip.Info(conf.Name)
+				catcher.Add(units.NewRepoStatusJob(conf.Path).Run(ctx))
+			}))
 
-			for idx := range repos {
-				if _, err := os.Stat(repos[idx].Path); !os.IsNotExist(err) {
-					grip.Warning(message.Fields{
-						"path":    repos[idx].Path,
-						"op":      "clone",
-						"outcome": "skipping",
-					})
-					continue
-				}
+		return catcher.Resolve()
+	})
+}
 
-				jobs.PushBack(units.NewRepoCloneJob(repos[idx]))
+func repoFetch() *cmdr.Commander {
+	cmd := cmdr.MakeCommander().
+		SetName("fetch").
+		SetUsage("fetch one or more repos")
+
+	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
+		jobs, run := units.SetupWorkers()
+		repos := args.conf.GetTaggedRepos(args.ops...)
+
+		for idx := range repos {
+			repo := repos[idx]
+
+			if repo.Fetch {
+				jobs.PushBack(units.NewRepoFetchJob(repo))
 			}
+		}
 
-			return run(ctx)
-		},
-	}
-
-}
-
-func repoStatus() cli.Command {
-	const repoFlagName = "repo"
-	return cli.Command{
-		Name:  "status",
-		Usage: "report on the status of repos",
-		Flags: []cli.Flag{
-			cli.StringSliceFlag{
-				Name:  repoFlagName,
-				Usage: "specify a local repository, or tag to report the status of",
-			},
-		},
-		Before: setAllTailArguements(repoFlagName),
-		Action: func(ctx context.Context, c *cli.Context) error {
-			tags := c.StringSlice(repoFlagName)
-
-			conf := sardis.AppConfiguration(ctx)
-
-			catcher := &erc.Collector{}
-
-			catcher.Add(fun.Observe(ctx,
-				itertool.Slice(conf.GetTaggedRepos(tags...)),
-				func(conf sardis.RepoConf) {
-					grip.Info(conf.Name)
-					catcher.Add(units.NewRepoStatusJob(conf.Path).Run(ctx))
-				}))
-
-			return catcher.Resolve()
-		},
-	}
-}
-
-func repoFetch() cli.Command {
-	const repoFlagName = "repo"
-	return cli.Command{
-		Name:   "fetch",
-		Usage:  "fetch one or more repos",
-		Before: setAllTailArguements(repoFlagName),
-		Flags: []cli.Flag{
-			cli.StringSliceFlag{
-				Name:  repoFlagName,
-				Usage: "specify a local repository, or tag, to cleanup",
-			},
-		},
-		Action: func(ctx context.Context, c *cli.Context) error {
-			names := c.StringSlice(repoFlagName)
-
-			repos := sardis.AppConfiguration(ctx).GetTaggedRepos(names...)
-
-			jobs, run := units.SetupWorkers()
-
-			for idx := range repos {
-				repo := repos[idx]
-
-				if repo.Fetch {
-					jobs.PushBack(units.NewRepoFetchJob(repo))
-
-				}
-			}
-
-			return run(ctx)
-
-		},
-	}
+		return run(ctx)
+	})
 }

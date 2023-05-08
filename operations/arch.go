@@ -10,7 +10,7 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 const nameFlagName = "name"
@@ -36,7 +36,7 @@ func fetchAur() *cmdr.Commander {
 			SetUsage("specify the name of a package").
 			Flag()).
 		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) ([]string, error) {
-			packages := append(cc.StringSlice(nameFlagName), cc.Args()...)
+			packages := append(cc.StringSlice(nameFlagName), cc.Args().Slice()...)
 			if len(packages) == 0 {
 				return nil, errors.New("must specify one package to fetch")
 			}
@@ -62,7 +62,7 @@ func buildPkg() *cmdr.Commander {
 			SetUsage("specify the name of a package").
 			Flag()).
 		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) ([]string, error) {
-			packages := append(cc.StringSlice(nameFlagName), cc.Args()...)
+			packages := append(cc.StringSlice(nameFlagName), cc.Args().Slice()...)
 			if len(packages) == 0 {
 				return nil, errors.New("must specify one package to fetch")
 			}
@@ -88,7 +88,7 @@ func installAur() *cmdr.Commander {
 			SetUsage("specify the name of a package").
 			Flag()).
 		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) ([]string, error) {
-			packages := append(cc.StringSlice(nameFlagName), cc.Args()...)
+			packages := append(cc.StringSlice(nameFlagName), cc.Args().Slice()...)
 			if len(packages) == 0 {
 				return nil, errors.New("must specify one package to fetch")
 			}

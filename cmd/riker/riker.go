@@ -12,22 +12,7 @@ import (
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/operations"
 	"github.com/tychoish/sardis/util"
-	"github.com/urfave/cli"
 )
-
-func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configuration, error) {
-	conf, err := sardis.LoadConfiguration(cc.GlobalString("conf"))
-
-	if err != nil {
-		return nil, err
-	}
-
-	conf.Settings.Logging.EnableJSONFormating = cc.GlobalBool("jsonLog")
-	conf.Settings.Logging.DisableStandardOutput = cc.GlobalBool("quietStdOut")
-	conf.Settings.Logging.Priority = level.FromString(cc.GlobalString("level"))
-
-	return conf, nil
-}
 
 func TopLevel() *cmdr.Commander {
 	return cmdr.MakeRootCommander().

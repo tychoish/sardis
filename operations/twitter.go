@@ -4,31 +4,33 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/tychoish/cmdr"
 	"github.com/tychoish/sardis"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-func Tweet() cli.Command {
-	return cli.Command{
-		Name:  "tweet",
-		Usage: "send a tweet",
-		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name:  "message",
-				Usage: "message to tweet",
-			},
-		},
-		Action: func(ctx context.Context, c *cli.Context) error {
-			msg := c.String("message")
+func Tweet() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("tweet").
+		SetUsage("send a tweet").
+		With(cmdr.SpecBuilder(ResolveConfiguration).SetMiddleware(sardis.WithConfiguration).Add).
+		Flags(cmdr.FlagBuilder("").
+			SetName("message", "m").
+			SetUsage("message to tweet").
+			Flag()).
+		With(cmdr.SpecBuilder(
+			func(ctx context.Context, cc *cli.Context) (string, error) {
+				return cc.String("message"), nil
+			}).
+			SetAction(func(ctx context.Context, msg string) error {
 
-			if len(msg) > 280 {
-				return fmt.Errorf("message is too long [%d]", len(msg))
-			}
+				if len(msg) > 280 {
+					return fmt.Errorf("message is too long [%d]", len(msg))
+				}
 
-			ctx = sardis.WithTwitterLogger(ctx, sardis.AppConfiguration(ctx))
-			sardis.Twitter(ctx).Info(msg)
+				ctx = sardis.WithTwitterLogger(ctx, sardis.AppConfiguration(ctx))
+				sardis.Twitter(ctx).Info(msg)
 
-			return nil
-		},
-	}
+				return nil
+			}).Add)
 }

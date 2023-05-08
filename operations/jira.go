@@ -3,37 +3,41 @@ package operations
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 
+	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-func Jira() cli.Command {
-	return cli.Command{
-		Name:  "jira",
-		Usage: "a collections of commands for jira management",
-		Subcommands: []cli.Command{
-			bulkCreateTickets(),
-		},
-	}
+func Jira() *cmdr.Commander {
+	return cmdr.MakeCommander().SetName("jira").
+		SetUsage("a collections of commands for jira management").
+		Subcommanders(bulkCreateTickets())
 }
 
-func bulkCreateTickets() cli.Command {
+func bulkCreateTickets() *cmdr.Commander {
 	const pathFlagName = "path"
 
-	return cli.Command{
-		Name:  "create",
-		Usage: "create tickets",
-		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name:  pathFlagName,
-				Usage: "specify the name of a file that holds jira tickets",
-			},
-		},
-		Before: requirePathExists(pathFlagName),
-		Action: func(ctx context.Context, c *cli.Context) error {
-			path := c.String(pathFlagName)
+	return cmdr.MakeCommander().SetName("create").
+		SetUsage("create tickets").
+		With(cmdr.SpecBuilder(ResolveConfiguration).SetMiddleware(sardis.WithConfiguration).Add).
+		Flags(cmdr.FlagBuilder(fun.Must(os.Getwd())).
+			SetName(pathFlagName).
+			SetUsage("specify the name of a file that holds jira tickets").
+			SetValidate(func(path string) error {
+				if _, err := os.Stat(path); os.IsNotExist(err) {
+					return fmt.Errorf("configuration file %s does not exist", path)
+				}
+				return nil
+			}).
+			Flag()).
+		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (string, error) {
+			return cc.String(pathFlagName), nil
+		}).SetAction(func(ctx context.Context, path string) error {
 			conf := sardis.AppConfiguration(ctx)
 
 			if conf.Settings.Credentials.Jira.URL == "" {
@@ -41,6 +45,5 @@ func bulkCreateTickets() cli.Command {
 			}
 
 			return units.NewBulkCreateJiraTicketJob(path).Run(ctx)
-		},
-	}
+		}).Add)
 }

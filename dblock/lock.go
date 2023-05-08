@@ -1,0 +1,233 @@
+package dblock
+
+import (
+	"context"
+	"time"
+
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/erc"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+type Configuration struct {
+	URI        string
+	Database   string
+	Collection string
+	InstanceID string
+	Prefix     string
+	TTL        time.Duration
+}
+
+type LockRecord struct {
+	Name     string    `bson:"_id" json:"_id"`
+	Active   bool      `bson:"in_use" json:"in_use"`
+	ModTime  time.Time `bson:"mod_time" json:"mod_time"`
+	ModCount int       `bson:"mod_count" json:"mod_count"`
+	Owner    string    `bson:"owner" json:"owner"`
+}
+
+type LockService interface {
+	GetLock(context.Context, string) Lock
+	CheckLock(context.Context, string) (bool, error)
+}
+
+type Lock interface {
+	Lock() fun.WaitFunc
+	Unlock()
+}
+
+type mdbLockService struct {
+	conf   *Configuration
+	client *mongo.Client
+}
+
+func NewLockService(conf *Configuration) (LockService, error) {
+	return new(mdbLockService), nil
+
+}
+
+func (ls *mdbLockService) GetLock(ctx context.Context, name string) Lock {
+	lock := &mdbLockImpl{
+		srv:    ls,
+		waiter: &adt.Atomic[*fun.WaitFunc]{},
+	}
+	lock.record.Name = name
+	return lock
+}
+
+func (ls *mdbLockService) CheckLock(ctx context.Context, name string) (bool, error) {
+	coll := ls.collection()
+	num, err := coll.CountDocuments(ctx, bson.M{"_id": name})
+	if err != nil {
+		return false, err
+	}
+	return num == 1, nil
+}
+
+type mdbLockImpl struct {
+	ctx    context.Context
+	srv    *mdbLockService
+	record LockRecord
+	waiter *adt.Atomic[*fun.WaitFunc]
+}
+
+func (l *mdbLockImpl) getNextQuery(now time.Time) bson.M {
+	return bson.M{
+		"_id": l.record.Name,
+		"$or": []bson.M{
+			{"in_use": false},
+			{"in_use": true, "mod_time": bson.M{"$lte": now.Add(-l.srv.conf.TTL)}},
+		},
+		"mod_count": bson.M{"$gte": l.record.ModCount},
+	}
+}
+
+func (s *mdbLockService) collection() *mongo.Collection {
+	return s.client.Database(s.conf.Database).Collection(s.conf.Collection)
+}
+
+func (l *mdbLockImpl) updateLockView(ctx context.Context) error {
+	coll := l.srv.collection()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	nextQuery := l.getNextQuery(now)
+	res := coll.FindOne(ctx, nextQuery)
+	if res.Err() == nil {
+		if err := res.Decode(&l.record); err != nil {
+			return err
+		}
+		l.record.ModCount++
+		l.record.ModTime = now
+	}
+	return res.Err()
+}
+
+func (l *mdbLockImpl) Lock() fun.WaitFunc {
+	ctx, cancel := context.WithCancel(l.ctx)
+	coll := l.srv.collection()
+	err := l.updateLockView(ctx)
+
+	var res *mongo.SingleResult
+	for {
+		if erc.ContextExpired(err) {
+			break
+		}
+		if err != nil {
+			l.record.Active = true
+			l.record.Owner = l.srv.conf.InstanceID
+
+			res = coll.FindOneAndUpdate(ctx,
+				l.getNextQuery(l.record.ModTime),
+				l.record,
+				options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After),
+			)
+			err = res.Err()
+			if err == nil {
+				if err := res.Decode(&l.record); err != nil {
+					panic(err)
+				}
+			}
+		}
+		if err == nil {
+			if err := res.Decode(&l.record); err != nil {
+				panic(err)
+			}
+			if !l.record.Active {
+				continue
+			}
+			if l.record.Owner != l.srv.conf.InstanceID {
+				continue
+			}
+			break
+		}
+
+		// someone else owns the lock
+		err = l.updateLockView(ctx)
+	}
+
+	signal := l.startBackgroundLockPing(ctx)
+
+	var release func()
+	waiter := fun.WaitFunc(func(ctx context.Context) {
+		defer release()
+		defer cancel()
+		select {
+		case <-ctx.Done():
+		case <-signal:
+		}
+	})
+
+	release = func() {
+		adt.CompareAndSwap[*fun.WaitFunc](l.waiter, &waiter, nil)
+	}
+
+	for {
+		if adt.CompareAndSwap[*fun.WaitFunc](l.waiter, nil, &waiter) {
+			return waiter
+		}
+
+		// if there's another wait in progress, we already
+		// hold the lock, and someone else locally has locked
+		// this lock; therefore we can hand ourselves the
+		// existing lock.
+		if nw := l.waiter.Get(); nw != nil {
+			cancel()
+			return *nw
+		}
+	}
+}
+
+func (l *mdbLockImpl) startBackgroundLockPing(ctx context.Context) chan struct{} {
+	signal := make(chan struct{})
+	go func() {
+		defer close(signal)
+		coll := l.srv.collection()
+
+		ticker := time.NewTicker(l.srv.conf.TTL / 2)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				now := time.Now().UTC().Round(time.Millisecond)
+				timeout := now.Add(-l.srv.conf.TTL)
+				res, err := coll.UpdateOne(ctx,
+					// query
+					bson.M{
+						"_id": l.record.Name,
+						"$or": []bson.M{
+							{
+								"owner":     l.record.Owner,
+								"mod_time":  bson.M{"$gt": timeout},
+								"mod_count": bson.M{"$in": []int{l.record.ModCount, l.record.ModCount - 1}},
+							},
+							{"mod_time": bson.M{"$lte": timeout}},
+						},
+					},
+					// update
+					bson.M{
+						"mod_count": bson.M{"$inc": 1},
+						"mod_time":  now,
+					},
+				)
+				if err != nil || res.ModifiedCount != 1 {
+					return
+				}
+			}
+		}
+	}()
+	return signal
+}
+
+func (l *mdbLockImpl) Unlock() {
+	if waiter := l.waiter.Get(); waiter != nil {
+		wf := *waiter
+		wf.Block()
+		return
+	}
+}

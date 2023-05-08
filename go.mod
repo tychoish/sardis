@@ -1,8 +1,6 @@
 module github.com/tychoish/sardis
 
-go 1.19
-
-replace github.com/nutmegdevelopment/sumologic => github.com/tychoish/sumologic v0.0.0-20200521155714-c2840dd463d0
+go 1.20
 
 require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
@@ -10,7 +8,7 @@ require (
 	github.com/go-git/go-git/v5 v5.2.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/tychoish/birch v0.2.3-0.20230413052020-46068f63d7bb
-	github.com/tychoish/cmdr v0.2.1-0.20230506141930-1c0cb2687232
+	github.com/tychoish/cmdr v0.3.0
 	github.com/tychoish/fun v0.9.2
 	github.com/tychoish/godmenu v0.1.0
 	github.com/tychoish/grip v0.2.8

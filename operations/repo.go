@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
+	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
@@ -69,9 +70,10 @@ type opsCmdArgs struct {
 func addOpCommand(cmd *cmdr.Commander, name string, op func(ctx context.Context, args *opsCmdArgs) error) *cmdr.Commander {
 	return cmd.Flags(cmdr.FlagBuilder([]string{}).
 		SetName(name).
-		SetUsage(fmt.Sprintf("specify one or more configured %s", name)).
+		SetUsage(fmt.Sprintf("specify one or more %s", name)).
 		Flag(),
 	).With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (*opsCmdArgs, error) {
+		grip.Info("resolving config")
 		conf, err := ResolveConfiguration(ctx, cc)
 		if err != nil {
 			return nil, err
@@ -80,6 +82,7 @@ func addOpCommand(cmd *cmdr.Commander, name string, op func(ctx context.Context,
 
 		return &opsCmdArgs{conf: conf, ops: ops}, nil
 	}).SetMiddleware(func(ctx context.Context, args *opsCmdArgs) context.Context {
+		grip.Infoln("setting remote", srv.HasCleanup(ctx), srv.HasOrchestrator(ctx))
 		return sardis.WithRemoteNotify(ctx, args.conf)
 	}).SetAction(op).Add)
 }

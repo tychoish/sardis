@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli/v2"
@@ -29,40 +30,35 @@ func notifyPipe() *cmdr.Commander {
 		SetName("pipe").
 		Aliases("xmpp").
 		SetUsage("send the contents of standard input over xmpp").
-		SetAction(func(ctx context.Context, c *cli.Context) error {
-			conf := sardis.AppConfiguration(ctx)
+		With(cmdr.SpecBuilder(ResolveConfiguration).
+			SetMiddleware(sardis.WithRemoteNotify).
+			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
+				logger := sardis.RemoteNotify(ctx)
 
-			ctx = sardis.WithRemoteNotify(ctx, conf)
-
-			logger := sardis.RemoteNotify(ctx)
-
-			scanner := bufio.NewScanner(os.Stdin)
-			for scanner.Scan() {
-				logger.Notice(message.MakeString(scanner.Text()))
-			}
-			return nil
-		})
+				scanner := bufio.NewScanner(os.Stdin)
+				for scanner.Scan() {
+					logger.Notice(message.MakeString(scanner.Text()))
+				}
+				return nil
+			}).Add)
 }
 
 func notifySend() *cmdr.Commander {
-	return cmdr.MakeCommander().
+	cmd := cmdr.MakeCommander().
 		SetName("send").
-		SetUsage("send the remaining arguments over xmpp").
-		SetAction(func(ctx context.Context, c *cli.Context) error {
-			conf := sardis.AppConfiguration(ctx)
-			ctx = sardis.WithRemoteNotify(ctx, conf)
-			notify := sardis.RemoteNotify(ctx)
-			notify.Notice(strings.Join(c.Args().Slice(), " "))
-
-			return nil
-		})
+		SetUsage("send the remaining arguments over xmpp")
+	return addOpCommand(cmd, "message", func(ctx context.Context, args *opsCmdArgs) error {
+		grip.Info("running op")
+		sardis.RemoteNotify(ctx).Notice(strings.Join(args.ops, " "))
+		return nil
+	})
 }
+
 func notifyDesktop() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("desktop").
 		SetUsage("send desktop notification").
 		SetAction(func(ctx context.Context, c *cli.Context) error {
-			ctx = sardis.WithDesktopNotify(ctx)
 			sardis.DesktopNotify(ctx).Notice(strings.Join(c.Args().Slice(), " "))
 			return nil
 		})

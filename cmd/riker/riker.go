@@ -7,11 +7,14 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/srv"
+	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/daggen"
 	"github.com/tychoish/sardis/operations"
 	"github.com/tychoish/sardis/util"
+	"github.com/urfave/cli/v2"
 )
 
 func TopLevel() *cmdr.Commander {
@@ -61,6 +64,22 @@ func TopLevel() *cmdr.Commander {
 		Subcommanders(
 			operations.Admin(),
 			operations.ArchLinux(),
+			cmdr.MakeCommander().
+				SetName("daggen").
+				SetAction(func(ctx context.Context, cc *cli.Context) error {
+					grip.Info(cc.String("path"))
+					daggen.GetDag(ctx, cc.String("path"))
+					return nil
+				}).
+				Flags(cmdr.FlagBuilder("/home/tychoish/src/sardis").
+					SetName("path").
+					SetValidate(func(path string) error {
+						grip.Infoln("-->", path)
+						if util.FileExists(path) {
+							return nil
+						}
+						return fmt.Errorf("%q does not exist", path)
+					}).Flag()),
 		)
 }
 

@@ -1,9 +1,12 @@
 name := sardis
+alt := riker
 buildDir := build
 srcFiles := $(shell find . -name "*.go" -not -path "./$(buildDir)/*" -not -name "*_test.go" -not -path "*\#*")
 testFiles := $(shell find . -name "*.go" -not -path "./$(buildDir)/*" -not -path "*\#*")
 
 _testPackages := ./ ./units ./operations
+
+MAKEFLAGS := --jobs 2
 
 ifeq (,$(SILENT))
 testArgs := -v
@@ -35,13 +38,22 @@ benchArgs += -run='Benchmark.*'
 endif
 
 
-build:$(buildDir)/$(name)
+build:$(buildDir)/$(name) $(buildDir)/$(alt)
+
 $(name):$(buildDir)/$(name)
 	rm $(buildDir)/$(name)
 	ln -s $(buildDir)/$(name)
 $(buildDir)/$(name):$(srcFiles)
 	@mkdir -p $(buildDir)
-	go build -ldflags "-X github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -o $@ cmd/$(name)/main.go
+	go build -ldflags "-X github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -o $@ cmd/$(name)/$(name).go
+
+$(alt):$(buildDir)/$(alt)
+	rm $(buildDir)/$(alt)
+	ln -s $(buildDir)/$(alt)
+$(buildDir)/$(alt):$(srcFiles)
+	@mkdir -p $(buildDir)
+	go build -ldflags "-X github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -o $@ cmd/$(alt)/$(alt).go
+
 
 test:
 	@mkdir -p $(buildDir)

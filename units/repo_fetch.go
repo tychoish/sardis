@@ -8,9 +8,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
-	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 )
@@ -34,14 +32,14 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.WorkerFunc {
 
 		cmd := jasper.Context(ctx).CreateCommand(ctx)
 
-		sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
-			"repo": conf.Name,
-		})
+		// sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
+		// 	"repo": conf.Name,
+		// })
 
 		cmd.Directory(conf.Path).
-			AddEnv(sardis.SSHAgentSocketEnvVar, sardis.AppConfiguration(ctx).SSHAgentSocket()).
-			SetOutputSender(level.Info, sender).
-			SetErrorSender(level.Warning, sender)
+			AddEnv(sardis.SSHAgentSocketEnvVar, sardis.AppConfiguration(ctx).SSHAgentSocket())
+			// SetOutputSender(level.Info, sender).
+			// SetErrorSender(level.Warning, sender)
 
 		if conf.LocalSync && fun.Contains("mail", conf.Tags) {
 			cmd.Append(conf.Pre...)

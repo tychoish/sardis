@@ -5,6 +5,7 @@ import (
 	"runtime"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/seq"
 )
@@ -25,6 +26,6 @@ func SetupQueue[T any](op func(context.Context, T) error) (*seq.List[T], fun.Wor
 	}
 }
 
-func SetupWorkers() (*seq.List[fun.WorkerFunc], fun.WorkerFunc) {
-	return SetupQueue(func(ctx context.Context, fn fun.WorkerFunc) error { return fn(ctx) })
+func SetupWorkers(ec *erc.Collector) (*seq.List[fun.WorkerFunc], fun.WorkerFunc) {
+	return SetupQueue(func(ctx context.Context, fn fun.WorkerFunc) error { err := fn(ctx); ec.Add(err); return err })
 }

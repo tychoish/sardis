@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
@@ -27,8 +26,6 @@ type repoSyncJob struct {
 }
 
 const (
-	repoSyncJobName = "repo-sync"
-
 	remoteUpdateCmdTemplate = "git add -A && git pull --rebase --autostash --keep origin $(git rev-parse --abbrev-ref HEAD)"
 	syncCmdTemplate         = remoteUpdateCmdTemplate + " && git commit -a -m 'auto-update: (%s)'; git push"
 )
@@ -55,15 +52,13 @@ func NewRepoSyncJob(host, path, branch string, pre, post []string) fun.WorkerFun
 
 func (j *repoSyncJob) buildID() string {
 	return j.once.Do(func() string {
-		tstr := time.Now().Format("2006-01-02::15.04.05")
+		hostname := util.GetHostname()
 
 		if j.isLocal() {
-			return fmt.Sprintf("LOCAL.%s.%s.%s.%s", repoSyncJobName, util.GetHostname(), j.Path, tstr)
+			return fmt.Sprintf("LOCAL<%s>.sync", hostname)
 		}
 
-		host, _ := os.Hostname()
-
-		return fmt.Sprintf("REMOTE.%s.%s-%s.%s.%s", repoSyncJobName, host, j.Host, j.Path, tstr)
+		return fmt.Sprintf("REMOTE<%s>.sync.FROM<%s>", j.Host, hostname)
 	})
 }
 

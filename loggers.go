@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/nwidger/jsoncolor"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
@@ -23,10 +24,17 @@ import (
 )
 
 func SetupLogging(ctx context.Context, conf *Configuration) error {
-	sender := grip.Sender()
+	var sender send.Sender
 
-	if runtime.GOOS == "linux" {
+	if conf.Settings.Logging.EnableJSONFormating || conf.Settings.Logging.EnableJSONColorFormatting {
+		sender = send.MakePlain()
+	} else {
+		sender = grip.Sender()
+	}
+
+	if runtime.GOOS == "linux" && !conf.Settings.Logging.DisableSyslog {
 		syslog, err := system.MakeDefault()
+		syslog.SetName(filepath.Base(os.Args[0]))
 		if err != nil {
 			return err
 		}
@@ -38,10 +46,20 @@ func SetupLogging(ctx context.Context, conf *Configuration) error {
 		}
 	}
 
-	if conf.Settings.Logging.EnableJSONFormating {
+	switch {
+	case conf.Settings.Logging.EnableJSONColorFormatting:
+		sender.SetFormatter(func(m message.Composer) (string, error) {
+			out, err := jsoncolor.Marshal(m.Raw())
+			if err != nil {
+				return "", err
+			}
+			return string(out), nil
+		})
+	case conf.Settings.Logging.EnableJSONFormating:
 		sender.SetFormatter(send.MakeJSONFormatter())
 	}
 
+	sender.SetPriority(conf.Settings.Logging.Priority)
 	sender.SetName(filepath.Base(os.Args[0]))
 
 	grip.SetGlobalLogger(grip.NewLogger(sender))

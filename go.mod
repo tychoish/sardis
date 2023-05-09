@@ -2,14 +2,13 @@ module github.com/tychoish/sardis
 
 go 1.20
 
-replace github.com/tychoish/grip => ../grip
-
+replace github.com/tychoish/cmdr => ../cmdr
 replace github.com/tychoish/jasper => ../jasper
-
-replace github.com/tychoish/grip/x/jira => ../grip/x/jira
+replace github.com/tychoish/grip => ../grip
 
 require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
+	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/go-git/go-git/v5 v5.2.0
 	github.com/mitchellh/go-homedir v1.1.0
@@ -17,9 +16,9 @@ require (
 	github.com/tychoish/cmdr v0.3.0
 	github.com/tychoish/fun v0.9.2
 	github.com/tychoish/godmenu v0.1.1
-	github.com/tychoish/grip v0.2.8
+	github.com/tychoish/grip v0.2.9
 	github.com/tychoish/grip/x/desktop v0.0.0-20230427110835-c9728a14310e
-	github.com/tychoish/grip/x/jira v0.0.0-20230427110835-c9728a14310e
+	github.com/tychoish/grip/x/jira v0.0.0-20230509053745-c6390abedfa5
 	github.com/tychoish/grip/x/system v0.0.0-20230427110835-c9728a14310e
 	github.com/tychoish/grip/x/telegram v0.0.0-20230430192632-9a70cb893120
 	github.com/tychoish/grip/x/twitter v0.0.0-20230427110835-c9728a14310e
@@ -47,6 +46,7 @@ require (
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
 	github.com/evergreen-ci/service v1.0.1-0.20200225230430-d9382e39d768 // indirect
+	github.com/fatih/color v1.15.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/frankban/quicktest v1.14.5 // indirect
 	github.com/fuyufjh/splunk-hec-go v0.4.0 // indirect
@@ -54,8 +54,6 @@ require (
 	github.com/go-chi/chi v4.1.2+incompatible // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
 	github.com/go-git/go-billy/v5 v5.0.0 // indirect
-	github.com/go-kit/log v0.2.1 // indirect
-	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-toast/toast v0.0.0-20190211030409-01e6764cf0a4 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
@@ -66,17 +64,19 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
+	github.com/hokaccha/go-prettyjson v0.0.0-20211117102719-0474bc63780f // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v0.0.0-20190725054713-01f96b0aa0cd // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.16 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-xmpp v0.0.0-20220513082406-1411b9cc8b9a // indirect
 	github.com/mholt/archiver v3.1.1+incompatible // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/nwaples/rardecode v1.1.3 // indirect
+	github.com/nwidger/jsoncolor v0.3.2 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
 	github.com/phyber/negroni-gzip v1.0.0 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect

@@ -5,16 +5,17 @@ import (
 	"strings"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/util"
 )
 
-func SyncRepo(repo sardis.RepoConf) fun.WorkerFunc {
+func SyncRepo(ec *erc.Collector, repo sardis.RepoConf) fun.WorkerFunc {
 	hostname := util.GetHostname()
 	hasMirrors := false
 
-	workerList, runWorkers := SetupWorkers()
+	workerList, runWorkers := SetupWorkers(ec)
 
 	for _, mirror := range repo.Mirrors {
 		if strings.Contains(mirror, hostname) {
@@ -34,13 +35,11 @@ func SyncRepo(repo sardis.RepoConf) fun.WorkerFunc {
 
 		if repo.LocalSync {
 			changes, err := repo.HasChanges()
-			if err != nil {
-				return err
-			}
 
-			if changes {
+			if changes || err != nil {
 				return NewLocalRepoSyncJob(repo.Path, repo.Branch, repo.Pre, repo.Post)(ctx)
 			}
+
 			return NewRepoFetchJob(repo)(ctx)
 		}
 

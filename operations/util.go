@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/dupe"
@@ -69,11 +70,14 @@ func setupLinks() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			jobs, worker := units.SetupWorkers()
+			ec := &erc.Collector{}
+			jobs, run := units.SetupWorkers(ec)
+
 			for _, link := range conf.Links {
 				jobs.PushBack(units.NewSymlinkCreateJob(link))
 			}
 
-			return worker(ctx)
+			ec.Add(run(ctx))
+			return ec.Resolve()
 		}).Add)
 }

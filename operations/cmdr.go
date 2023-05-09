@@ -17,7 +17,9 @@ import (
 func Commander() *cmdr.Commander {
 	return cmdr.MakeRootCommander().
 		Flags(cmdr.FlagBuilder(false).SetName("jsonLog").SetUsage("format logs as json").Flag(),
+			cmdr.FlagBuilder(false).SetName("colorJsonLog").SetUsage("colorized json logs").Flag(),
 			cmdr.FlagBuilder(false).SetName("quietStdOut").SetUsage("don't log to standard out").Flag(),
+			cmdr.FlagBuilder(false).SetName("quietSyslog", "qs").SetUsage("don't log to syslog").Flag(),
 			cmdr.FlagBuilder(filepath.Join(util.GetHomeDir(), ".sardis.yaml")).
 				SetName("conf", "c").
 				SetUsage("configuration file path").
@@ -40,9 +42,7 @@ func Commander() *cmdr.Commander {
 					return nil
 				}).Flag(),
 		).
-		Middleware(func(ctx context.Context) context.Context {
-			return grip.WithLogger(ctx, grip.NewLogger(grip.Sender()))
-		}).
+		Middleware(func(ctx context.Context) context.Context { return grip.WithLogger(ctx, grip.NewLogger(grip.Sender())) }).
 		Middleware(sardis.WithDesktopNotify).
 		Middleware(func(ctx context.Context) context.Context {
 			jpm := jasper.NewManager(jasper.ManagerOptions{Synchronized: true})

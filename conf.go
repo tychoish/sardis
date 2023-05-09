@@ -125,9 +125,11 @@ type Settings struct {
 }
 
 type LoggingConf struct {
-	DisableStandardOutput bool           `bson:"disable_standard_output" json:"disable_standard_output" yaml:"disable_standard_output"`
-	EnableJSONFormating   bool           `bson:"enable_json_formatting" json:"enable_json_formatting" yaml:"enable_json_formatting"`
-	Priority              level.Priority `bson:"priority" json:"priority" yaml:"priority"`
+	DisableStandardOutput     bool           `bson:"disable_standard_output" json:"disable_standard_output" yaml:"disable_standard_output"`
+	EnableJSONFormating       bool           `bson:"enable_json_formatting" json:"enable_json_formatting" yaml:"enable_json_formatting"`
+	EnableJSONColorFormatting bool           `bson:"enable_json_color_formatting" json:"enable_json_color_formatting" yaml:"enable_json_color_formatting"`
+	DisableSyslog             bool           `bson:"disable_syslog" json:"disable_syslog" yaml:"disable_syslog"`
+	Priority                  level.Priority `bson:"priority" json:"priority" yaml:"priority"`
 }
 
 type CredentialsConf struct {

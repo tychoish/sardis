@@ -43,13 +43,14 @@ func fetchAur() *cmdr.Commander {
 
 			return packages, nil
 		}).SetAction(func(ctx context.Context, packages []string) error {
-			queue, run := units.SetupWorkers()
+			ec := &erc.Collector{}
+			queue, run := units.SetupWorkers(ec)
 
 			for _, name := range packages {
 				queue.PushBack(units.NewArchFetchAurJob(name, true))
 			}
-
-			return run(ctx)
+			ec.Add(run(ctx))
+			return ec.Resolve()
 		}).Add)
 }
 
@@ -69,13 +70,15 @@ func buildPkg() *cmdr.Commander {
 
 			return packages, nil
 		}).SetAction(func(ctx context.Context, packages []string) error {
-			queue, run := units.SetupWorkers()
+			ec := &erc.Collector{}
+			queue, run := units.SetupWorkers(ec)
 
 			for _, name := range packages {
 				queue.PushBack(units.NewArchAbsBuildJob(name))
 			}
 
-			return run(ctx)
+			ec.Add(run(ctx))
+			return ec.Resolve()
 		}).Add)
 }
 

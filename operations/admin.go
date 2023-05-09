@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/sardis"
@@ -21,6 +22,12 @@ func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configu
 	conf.Settings.Logging.EnableJSONFormating = cc.Bool("jsonLog")
 	conf.Settings.Logging.DisableStandardOutput = cc.Bool("quietStdOut")
 	conf.Settings.Logging.Priority = level.FromString(cc.String("level"))
+	conf.Settings.Logging.EnableJSONColorFormatting = cc.Bool("colorJsonLog")
+	conf.Settings.Logging.DisableSyslog = cc.Bool("quietSyslog")
+
+	if err := sardis.SetupLogging(ctx, conf); err != nil {
+		return nil, err
+	}
 
 	return conf, nil
 }
@@ -60,7 +67,8 @@ func nightly() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			jobs, run := units.SetupWorkers()
+			ec := &erc.Collector{}
+			jobs, run := units.SetupWorkers(ec)
 
 			for idx := range conf.Links {
 				jobs.PushBack(units.NewSymlinkCreateJob(conf.Links[idx]))
@@ -73,7 +81,7 @@ func nightly() *cmdr.Commander {
 			for idx := range conf.System.Services {
 				jobs.PushBack(units.NewSystemServiceSetupJob(conf.System.Services[idx]))
 			}
-
-			return run(ctx)
+			ec.Add(run(ctx))
+			return ec.Resolve()
 		}).Add)
 }

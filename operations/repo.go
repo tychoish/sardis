@@ -101,7 +101,9 @@ func repoUpdate() *cmdr.Commander {
 		shouldNotify := false
 
 		started := time.Now()
-		jobs, worker := units.SetupWorkers()
+		ec := &erc.Collector{}
+		jobs, run := units.SetupWorkers(ec)
+
 		for idx := range repos {
 			repo := repos[idx]
 			if repo.Disabled {
@@ -110,7 +112,7 @@ func repoUpdate() *cmdr.Commander {
 			if repo.Notify {
 				shouldNotify = true
 			}
-			jobs.PushBack(units.SyncRepo(repo))
+			jobs.PushBack(units.SyncRepo(ec, repo))
 		}
 
 		grip.Info(message.Fields{
@@ -118,12 +120,9 @@ func repoUpdate() *cmdr.Commander {
 			"message": "waiting for jobs to complete",
 			"tags":    args.ops,
 		})
+		ec.Add(run(ctx))
 
-		if err := worker(ctx); err != nil {
-			return err
-		}
-
-		if shouldNotify {
+		if shouldNotify && !ec.HasErrors() {
 			notify.Notice(message.Fields{
 				"tag":     args.ops,
 				"op":      "repo sync",
@@ -137,10 +136,11 @@ func repoUpdate() *cmdr.Commander {
 			"code":    "success",
 			"tag":     args.ops,
 			"dur_sec": time.Since(started).Seconds(),
+			"err":     ec.HasErrors(),
 			"repos":   len(repos),
 		})
 
-		return nil
+		return ec.Resolve()
 	})
 }
 
@@ -152,14 +152,14 @@ func repoCleanup() *cmdr.Commander {
 
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
 		repos := args.conf.GetTaggedRepos(args.ops...)
-
-		jobs, run := units.SetupWorkers()
+		ec := &erc.Collector{}
+		jobs, run := units.SetupWorkers(ec)
 
 		for _, repo := range repos {
 			jobs.PushBack(units.NewRepoCleanupJob(repo.Path))
 		}
-
-		return run(ctx)
+		ec.Add(run(ctx))
+		return ec.Resolve()
 	})
 }
 
@@ -169,7 +169,9 @@ func repoClone() *cmdr.Commander {
 		SetUsage("clone a repository or all matching repositories")
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
 		repos := args.conf.GetTaggedRepos(args.ops...)
-		jobs, run := units.SetupWorkers()
+
+		ec := &erc.Collector{}
+		jobs, run := units.SetupWorkers(ec)
 
 		for idx := range repos {
 			if _, err := os.Stat(repos[idx].Path); !os.IsNotExist(err) {
@@ -184,7 +186,8 @@ func repoClone() *cmdr.Commander {
 			jobs.PushBack(units.NewRepoCloneJob(repos[idx]))
 		}
 
-		return run(ctx)
+		ec.Add(run(ctx))
+		return ec.Resolve()
 	})
 }
 
@@ -213,7 +216,9 @@ func repoFetch() *cmdr.Commander {
 		SetUsage("fetch one or more repos")
 
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
-		jobs, run := units.SetupWorkers()
+		ec := &erc.Collector{}
+		jobs, run := units.SetupWorkers(ec)
+
 		repos := args.conf.GetTaggedRepos(args.ops...)
 
 		for idx := range repos {
@@ -224,6 +229,7 @@ func repoFetch() *cmdr.Commander {
 			}
 		}
 
-		return run(ctx)
+		ec.Add(run(ctx))
+		return ec.Resolve()
 	})
 }

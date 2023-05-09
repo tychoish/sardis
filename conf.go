@@ -1,7 +1,6 @@
 package sardis
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -205,42 +204,6 @@ func LoadConfiguration(fn string) (*Configuration, error) {
 	return out, nil
 }
 
-type ctxKey string
-
-const confCtxKey ctxKey = "sardis-conf"
-
-type ContextSetupFunction[T any] func(context.Context, T) context.Context
-
-func ContextSetup[T any](fns ...ContextSetupFunction[T]) ContextSetupFunction[T] {
-	return func(ctx context.Context, conf T) context.Context {
-		for _, fn := range fns {
-			ctx = fn(ctx, conf)
-		}
-		return ctx
-	}
-}
-
-func WithConfiguration(ctx context.Context, conf *Configuration) context.Context {
-	if HasAppConfiguration(ctx) {
-		return ctx
-	}
-	return context.WithValue(ctx, confCtxKey, *conf)
-}
-
-func AppConfiguration(ctx context.Context) *Configuration {
-	val, ok := ctx.Value(confCtxKey).(Configuration)
-	if !ok {
-		grip.Critical("configuration not loaded in context")
-		return nil
-	}
-	return &val
-}
-
-func HasAppConfiguration(ctx context.Context) bool {
-	_, ok := ctx.Value(confCtxKey).(Configuration)
-	return ok
-}
-
 func (conf *MenuConf) Validate() error {
 	ec := &erc.Collector{}
 
@@ -363,15 +326,17 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) {
 			continue
 		}
 
-		conf.Repo = append(conf.Repo, mcf.Repo...)
-		conf.Links = append(conf.Links, mcf.Links...)
-		conf.Hosts = append(conf.Hosts, mcf.Hosts...)
-		conf.Commands = append(conf.Commands, mcf.Commands...)
 		conf.Blog = append(conf.Blog, mcf.Blog...)
-		conf.System.Services = append(conf.System.Services, mcf.System.Services...)
-		conf.System.GoPackages = append(conf.System.GoPackages, mcf.System.GoPackages...)
+		conf.Commands = append(conf.Commands, mcf.Commands...)
+		conf.Hosts = append(conf.Hosts, mcf.Hosts...)
+		conf.Links = append(conf.Links, mcf.Links...)
+		conf.Menus = append(conf.Menus, mcf.Menus...)
+		conf.Repo = append(conf.Repo, mcf.Repo...)
 		conf.System.Arch.AurPackages = append(conf.System.Arch.AurPackages, mcf.System.Arch.AurPackages...)
 		conf.System.Arch.Packages = append(conf.System.Arch.Packages, mcf.System.Arch.Packages...)
+		conf.System.GoPackages = append(conf.System.GoPackages, mcf.System.GoPackages...)
+		conf.System.Services = append(conf.System.Services, mcf.System.Services...)
+		conf.TerminalCommands = append(conf.TerminalCommands, mcf.TerminalCommands...)
 	}
 
 	if conf.shouldIndexRepos() {

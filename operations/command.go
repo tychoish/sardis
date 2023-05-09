@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sort"
 
 	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
 	"github.com/cheynewallace/tabby"
@@ -151,6 +152,8 @@ func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
 					opts = append(opts, cmd.Name)
 				}
 
+				sort.Strings(opts)
+
 				cmd, err := godmenu.RunDMenu(ctx, godmenu.Options{
 					Selections: opts,
 				})
@@ -163,9 +166,7 @@ func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
 			}).Add)
 }
 
-type bufCloser struct {
-	bytes.Buffer
-}
+type bufCloser struct{ bytes.Buffer }
 
 func (b bufCloser) Close() error { return nil }
 

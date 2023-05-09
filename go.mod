@@ -2,6 +2,12 @@ module github.com/tychoish/sardis
 
 go 1.20
 
+replace github.com/tychoish/grip => ../grip
+
+replace github.com/tychoish/jasper => ../jasper
+
+replace github.com/tychoish/grip/x/jira => ../grip/x/jira
+
 require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
 	github.com/cheynewallace/tabby v1.1.1
@@ -10,7 +16,7 @@ require (
 	github.com/tychoish/birch v0.2.3-0.20230413052020-46068f63d7bb
 	github.com/tychoish/cmdr v0.3.0
 	github.com/tychoish/fun v0.9.2
-	github.com/tychoish/godmenu v0.1.0
+	github.com/tychoish/godmenu v0.1.1
 	github.com/tychoish/grip v0.2.8
 	github.com/tychoish/grip/x/desktop v0.0.0-20230427110835-c9728a14310e
 	github.com/tychoish/grip/x/jira v0.0.0-20230427110835-c9728a14310e
@@ -48,6 +54,8 @@ require (
 	github.com/go-chi/chi v4.1.2+incompatible // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
 	github.com/go-git/go-billy/v5 v5.0.0 // indirect
+	github.com/go-kit/log v0.2.1 // indirect
+	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-toast/toast v0.0.0-20190211030409-01e6764cf0a4 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect

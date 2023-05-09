@@ -399,7 +399,7 @@ func (conf *Configuration) expandLinks(catcher *erc.Collector) []LinkConf {
 
 func (conf *Configuration) GetTaggedRepos(tags ...string) []RepoConf {
 	if len(tags) == 0 {
-		return conf.Repo
+		return nil
 	}
 
 	var out []RepoConf
@@ -730,6 +730,31 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 			out[cmd.Alias] = cmd
 		}
 	}
+	for _, menus := range conf.Menus {
+		for _, operation := range menus.Selections {
+			var cmd CommandConf
+			if menus.Command == "" {
+				cmd.Name = operation
+				cmd.Command = operation
+			} else {
+				cmd.Name = fmt.Sprintf("%s.%s", menus.Name, operation)
+				cmd.Command = fmt.Sprintf("%s %s", menus.Command, operation)
+			}
+			out[cmd.Name] = cmd
+		}
+		for _, alias := range menus.Aliases {
+			var cmd CommandConf
+			if menus.Command == "" {
+				cmd.Name = alias.Key
+				cmd.Command = alias.Value
+			} else {
+				cmd.Name = fmt.Sprintf("%s.%s", menus.Name, alias.Key)
+				cmd.Command = fmt.Sprintf("%s %s", menus.Command, alias.Value)
+			}
+			out[cmd.Name] = cmd
+		}
+	}
+
 	return out
 }
 

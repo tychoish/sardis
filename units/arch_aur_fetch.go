@@ -38,8 +38,12 @@ func NewArchFetchAurJob(name string, update bool) fun.WorkerFunc {
 			return nil
 		}
 
-		return jasper.Context(ctx).CreateCommand(ctx).Directory(dir).
-			Priority(level.Info).SetOutputSender(level.Debug, grip.Sender()).
-			AppendArgs(args...).Run(ctx)
+		return jasper.Context(ctx).
+			CreateCommand(ctx).
+			Directory(dir).
+			Priority(level.Info).
+			SetOutputSender(level.Debug, grip.Sender()).
+			AppendArgs(args...).
+			Run(ctx)
 	}
 }

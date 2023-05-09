@@ -11,7 +11,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/grip/x/desktop"
@@ -44,7 +43,6 @@ func SetupLogging(ctx context.Context, conf *Configuration) error {
 	}
 
 	sender.SetName(filepath.Base(os.Args[0]))
-	sender.SetPriority(conf.Settings.Logging.Priority)
 
 	grip.SetGlobalLogger(grip.NewLogger(sender))
 
@@ -78,9 +76,11 @@ func WithTwitterLogger(ctx context.Context, conf *Configuration) context.Context
 
 func DesktopNotify(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "desktop") }
 func WithDesktopNotify(ctx context.Context) context.Context {
+	root := grip.Sender()
 	s := desktop.MakeSender()
 	s.SetName("sardis")
-	sender := send.MakeMulti(s, grip.Sender())
+	s.SetPriority(root.Priority())
+	sender := send.MakeMulti(s, root)
 	return grip.WithContextLogger(ctx, "desktop", grip.NewLogger(sender))
 }
 
@@ -97,10 +97,11 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 	defer func() {
 		desktop := desktop.MakeSender()
 		desktop.SetName("sardis")
+		desktop.SetPriority(grip.Sender().Priority())
 
 		loggers = append(loggers, desktop, root)
 		sender := send.MakeMulti(loggers...)
-		sender.SetPriority(level.Info)
+
 		out = grip.WithContextLogger(ctx, "remote-notify", grip.NewLogger(sender))
 	}()
 
@@ -121,6 +122,7 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 		}
 
 		sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
+		sender.SetPriority(root.Priority())
 
 		sender.SetFormatter(func(m message.Composer) (string, error) {
 			return fmt.Sprintf("[%s] %s", host, m.String()), nil
@@ -138,7 +140,7 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 
 	if conf.Settings.Telegram.Target != "" {
 		sender := send.MakeBuffered(telegram.New(conf.Settings.Telegram), time.Second, 10)
-
+		sender.SetPriority(root.Priority())
 		sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
 		sender.SetFormatter(func(m message.Composer) (string, error) {
 			return fmt.Sprintf("[%s] %s", host, m.String()), nil

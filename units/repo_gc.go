@@ -30,7 +30,7 @@ func NewRepoCleanupJob(path string) fun.WorkerFunc {
 		startAt := time.Now()
 		sender := grip.Context(ctx).Sender()
 
-		err := cmd.CreateCommand(ctx).Priority(level.Debug).
+		err := cmd.CreateCommand(ctx).Priority(level.Info).
 			Directory(path).
 			SetOutputSender(level.Info, sender).
 			SetErrorSender(level.Warning, sender).

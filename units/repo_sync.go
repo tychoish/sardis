@@ -11,7 +11,6 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
-	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/util"
@@ -84,18 +83,12 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 
 	conf := sardis.AppConfiguration(ctx)
 
-	cmd := jasper.Context(ctx).CreateCommand(ctx)
-
-	sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
-		"host": j.Host,
-	})
-
-	err := cmd.Priority(level.Debug).
+	err := jasper.Context(ctx).
+		CreateCommand(ctx).
+		Priority(level.Info).
 		ID(j.buildID()).
 		AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
 		Directory(j.Path).
-		SetOutputSender(level.Info, sender).
-		SetErrorSender(level.Warning, sender).
 		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && ", j.Path)+fmt.Sprintf(syncCmdTemplate, j.buildID())).
 		Append(j.PreHook...).
 		AppendArgs("git", "add", "-A").
@@ -106,7 +99,8 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 		AppendArgs("git", "push").
 		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, fmt.Sprintf(syncCmdTemplate, j.buildID()))).
 		AppendArgsWhen(!j.isLocal(), "git", "pull", "--keep", "--rebase", "--autostash", "origin").
-		Append(j.PostHook...).Run(ctx)
+		Append(j.PostHook...).
+		Run(ctx)
 
 	grip.Info(message.Fields{
 		"op":     "completed repo sync",

@@ -8,16 +8,15 @@ import (
 	"time"
 
 	"github.com/cheynewallace/tabby"
-	"github.com/mitchellh/go-homedir"
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
-	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
+	"github.com/tychoish/sardis/util"
 	"github.com/urfave/cli/v2"
 )
 
@@ -41,7 +40,7 @@ func repoList() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			homedir, _ := homedir.Expand("~/")
+			homedir := util.GetHomeDir()
 
 			table := tabby.New()
 			table.AddHeader("Name", "Path", "Local", "Enabled", "Tags")
@@ -73,7 +72,6 @@ func addOpCommand(cmd *cmdr.Commander, name string, op func(ctx context.Context,
 		SetUsage(fmt.Sprintf("specify one or more %s", name)).
 		Flag(),
 	).With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (*opsCmdArgs, error) {
-		grip.Info("resolving config")
 		conf, err := ResolveConfiguration(ctx, cc)
 		if err != nil {
 			return nil, err
@@ -82,7 +80,7 @@ func addOpCommand(cmd *cmdr.Commander, name string, op func(ctx context.Context,
 
 		return &opsCmdArgs{conf: conf, ops: ops}, nil
 	}).SetMiddleware(func(ctx context.Context, args *opsCmdArgs) context.Context {
-		grip.Infoln("setting remote", srv.HasCleanup(ctx), srv.HasOrchestrator(ctx))
+		ctx = sardis.WithConfiguration(ctx, args.conf)
 		return sardis.WithRemoteNotify(ctx, args.conf)
 	}).SetAction(op).Add)
 }
@@ -93,11 +91,12 @@ func repoUpdate() *cmdr.Commander {
 		Aliases("sync")
 
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
-		notify := sardis.RemoteNotify(ctx)
 		repos := args.conf.GetTaggedRepos(args.ops...)
 		if len(repos) == 0 {
 			return fmt.Errorf("no tagged repository named '%v' configured", args.ops)
 		}
+
+		notify := sardis.RemoteNotify(ctx)
 
 		shouldNotify := false
 

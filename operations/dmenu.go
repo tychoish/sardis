@@ -2,6 +2,7 @@ package operations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -71,7 +72,7 @@ func DMenu() *cmdr.Commander {
 			dmenuListCmds(dmenuListCommandRun).SetName("all"),
 			listMenus(),
 		).
-		Flags((&cmdr.FlagOptions[[]string]{}).
+		Flags(cmdr.FlagBuilder("").
 			SetName(commandFlagName, "c").
 			SetUsage("specify a default flag name").
 			Flag()).
@@ -80,10 +81,6 @@ func DMenu() *cmdr.Commander {
 		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (string, error) {
 			if name := cc.String(commandFlagName); name != "" {
 				return name, nil
-			}
-
-			if cc.NArg() != 1 {
-				return "", fmt.Errorf("must specify %s", commandFlagName)
 			}
 
 			return cc.Args().First(), nil
@@ -96,7 +93,6 @@ func DMenu() *cmdr.Commander {
 				others = append(others, group)
 			}
 			sort.Strings(others)
-
 			if group, ok := cmdGrp[name]; ok {
 				cmds := group.ExportCommands()
 				opts := make([]string, 0, len(cmds))
@@ -159,10 +155,13 @@ func DMenu() *cmdr.Commander {
 				}
 				others = append(others, menu.Name)
 			}
-
 			output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: others})
 			if err != nil {
 				return err
+			}
+
+			if output == "" {
+				return errors.New("no selection")
 			}
 
 			// don't notify here let the inner one do that

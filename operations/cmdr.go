@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/srv"
+	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
@@ -31,12 +32,17 @@ func Commander() *cmdr.Commander {
 				SetName("level").
 				SetUsage("specify logging threshold: emergency|alert|critical|error|warning|notice|info|debug").
 				SetValidate(func(val string) error {
-					if level.FromString(val) == level.Invalid {
+					priority := level.FromString(val)
+					if priority == level.Invalid {
 						return fmt.Errorf("%q is not a valid logging level", val)
 					}
+					grip.Sender().SetPriority(priority)
 					return nil
 				}).Flag(),
 		).
+		Middleware(func(ctx context.Context) context.Context {
+			return grip.WithLogger(ctx, grip.NewLogger(grip.Sender()))
+		}).
 		Middleware(sardis.WithDesktopNotify).
 		Middleware(func(ctx context.Context) context.Context {
 			jpm := jasper.NewManager(jasper.ManagerOptions{Synchronized: true})

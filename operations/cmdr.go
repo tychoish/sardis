@@ -40,9 +40,12 @@ func Commander() *cmdr.Commander {
 					}
 					grip.Sender().SetPriority(priority)
 					return nil
-				}).Flag(),
-		).
-		Middleware(func(ctx context.Context) context.Context { return grip.WithLogger(ctx, grip.NewLogger(grip.Sender())) }).
+				}).Flag()).
+		With(cmdr.SpecBuilder(ResolveConfiguration).
+			SetMiddleware(sardis.ContextSetup(
+				sardis.WithConfiguration,
+				sardis.WithAppLogger,
+			)).Add).
 		Middleware(sardis.WithDesktopNotify).
 		Middleware(func(ctx context.Context) context.Context {
 			jpm := jasper.NewManager(jasper.ManagerOptions{Synchronized: true})

@@ -47,7 +47,7 @@ func notifySend() *cmdr.Commander {
 	cmd := cmdr.MakeCommander().
 		SetName("send").
 		SetUsage("send the remaining arguments over xmpp")
-	return addOpCommand(cmd, "message", func(ctx context.Context, args *opsCmdArgs) error {
+	return addOpCommand(cmd, "message", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		grip.Info("running op")
 		sardis.RemoteNotify(ctx).Notice(strings.Join(args.ops, " "))
 		return nil

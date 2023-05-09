@@ -30,7 +30,7 @@ func RunCommand() *cmdr.Commander {
 			qrCode(),
 		)
 	return addOpCommand(cmd, "command",
-		func(ctx context.Context, args *opsCmdArgs) error {
+		func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 			return runConfiguredCommand(ctx, args.conf, args.ops)
 		})
 }

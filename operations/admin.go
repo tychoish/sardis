@@ -13,8 +13,11 @@ import (
 )
 
 func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configuration, error) {
-	conf, err := sardis.LoadConfiguration(cc.String("conf"))
+	if sardis.HasAppConfiguration(ctx) {
+		return sardis.AppConfiguration(ctx), nil
+	}
 
+	conf, err := sardis.LoadConfiguration(cc.String("conf"))
 	if err != nil {
 		return nil, err
 	}
@@ -24,10 +27,6 @@ func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configu
 	conf.Settings.Logging.Priority = level.FromString(cc.String("level"))
 	conf.Settings.Logging.EnableJSONColorFormatting = cc.Bool("colorJsonLog")
 	conf.Settings.Logging.DisableSyslog = cc.Bool("quietSyslog")
-
-	if err := sardis.SetupLogging(ctx, conf); err != nil {
-		return nil, err
-	}
 
 	return conf, nil
 }

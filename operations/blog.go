@@ -32,7 +32,6 @@ func blogPublish() *cmdr.Commander {
 			SetName(blogNameFlag).
 			SetUsage("name of the configured blog").
 			Flag()).
-		With(cmdr.SpecBuilder(ResolveConfiguration).SetMiddleware(sardis.WithConfiguration).Add).
 		With(cmdr.SpecBuilder(
 			func(ctx context.Context, cc *cli.Context) (string, error) {
 				if name := cc.String(blogNameFlag); name != "" {

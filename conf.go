@@ -197,6 +197,7 @@ func LoadConfiguration(fn string) (*Configuration, error) {
 	if err := util.UnmarshalFile(fn, out); err != nil {
 		return nil, fmt.Errorf("problem unmarshaling config data: %w", err)
 	}
+
 	if err := out.Validate(); err != nil {
 		return nil, err
 	}
@@ -208,7 +209,21 @@ type ctxKey string
 
 const confCtxKey ctxKey = "sardis-conf"
 
+type ContextSetupFunction[T any] func(context.Context, T) context.Context
+
+func ContextSetup[T any](fns ...ContextSetupFunction[T]) ContextSetupFunction[T] {
+	return func(ctx context.Context, conf T) context.Context {
+		for _, fn := range fns {
+			ctx = fn(ctx, conf)
+		}
+		return ctx
+	}
+}
+
 func WithConfiguration(ctx context.Context, conf *Configuration) context.Context {
+	if HasAppConfiguration(ctx) {
+		return ctx
+	}
 	return context.WithValue(ctx, confCtxKey, *conf)
 }
 
@@ -219,6 +234,11 @@ func AppConfiguration(ctx context.Context) *Configuration {
 		return nil
 	}
 	return &val
+}
+
+func HasAppConfiguration(ctx context.Context) bool {
+	_, ok := ctx.Value(confCtxKey).(Configuration)
+	return ok
 }
 
 func (conf *MenuConf) Validate() error {

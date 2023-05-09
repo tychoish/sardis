@@ -17,7 +17,6 @@ import (
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
 	"github.com/tychoish/sardis/util"
-	"github.com/urfave/cli/v2"
 )
 
 func Repo() *cmdr.Commander {
@@ -61,36 +60,12 @@ func repoList() *cmdr.Commander {
 		}).Add)
 }
 
-type opsCmdArgs struct {
-	conf *sardis.Configuration
-	ops  []string
-}
-
-func addOpCommand(cmd *cmdr.Commander, name string, op func(ctx context.Context, args *opsCmdArgs) error) *cmdr.Commander {
-	return cmd.Flags(cmdr.FlagBuilder([]string{}).
-		SetName(name).
-		SetUsage(fmt.Sprintf("specify one or more %s", name)).
-		Flag(),
-	).With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (*opsCmdArgs, error) {
-		conf, err := ResolveConfiguration(ctx, cc)
-		if err != nil {
-			return nil, err
-		}
-		ops := append(cc.StringSlice(name), cc.Args().Slice()...)
-
-		return &opsCmdArgs{conf: conf, ops: ops}, nil
-	}).SetMiddleware(func(ctx context.Context, args *opsCmdArgs) context.Context {
-		ctx = sardis.WithConfiguration(ctx, args.conf)
-		return sardis.WithRemoteNotify(ctx, args.conf)
-	}).SetAction(op).Add)
-}
-
 func repoUpdate() *cmdr.Commander {
 	cmd := cmdr.MakeCommander().
 		SetName("update").
 		Aliases("sync")
 
-	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
+	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		repos := args.conf.GetTaggedRepos(args.ops...)
 		if len(repos) == 0 {
 			return fmt.Errorf("no tagged repository named '%v' configured", args.ops)
@@ -150,7 +125,7 @@ func repoCleanup() *cmdr.Commander {
 		Aliases("cleanup").
 		SetUsage("run repository cleanup")
 
-	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
+	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		repos := args.conf.GetTaggedRepos(args.ops...)
 		ec := &erc.Collector{}
 		jobs, run := units.SetupWorkers(ec)
@@ -167,7 +142,7 @@ func repoClone() *cmdr.Commander {
 	cmd := cmdr.MakeCommander().
 		SetName("clone").
 		SetUsage("clone a repository or all matching repositories")
-	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
+	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		repos := args.conf.GetTaggedRepos(args.ops...)
 
 		ec := &erc.Collector{}
@@ -196,7 +171,7 @@ func repoStatus() *cmdr.Commander {
 		SetName("status").
 		SetUsage("report on the status of repos")
 
-	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
+	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		catcher := &erc.Collector{}
 
 		catcher.Add(fun.Observe(ctx,
@@ -215,7 +190,7 @@ func repoFetch() *cmdr.Commander {
 		SetName("fetch").
 		SetUsage("fetch one or more repos")
 
-	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs) error {
+	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		ec := &erc.Collector{}
 		jobs, run := units.SetupWorkers(ec)
 

@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/coreos/go-systemd/journal"
 	"github.com/nwidger/jsoncolor"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/srv"
@@ -23,7 +24,13 @@ import (
 	"github.com/tychoish/sardis/util"
 )
 
-func SetupLogging(ctx context.Context, conf *Configuration) error {
+func WithAppLogger(ctx context.Context, conf *Configuration) context.Context {
+	logger := grip.NewLogger(SetupLogging(ctx, conf))
+	grip.SetGlobalLogger(logger)
+	return grip.WithLogger(ctx, logger)
+}
+
+func SetupLogging(ctx context.Context, conf *Configuration) send.Sender {
 	var sender send.Sender
 
 	if conf.Settings.Logging.EnableJSONFormating || conf.Settings.Logging.EnableJSONColorFormatting {
@@ -32,12 +39,9 @@ func SetupLogging(ctx context.Context, conf *Configuration) error {
 		sender = grip.Sender()
 	}
 
-	if runtime.GOOS == "linux" && !conf.Settings.Logging.DisableSyslog {
-		syslog, err := system.MakeDefault()
+	if runtime.GOOS == "linux" && !conf.Settings.Logging.DisableSyslog && journal.Enabled() {
+		syslog := system.MakeDefault()
 		syslog.SetName(filepath.Base(os.Args[0]))
-		if err != nil {
-			return err
-		}
 
 		if conf.Settings.Logging.DisableStandardOutput {
 			sender = syslog
@@ -62,9 +66,7 @@ func SetupLogging(ctx context.Context, conf *Configuration) error {
 	sender.SetPriority(conf.Settings.Logging.Priority)
 	sender.SetName(filepath.Base(os.Args[0]))
 
-	grip.SetGlobalLogger(grip.NewLogger(sender))
-
-	return nil
+	return sender
 }
 
 func Twitter(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "twitter") }

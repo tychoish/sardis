@@ -83,7 +83,7 @@ func blogPublish() *cmdr.Commander {
 					return nil
 				}
 
-				if err := units.NewLocalRepoSyncJob(repo.Path, repo.Branch, repo.Pre, repo.Post)(ctx); err != nil {
+				if err := units.NewLocalRepoSyncJob(*repo)(ctx); err != nil {
 					return fmt.Errorf("problem syncing blog repo: %w", err)
 				}
 

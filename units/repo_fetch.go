@@ -3,19 +3,31 @@ package units
 import (
 	"context"
 	"errors"
-	"os"
+	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
+	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
 )
 
 func NewRepoFetchJob(conf sardis.RepoConf) fun.WorkerFunc {
 	return erc.WithCollector(func(ctx context.Context, ec *erc.Collector) error {
-		if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
+		start := time.Now()
+		defer func() {
+			grip.Notice(message.Fields{
+				"path":   conf.Path,
+				"repo":   conf.Remote,
+				"errors": ec.HasErrors(),
+				"op":     "repo fetch",
+				"time":   time.Since(start),
+			})
+		}()
+
+		if !util.FileExists(conf.Path) {
 			grip.Info(message.Fields{
 				"path": conf.Path,
 				"op":   "repo doesn't exist; cloning",
@@ -49,13 +61,6 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.WorkerFunc {
 		cmd.Append(conf.Post...)
 
 		ec.Add(cmd.Run(ctx))
-
-		grip.Notice(message.Fields{
-			"path":   conf.Path,
-			"repo":   conf.Remote,
-			"errors": ec.HasErrors(),
-			"op":     "repo fetch",
-		})
 		return nil
 	})
 }

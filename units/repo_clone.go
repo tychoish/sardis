@@ -23,7 +23,10 @@ func NewRepoCloneJob(rconf sardis.RepoConf) fun.WorkerFunc {
 
 		if _, err := os.Stat(rconf.Path); !os.IsNotExist(err) {
 			if rconf.LocalSync {
-				ec.Add(NewLocalRepoSyncJob(rconf.Path, rconf.Branch, nil, nil)(ctx))
+				rconfCopy := rconf
+				rconfCopy.Pre = nil
+				rconfCopy.Post = nil
+				ec.Add(NewLocalRepoSyncJob(rconfCopy)(ctx))
 			} else if rconf.Fetch {
 				ec.Add(NewRepoFetchJob(rconf)(ctx))
 			}

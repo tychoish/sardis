@@ -19,31 +19,30 @@ func NewRepoCleanupJob(path string) fun.WorkerFunc {
 			return fmt.Errorf("cannot cleanup %s, no repository exists", path)
 		}
 
-		grip.Info(message.Fields{
-			"job":  "repo-cleanup",
-			"path": path,
-			"op":   "running",
-		})
+		start := time.Now()
+
+		var err error
+
+		defer func() {
+			grip.Notice(message.Fields{
+				"op":    "repo-cleanup",
+				"repo":  path,
+				"dur":   time.Since(start),
+				"error": err != nil,
+			})
+		}()
 
 		cmd := jasper.Context(ctx)
 
-		startAt := time.Now()
 		sender := grip.Context(ctx).Sender()
 
-		err := cmd.CreateCommand(ctx).Priority(level.Info).
+		err = cmd.CreateCommand(ctx).Priority(level.Info).
 			Directory(path).
-			SetOutputSender(level.Info, sender).
+			SetOutputSender(level.Debug, sender).
 			SetErrorSender(level.Warning, sender).
 			AppendArgs("git", "gc").
 			AppendArgs("git", "prune").
 			Run(ctx)
-
-		grip.Notice(message.Fields{
-			"op":    "repo-cleanup",
-			"repo":  path,
-			"secs":  time.Since(startAt).Seconds(),
-			"error": err != nil,
-		})
 
 		return err
 	}

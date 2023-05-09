@@ -25,7 +25,7 @@ func SyncRepo(ec *erc.Collector, repo sardis.RepoConf) fun.WorkerFunc {
 		}
 
 		hasMirrors = true
-		workerList.PushBack(NewRepoSyncJob(mirror, repo.Path, repo.Branch, repo.Pre, nil))
+		workerList.PushBack(NewRepoSyncJob(mirror, repo))
 	}
 
 	return func(ctx context.Context) error {
@@ -37,7 +37,7 @@ func SyncRepo(ec *erc.Collector, repo sardis.RepoConf) fun.WorkerFunc {
 			changes, err := repo.HasChanges()
 
 			if changes || err != nil {
-				return NewLocalRepoSyncJob(repo.Path, repo.Branch, repo.Pre, repo.Post)(ctx)
+				return NewLocalRepoSyncJob(repo)(ctx)
 			}
 
 			return NewRepoFetchJob(repo)(ctx)

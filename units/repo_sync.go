@@ -30,23 +30,23 @@ const (
 	syncCmdTemplate         = remoteUpdateCmdTemplate + " && git commit -a -m 'auto-update: (%s)'; git push"
 )
 
-func NewLocalRepoSyncJob(path, branch string, pre, post []string) fun.WorkerFunc {
+func NewLocalRepoSyncJob(repo sardis.RepoConf) fun.WorkerFunc {
 	j := &repoSyncJob{}
 	j.Host = "LOCAL"
-	j.Path = path
-	j.Branch = branch
-	j.PreHook = pre
-	j.PostHook = post
+	j.Path = repo.Path
+	j.Branch = repo.Branch
+	j.PreHook = repo.Pre
+	j.PostHook = repo.Post
 	return j.Run
 }
 
-func NewRepoSyncJob(host, path, branch string, pre, post []string) fun.WorkerFunc {
+func NewRepoSyncJob(host string, repo sardis.RepoConf) fun.WorkerFunc {
 	j := &repoSyncJob{}
 	j.Host = host
-	j.Path = path
-	j.Branch = branch
-	j.PreHook = pre
-	j.PostHook = post
+	j.Path = repo.Path
+	j.Branch = repo.Branch
+	j.PreHook = repo.Pre
+	j.PostHook = repo.Post
 	return j.Run
 }
 

@@ -81,6 +81,8 @@ func addOpCommand[T cmdr.FlagTypes](
 			}
 		}
 
+		out.ops = ops
+
 		return out, nil
 	}).SetMiddleware(func(ctx context.Context, args *opsCmdArgs[T]) context.Context {
 		return sardis.WithRemoteNotify(ctx, args.conf)

@@ -11,19 +11,25 @@ import (
 	"github.com/tychoish/grip/message"
 )
 
+type OperationType string
+
 type DiffMode int
 
 const (
 	DiffMissing DiffMode = iota
 	DiffSame
 	Diff
+
+	OperationDelete  OperationType = "delete"
+	OperationDisplay OperationType = "print"
 )
 
 type Options struct {
-	Target string
-	Mirror string
-	Mode   DiffMode
-	Header string
+	Target    string
+	Mirror    string
+	Mode      DiffMode
+	Header    string
+	Operation OperationType
 }
 
 type state map[string]string

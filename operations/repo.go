@@ -14,9 +14,9 @@ import (
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
+	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
-	"github.com/tychoish/sardis/util"
 )
 
 func Repo() *cmdr.Commander {
@@ -39,7 +39,7 @@ func repoList() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			homedir := util.GetHomeDir()
+			homedir := util.GetHomedir()
 
 			table := tabby.New()
 			table.AddHeader("Name", "Path", "Local", "Enabled", "Tags")

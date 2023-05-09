@@ -21,7 +21,7 @@ import (
 	"github.com/tychoish/grip/x/telegram"
 	"github.com/tychoish/grip/x/twitter"
 	"github.com/tychoish/grip/x/xmpp"
-	"github.com/tychoish/sardis/util"
+	"github.com/tychoish/jasper/util"
 )
 
 func WithAppLogger(ctx context.Context, conf *Configuration) context.Context {

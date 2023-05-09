@@ -2,8 +2,6 @@ module github.com/tychoish/sardis
 
 go 1.20
 
-replace github.com/tychoish/cmdr => ../cmdr
-
 require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
 	github.com/cheynewallace/tabby v1.1.1
@@ -12,7 +10,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nwidger/jsoncolor v0.3.2
 	github.com/tychoish/birch v0.2.3-0.20230413052020-46068f63d7bb
-	github.com/tychoish/cmdr v0.3.1-0.20230509105443-5857993c4883
+	github.com/tychoish/cmdr v0.3.1-0.20230509153937-bf79f9f7a0fb
 	github.com/tychoish/fun v0.9.2
 	github.com/tychoish/godmenu v0.1.1
 	github.com/tychoish/grip v0.2.10
@@ -22,9 +20,9 @@ require (
 	github.com/tychoish/grip/x/telegram v0.0.0-20230430192632-9a70cb893120
 	github.com/tychoish/grip/x/twitter v0.0.0-20230427110835-c9728a14310e
 	github.com/tychoish/grip/x/xmpp v0.0.0-20230427110835-c9728a14310e
-	github.com/tychoish/jasper v0.1.1-0.20230509065339-1afad23863fb
-	github.com/tychoish/jasper/x/cli v0.0.0-20230508143104-18fd78251605
-	github.com/tychoish/jasper/x/remote v0.0.0-20230503013204-8c9b0970f9d1
+	github.com/tychoish/jasper v0.1.1-0.20230509174929-2fe8b231212c
+	github.com/tychoish/jasper/x/cli v0.0.0-20230509174929-2fe8b231212c
+	github.com/tychoish/jasper/x/remote v0.0.0-20230509174929-2fe8b231212c
 	github.com/urfave/cli/v2 v2.25.3
 	go.mongodb.org/mongo-driver v1.11.6
 	golang.org/x/tools v0.6.0
@@ -91,8 +89,8 @@ require (
 	github.com/tychoish/gimlet v0.0.0-20230130001449-8987c96bb886 // indirect
 	github.com/tychoish/grip/x/metrics v0.0.0-20230430204648-ccdad1e4b419 // indirect
 	github.com/tychoish/grip/x/splunk v0.0.0-20230430204648-ccdad1e4b419 // indirect
-	github.com/tychoish/jasper/x/splunk v0.0.0-20230503013204-8c9b0970f9d1 // indirect
-	github.com/tychoish/jasper/x/track v0.0.0-20230502230321-07d6256076b2 // indirect
+	github.com/tychoish/jasper/x/splunk v0.0.0-20230509174929-2fe8b231212c // indirect
+	github.com/tychoish/jasper/x/track v0.0.0-20230509174929-2fe8b231212c // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect

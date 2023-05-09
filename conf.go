@@ -18,7 +18,8 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/x/telegram"
 	"github.com/tychoish/grip/x/xmpp"
-	"github.com/tychoish/sardis/util"
+	"github.com/tychoish/jasper/util"
+	sutil "github.com/tychoish/sardis/util"
 )
 
 type Configuration struct {
@@ -193,7 +194,7 @@ type MenuConf struct {
 func LoadConfiguration(fn string) (*Configuration, error) {
 	out := &Configuration{}
 
-	if err := util.UnmarshalFile(fn, out); err != nil {
+	if err := sutil.UnmarshalFile(fn, out); err != nil {
 		return nil, fmt.Errorf("problem unmarshaling config data: %w", err)
 	}
 
@@ -497,7 +498,7 @@ func (conf *ArchLinuxConf) Validate() error {
 	}
 
 	if conf.BuildPath == "" {
-		conf.BuildPath = filepath.Join(util.GetHomeDir(), "abs")
+		conf.BuildPath = filepath.Join(util.GetHomedir(), "abs")
 	} else {
 		var err error
 
@@ -559,8 +560,8 @@ func (conf *RepoConf) Validate() error {
 		return err
 	}
 
-	conf.Post = util.TryExpandHomeDirs(conf.Post)
-	conf.Pre = util.TryExpandHomeDirs(conf.Pre)
+	conf.Post = sutil.TryExpandHomeDirs(conf.Post)
+	conf.Pre = sutil.TryExpandHomeDirs(conf.Pre)
 
 	return nil
 }
@@ -639,7 +640,7 @@ func (conf *CredentialsConf) Validate() error {
 		return err
 	}
 
-	return util.UnmarshalFile(conf.Path, &conf)
+	return sutil.UnmarshalFile(conf.Path, &conf)
 }
 
 func (h *HostConf) Validate() error {
@@ -648,7 +649,7 @@ func (h *HostConf) Validate() error {
 	erc.When(catcher, h.Name == "", "cannot have an empty name for a host")
 	erc.When(catcher, h.Hostname == "", "cannot have an empty host name")
 	erc.When(catcher, h.Port == 0, "must specify a non-zero port number for a host")
-	erc.When(catcher, !util.SliceContains([]string{"ssh", "jasper"}, h.Protocol), "host protocol must be ssh or jasper")
+	erc.When(catcher, !fun.Contains(h.Protocol, []string{"ssh", "jasper"}), "host protocol must be ssh or jasper")
 
 	if h.Protocol == "ssh" {
 		erc.When(catcher, h.User == "", "must specify user for ssh hosts")
@@ -669,7 +670,7 @@ func (conf *Configuration) GetHost(name string) (*HostConf, error) {
 
 func (conf *CommandGroupConf) Validate() error {
 	var err error
-	home := util.GetHomeDir()
+	home := util.GetHomedir()
 	catcher := &erc.Collector{}
 
 	if conf.Directory == "" {
@@ -766,7 +767,7 @@ func (conf *CommandGroupConf) ExportCommands() map[string]CommandConf {
 
 func (conf *Configuration) SSHAgentSocket() string {
 	if conf.Settings.SSHAgentSocketPath == "" {
-		conf.Settings.SSHAgentSocketPath = fun.Must(util.GetSSHAgentPath())
+		conf.Settings.SSHAgentSocketPath = fun.Must(sutil.GetSSHAgentPath())
 	}
 	return conf.Settings.SSHAgentSocketPath
 }

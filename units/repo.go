@@ -7,8 +7,8 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
+	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
-	"github.com/tychoish/sardis/util"
 )
 
 func SyncRepo(ec *erc.Collector, repo sardis.RepoConf) fun.WorkerFunc {

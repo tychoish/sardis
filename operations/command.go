@@ -14,8 +14,8 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
+	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
-	"github.com/tychoish/sardis/util"
 	"github.com/urfave/cli/v2"
 )
 
@@ -83,7 +83,7 @@ func listCommands() *cmdr.Commander {
 		SetUsage("return a list of defined commands").
 		With(cmdr.SpecBuilder(ResolveConfiguration).
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				homedir := util.GetHomeDir()
+				homedir := util.GetHomedir()
 
 				table := tabby.New()
 				table.AddHeader("Name", "Group", "Command", "Directory")

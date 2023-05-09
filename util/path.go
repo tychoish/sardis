@@ -3,90 +3,24 @@ package util
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"os/user"
 	"path/filepath"
-	"runtime"
 	"strings"
 
-	homedir "github.com/mitchellh/go-homedir"
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/adt"
+	jutil "github.com/tychoish/jasper/util"
 )
-
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
-}
-
-var (
-	hostNameCache *adt.Once[string]
-	homeDirCache  *adt.Once[string]
-)
-
-func init() {
-	hostNameCache = &adt.Once[string]{}
-	homeDirCache = &adt.Once[string]{}
-}
-
-func GetHomeDir() string {
-	return homeDirCache.Do(func() string {
-		userHome, err := homedir.Dir()
-		if err != nil {
-			// workaround for cygwin if we're on windows but couldn't get a homedir
-			if runtime.GOOS == "windows" && len(os.Getenv("HOME")) > 0 {
-				userHome = os.Getenv("HOME")
-			}
-		}
-
-		return userHome
-	})
-}
-
-func GetHostname() string {
-	return hostNameCache.Do(func() string {
-		name, err := os.Hostname()
-		if err != nil {
-			return "UNKNOWN_HOSTNAME"
-		}
-		return name
-	})
-}
 
 func TryExpandHomeDirs(in []string) []string {
 	out := make([]string, len(in))
 
 	for idx := range in {
-		str := in[idx]
-		if strings.HasPrefix(str, "~") {
-			expanded, err := homedir.Expand(str)
-			if err != nil {
-				expanded = str
-			}
-			str = expanded
-		}
-
-		out[idx] = str
+		out[idx] = jutil.TryExpandHomedir(in[idx])
 	}
 
 	return out
-}
-
-func CollapseHomeDir(in string) string {
-	dir := GetHomeDir()
-
-	if !strings.Contains(in, dir) {
-		return in
-	}
-
-	in = strings.Replace(in, dir, "~", 1)
-	if strings.HasSuffix(in, "~") {
-		in = fmt.Sprint(in, string(filepath.Separator))
-	}
-
-	return in
 }
 
 func GetDirectoryContents(path string) (fun.Iterator[string], error) {
@@ -116,7 +50,7 @@ func GetSSHAgentPath() (out string, err error) {
 		return "", err
 	}
 
-	if path := filepath.Join("/run/user", usr.Uid, "ssh-agent-socket"); FileExists(path) {
+	if path := filepath.Join("/run/user", usr.Uid, "ssh-agent-socket"); jutil.FileExists(path) {
 		return path, nil
 	}
 

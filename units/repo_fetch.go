@@ -23,7 +23,7 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.WorkerFunc {
 				"repo":   conf.Remote,
 				"errors": ec.HasErrors(),
 				"op":     "repo fetch",
-				"time":   time.Since(start),
+				"dur":    time.Since(start).String(),
 			})
 		}()
 
@@ -42,13 +42,13 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.WorkerFunc {
 			return nil
 		}
 
-		cmd := jasper.Context(ctx).CreateCommand(ctx)
-
 		// sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
 		// 	"repo": conf.Name,
 		// })
 
-		cmd.Directory(conf.Path).
+		cmd := jasper.Context(ctx).
+			CreateCommand(ctx).
+			Directory(conf.Path).
 			AddEnv(sardis.SSHAgentSocketEnvVar, sardis.AppConfiguration(ctx).SSHAgentSocket())
 			// SetOutputSender(level.Info, sender).
 			// SetErrorSender(level.Warning, sender)

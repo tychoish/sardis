@@ -13,16 +13,16 @@ require (
 	github.com/tychoish/cmdr v0.3.1-0.20230510060338-8bbb1a50c23c
 	github.com/tychoish/fun v0.9.2
 	github.com/tychoish/godmenu v0.1.1
-	github.com/tychoish/grip v0.3.0
-	github.com/tychoish/grip/x/desktop v0.0.0-20230510060232-abf728533a0e
-	github.com/tychoish/grip/x/jira v0.0.0-20230510024426-0e003b8064f9
-	github.com/tychoish/grip/x/system v0.0.0-20230510060232-abf728533a0e
-	github.com/tychoish/grip/x/telegram v0.0.0-20230510060232-abf728533a0e
-	github.com/tychoish/grip/x/twitter v0.0.0-20230510060232-abf728533a0e
-	github.com/tychoish/grip/x/xmpp v0.0.0-20230510060232-abf728533a0e
-	github.com/tychoish/jasper v0.1.1-0.20230510060259-f0d34ba6e18a
-	github.com/tychoish/jasper/x/cli v0.0.0-20230510060259-f0d34ba6e18a
-	github.com/tychoish/jasper/x/remote v0.0.0-20230510060259-f0d34ba6e18a
+	github.com/tychoish/grip v0.3.1
+	github.com/tychoish/grip/x/desktop v0.0.0-20230510191431-a46d828053d6
+	github.com/tychoish/grip/x/jira v0.0.0-20230510192207-dc2e7390e835
+	github.com/tychoish/grip/x/system v0.0.0-20230510192207-dc2e7390e835
+	github.com/tychoish/grip/x/telegram v0.0.0-20230510191431-a46d828053d6
+	github.com/tychoish/grip/x/twitter v0.0.0-20230510191431-a46d828053d6
+	github.com/tychoish/grip/x/xmpp v0.0.0-20230510191431-a46d828053d6
+	github.com/tychoish/jasper v0.1.1
+	github.com/tychoish/jasper/x/cli v0.0.0-20230510194619-0b301efba446
+	github.com/tychoish/jasper/x/remote v0.0.0-20230510193640-652d1100c1b7
 	github.com/urfave/cli/v2 v2.25.3
 	go.mongodb.org/mongo-driver v1.11.6
 	golang.org/x/tools v0.6.0
@@ -44,7 +44,6 @@ require (
 	github.com/evergreen-ci/service v1.0.1-0.20200225230430-d9382e39d768 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
-	github.com/frankban/quicktest v1.14.5 // indirect
 	github.com/fuyufjh/splunk-hec-go v0.4.0 // indirect
 	github.com/gen2brain/beeep v0.0.0-20220518085355-d7852edf42fc // indirect
 	github.com/go-chi/chi v4.1.2+incompatible // indirect
@@ -87,9 +86,9 @@ require (
 	github.com/tychoish/birch/x/ftdc v0.0.0-20230413052020-46068f63d7bb // indirect
 	github.com/tychoish/birch/x/mrpc v0.0.0-20230413052020-46068f63d7bb // indirect
 	github.com/tychoish/gimlet v0.0.0-20230130001449-8987c96bb886 // indirect
-	github.com/tychoish/grip/x/metrics v0.0.0-20230430204648-ccdad1e4b419 // indirect
-	github.com/tychoish/grip/x/splunk v0.0.0-20230430204648-ccdad1e4b419 // indirect
-	github.com/tychoish/jasper/x/splunk v0.0.0-20230509174929-2fe8b231212c // indirect
+	github.com/tychoish/grip/x/metrics v0.0.0-20230510192207-dc2e7390e835 // indirect
+	github.com/tychoish/grip/x/splunk v0.0.0-20230510192207-dc2e7390e835 // indirect
+	github.com/tychoish/jasper/x/splunk v0.0.0-20230510193424-429e4caa8e98 // indirect
 	github.com/tychoish/jasper/x/track v0.0.0-20230509174929-2fe8b231212c // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect

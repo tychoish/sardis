@@ -55,10 +55,10 @@ func (j *repoSyncJob) buildID() string {
 		hostname := util.GetHostname()
 
 		if j.isLocal() {
-			return fmt.Sprintf("LOCAL<%s>.sync", hostname)
+			return fmt.Sprintf("LOCAL(%s).sync", hostname)
 		}
 
-		return fmt.Sprintf("REMOTE<%s>.sync.FROM<%s>", j.Host, hostname)
+		return fmt.Sprintf("REMOTE(%s).sync.FROM(%s)", j.Host, hostname)
 	})
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
+	"github.com/urfave/cli/v2"
 )
 
 func Commander() *cmdr.Commander {
@@ -51,6 +52,9 @@ func Commander() *cmdr.Commander {
 			jpm := jasper.NewManager(jasper.ManagerOptions{Synchronized: true})
 			srv.AddCleanup(ctx, jpm.Close)
 			return jasper.WithManager(ctx, jpm)
+		}).
+		SetAction(func(ctx context.Context, cc *cli.Context) error {
+			return cli.ShowAppHelp(cc)
 		}).
 		Subcommanders(
 			Admin(),

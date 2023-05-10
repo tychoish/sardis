@@ -64,8 +64,8 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops [
 					notify.Error(message.WrapError(err, name))
 					return err
 				}
-				notify.Sender().SetName(name)
-				notify.Notice("completed")
+				notify.Sender()
+				notify.Noticeln(name, "completed")
 				return nil
 			}).
 			Run(ctx)

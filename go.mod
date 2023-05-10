@@ -10,19 +10,19 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nwidger/jsoncolor v0.3.2
 	github.com/tychoish/birch v0.2.3-0.20230413052020-46068f63d7bb
-	github.com/tychoish/cmdr v0.3.1-0.20230509153937-bf79f9f7a0fb
+	github.com/tychoish/cmdr v0.3.1-0.20230510060338-8bbb1a50c23c
 	github.com/tychoish/fun v0.9.2
 	github.com/tychoish/godmenu v0.1.1
-	github.com/tychoish/grip v0.2.10
-	github.com/tychoish/grip/x/desktop v0.0.0-20230427110835-c9728a14310e
-	github.com/tychoish/grip/x/jira v0.0.0-20230509053745-c6390abedfa5
-	github.com/tychoish/grip/x/system v0.0.0-20230509105305-71fe4c017e7e
-	github.com/tychoish/grip/x/telegram v0.0.0-20230430192632-9a70cb893120
-	github.com/tychoish/grip/x/twitter v0.0.0-20230427110835-c9728a14310e
-	github.com/tychoish/grip/x/xmpp v0.0.0-20230427110835-c9728a14310e
-	github.com/tychoish/jasper v0.1.1-0.20230509174929-2fe8b231212c
-	github.com/tychoish/jasper/x/cli v0.0.0-20230509174929-2fe8b231212c
-	github.com/tychoish/jasper/x/remote v0.0.0-20230509174929-2fe8b231212c
+	github.com/tychoish/grip v0.3.0
+	github.com/tychoish/grip/x/desktop v0.0.0-20230510060232-abf728533a0e
+	github.com/tychoish/grip/x/jira v0.0.0-20230510024426-0e003b8064f9
+	github.com/tychoish/grip/x/system v0.0.0-20230510060232-abf728533a0e
+	github.com/tychoish/grip/x/telegram v0.0.0-20230510060232-abf728533a0e
+	github.com/tychoish/grip/x/twitter v0.0.0-20230510060232-abf728533a0e
+	github.com/tychoish/grip/x/xmpp v0.0.0-20230510060232-abf728533a0e
+	github.com/tychoish/jasper v0.1.1-0.20230510060259-f0d34ba6e18a
+	github.com/tychoish/jasper/x/cli v0.0.0-20230510060259-f0d34ba6e18a
+	github.com/tychoish/jasper/x/remote v0.0.0-20230510060259-f0d34ba6e18a
 	github.com/urfave/cli/v2 v2.25.3
 	go.mongodb.org/mongo-driver v1.11.6
 	golang.org/x/tools v0.6.0

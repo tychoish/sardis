@@ -20,7 +20,9 @@ func TestInterBSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	boutput, err := birch.DC.MapString(input).MarshalBSON()
-	t.Error(err)
+	if err != nil {
+		t.Error(err)
+	}
 
 	t.Log(bytes.Equal(boutput, output))
 	t.Log(output)

@@ -13,15 +13,17 @@ import (
 	jutil "github.com/tychoish/jasper/util"
 )
 
-func TryExpandHomeDirs(in []string) []string {
-	out := make([]string, len(in))
+func Apply[T any](fn func(T) T, in []T) []T {
+	out := make([]T, len(in))
 
 	for idx := range in {
-		out[idx] = jutil.TryExpandHomedir(in[idx])
+		out[idx] = fn(in[idx])
 	}
 
 	return out
 }
+
+func TryExpandHomeDirs(in []string) []string { return Apply(jutil.TryExpandHomedir, in) }
 
 func GetDirectoryContents(path string) (fun.Iterator[string], error) {
 	dir, err := os.Open(path)

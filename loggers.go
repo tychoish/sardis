@@ -25,9 +25,9 @@ import (
 )
 
 func WithAppLogger(ctx context.Context, conf *Configuration) context.Context {
-	logger := grip.NewLogger(SetupLogging(ctx, conf))
-	grip.SetGlobalLogger(logger)
-	return grip.WithLogger(ctx, logger)
+	sender := SetupLogging(ctx, conf)
+	grip.SetSender(sender)
+	return grip.WithLogger(ctx, grip.NewLogger(sender))
 }
 
 func SetupLogging(ctx context.Context, conf *Configuration) send.Sender {

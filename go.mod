@@ -2,6 +2,10 @@ module github.com/tychoish/sardis
 
 go 1.20
 
+replace github.com/tychoish/fun => ../fun
+
+replace github.com/tychoish/grip => ../grip
+
 require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
 	github.com/cheynewallace/tabby v1.1.1
@@ -11,9 +15,9 @@ require (
 	github.com/nwidger/jsoncolor v0.3.2
 	github.com/tychoish/birch v0.2.3-0.20230413052020-46068f63d7bb
 	github.com/tychoish/cmdr v0.3.1-0.20230510060338-8bbb1a50c23c
-	github.com/tychoish/fun v0.9.2
+	github.com/tychoish/fun v0.9.3
 	github.com/tychoish/godmenu v0.1.1
-	github.com/tychoish/grip v0.3.1
+	github.com/tychoish/grip v0.3.2
 	github.com/tychoish/grip/x/desktop v0.0.0-20230510191431-a46d828053d6
 	github.com/tychoish/grip/x/jira v0.0.0-20230510192207-dc2e7390e835
 	github.com/tychoish/grip/x/system v0.0.0-20230510192207-dc2e7390e835
@@ -21,8 +25,8 @@ require (
 	github.com/tychoish/grip/x/twitter v0.0.0-20230510191431-a46d828053d6
 	github.com/tychoish/grip/x/xmpp v0.0.0-20230510191431-a46d828053d6
 	github.com/tychoish/jasper v0.1.1
-	github.com/tychoish/jasper/x/cli v0.0.0-20230510194619-0b301efba446
-	github.com/tychoish/jasper/x/remote v0.0.0-20230510193640-652d1100c1b7
+	github.com/tychoish/jasper/x/cli v0.0.0-20230513171300-5370c8bff7a0
+	github.com/tychoish/jasper/x/remote v0.0.0-20230513171300-5370c8bff7a0
 	github.com/urfave/cli/v2 v2.25.3
 	go.mongodb.org/mongo-driver v1.11.6
 	golang.org/x/tools v0.6.0

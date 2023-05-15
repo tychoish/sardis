@@ -554,12 +554,7 @@ func (conf *RepoConf) Validate() error {
 		return errors.New("cannot specify sync and fetch")
 	}
 
-	var err error
-	conf.Path, err = homedir.Expand(conf.Path)
-	if err != nil {
-		return err
-	}
-
+	conf.Path = util.TryExpandHomedir(conf.Path)
 	conf.Post = sutil.TryExpandHomeDirs(conf.Post)
 	conf.Pre = sutil.TryExpandHomeDirs(conf.Pre)
 

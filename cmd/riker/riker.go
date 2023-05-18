@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -74,13 +75,12 @@ func TopLevel() *cmdr.Commander {
 								path = fun.Must(os.Getwd())
 							}
 
-							toCheck := util.TryExpandHomedir(path)
 							if strings.HasSuffix(path, "...") {
 								grip.Warningln("module-path (working directory) should not use '...';",
 									"set go test path with '--path'")
-								toCheck = filepath.Dir(path)
+								return fmt.Errorf("module path %q should not have ... suffix", path)
 							}
-							if util.FileExists(toCheck) {
+							if util.FileExists(util.TryExpandHomedir(path)) {
 								return nil
 							}
 							grip.Warning(fmt.Errorf("%q does not exist", path))
@@ -112,8 +112,9 @@ func TopLevel() *cmdr.Commander {
 						Timeout:     cc.Duration("timeout"),
 						Recursive:   cc.Bool("recursive"),
 						PackagePath: cc.String("path"),
-						RootPath:    cc.String("path"),
+						RootPath:    cc.String("module-path"),
 						GoTestArgs:  cc.Args().Slice(),
+						Workers:     runtime.NumCPU(),
 					}
 
 					if err := opts.Validate(); err != nil {

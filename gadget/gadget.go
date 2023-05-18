@@ -46,6 +46,7 @@ func (opts *Options) Validate() error {
 
 	erc.When(ec, opts.Workers < 1, "gadget options cannot specify 0 or fewer workers")
 	erc.When(ec, opts.Timeout < time.Second, "timeout should be at least a second")
+	erc.Whenf(ec, strings.HasSuffix(opts.RootPath, "..."), "root path [%s] should not have ...", opts.RootPath)
 
 	if ec.HasErrors() {
 		return ec.Resolve()

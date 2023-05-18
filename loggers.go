@@ -53,7 +53,6 @@ func SetupLogging(ctx context.Context, conf *Configuration) send.Sender {
 	switch {
 	case conf.Settings.Logging.EnableJSONColorFormatting:
 		sender.SetFormatter(func(m message.Composer) (string, error) {
-			m.SetOption(message.OptionSkipAllMetadata)
 			out, err := jsoncolor.Marshal(m.Raw())
 			if err != nil {
 				return "", err

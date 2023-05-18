@@ -42,6 +42,14 @@ func GetDirectoryContents(path string) (fun.Iterator[string], error) {
 	}), nil
 }
 
+func TryCollapseHomedir(in string) string {
+	hd := jutil.GetHomedir()
+	if strings.HasPrefix(in, hd) {
+		return strings.Replace(in, hd, "~", 1)
+	}
+	return in
+}
+
 func GetSSHAgentPath() (out string, err error) {
 	if path, ok := os.LookupEnv("SSH_AUTH_SOCK"); ok {
 		return path, nil

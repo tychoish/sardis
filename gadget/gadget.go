@@ -1,7 +1,5 @@
 package gadget
 
-// TODO: use KV rather than fields for easier to parse order by eyes
-
 import (
 	"bytes"
 	"context"
@@ -21,6 +19,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
+	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -28,33 +27,57 @@ import (
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/options"
-	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/daggen"
+	"github.com/tychoish/sardis/util"
 )
 
 type Options struct {
-	Notify     string
-	RootPath   string
-	Path       string
-	Timeout    time.Duration
-	Recursive  bool
-	GoTestArgs []string
+	Notify      string
+	RootPath    string
+	PackagePath string
+	Timeout     time.Duration
+	Recursive   bool
+	GoTestArgs  []string
+	Workers     int
 }
 
 func (opts *Options) Validate() error {
-	if opts.Path == "" {
-		opts.Path = "..."
+	ec := &erc.Collector{}
+
+	erc.When(ec, opts.Workers < 1, "gadget options cannot specify 0 or fewer workers")
+	erc.When(ec, opts.Timeout < time.Second, "timeout should be at least a second")
+
+	if ec.HasErrors() {
+		return ec.Resolve()
 	}
+
+	if strings.HasPrefix(opts.PackagePath, "./") {
+		switch len(opts.PackagePath) {
+		case 2:
+			opts.PackagePath = ""
+		default:
+			opts.PackagePath = opts.PackagePath[3:]
+		}
+	}
+
+	if opts.PackagePath == "" {
+		opts.PackagePath = "..."
+	}
+
+	if opts.Recursive && !strings.HasSuffix(opts.PackagePath, "...") {
+		opts.PackagePath = filepath.Join(opts.PackagePath, "...")
+	}
+
+	if !filepath.IsAbs(opts.RootPath) {
+		opts.RootPath = risky.Try(filepath.Abs, opts.RootPath)
+	}
+
 	return nil
 }
 
 func strptr(in string) *string { return &in }
 
 func RunTests(ctx context.Context, opts Options) error {
-	if err := opts.Validate(); err != nil {
-		return err
-	}
-
 	iter := WalkDirIterator(ctx, opts.RootPath, func(path string, d fs.DirEntry) (*string, error) {
 		if d.Name() != "go.mod" {
 			return nil, nil
@@ -66,7 +89,7 @@ func RunTests(ctx context.Context, opts Options) error {
 	ec := &erc.Collector{}
 
 	main := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
-	pool := srv.WorkerPool(main, itertool.Options{NumWorkers: 4, ContinueOnError: true})
+	pool := srv.WorkerPool(main, itertool.Options{NumWorkers: opts.Workers, ContinueOnError: true})
 	if err := pool.Start(ctx); err != nil {
 		return err
 	}
@@ -96,18 +119,16 @@ func RunTests(ctx context.Context, opts Options) error {
 		mod := pkgs.IndexByLocalDirectory()[modulePath]
 
 		grip.Build().Level(level.Debug).
-			SetOption(message.OptionSkipAllMetadata).
 			Pair("pkg", mod.ModuleName).
 			Pair("op", "populate").
 			Pair("pkgs", len(pkgs)).
-			Pair("path", util.CollapseHomedir(modulePath)).
+			Pair("path", util.TryCollapseHomedir(modulePath)).
 			Send()
 
 		start := time.Now()
 		allReports := &adt.Map[string, testReport]{}
 		ec.Add(main.Add(func(ctx context.Context) error {
 			reports := &adt.Map[string, testReport]{}
-
 			catch := &erc.Collector{}
 			lintStart := time.Now()
 			err := jpm.CreateCommand(ctx).
@@ -122,7 +143,6 @@ func RunTests(ctx context.Context, opts Options) error {
 			catch.Add(erc.Wrapf(err, "lint errors for %q", modulePath))
 
 			grip.Build().Level(level.Info).
-				SetOption(message.OptionSkipAllMetadata).
 				Pair("pkg", mod.ModuleName).
 				Pair("op", "lint").
 				Pair("ok", err == nil).
@@ -143,7 +163,8 @@ func RunTests(ctx context.Context, opts Options) error {
 				grip.ErrorWhen(!errors.Is(err, io.EOF), message.WrapError(err, m))
 			})
 
-			args := []string{"go", "test", "-p=8", "-race", "-coverprofile=coverage.out", "--timeout", opts.Timeout.String(), fmt.Sprint("./", opts.Path)}
+			args := []string{"go", "test", "-p=8", "-race", "-coverprofile=coverage.out", "--timeout", opts.Timeout.String(), fmt.Sprint("./", opts.PackagePath)}
+			args = append(args, opts.GoTestArgs...)
 			testStart := time.Now()
 			err = jpm.CreateCommand(ctx).
 				ID(fmt.Sprint("test.", shortName)).
@@ -157,7 +178,6 @@ func RunTests(ctx context.Context, opts Options) error {
 			testDur := time.Since(testStart)
 
 			grip.Build().Level(level.Info).
-				SetOption(message.OptionSkipAllMetadata).
 				Pair("pkg", mod.ModuleName).
 				Pair("op", "test").
 				Pair("ok", err == nil).
@@ -232,7 +252,6 @@ func (tr testReport) Message() message.Composer {
 
 	out := message.MakeKV(pairs...)
 	out.SetPriority(priority)
-	out.SetOption(message.OptionSkipAllMetadata)
 
 	return out
 }
@@ -242,7 +261,12 @@ func testOutputFilter(
 	pkgs map[string]daggen.PackageInfo,
 ) send.MessageFormatter {
 	return func(m message.Composer) (_ string, err error) {
-		defer func() { err = erc.Merge(err, erc.Recovery()) }()
+		defer func() {
+			ec := &erc.Collector{}
+			ec.Add(err)
+			erc.Recover(ec)
+			err = ec.Resolve()
+		}()
 
 		mstr := m.String()
 		if strings.HasPrefix(mstr, "ok") {
@@ -357,7 +381,6 @@ func report(
 	}
 
 	msg := message.MakeKV(pairs...)
-	msg.SetOption(message.OptionSkipAllMetadata)
 	switch {
 	case tr.MissingTests:
 		msg.SetPriority(level.Warning)

@@ -17,6 +17,8 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper/util"
+
+	"github.com/stevenle/topsort/v2"
 	"golang.org/x/tools/go/packages"
 	"gopkg.in/yaml.v3"
 )
@@ -47,6 +49,27 @@ func (p Packages) IndexByPackageName() map[string]PackageInfo {
 		out[info.PackageName] = info
 	}
 	return out
+}
+
+func (p Packages) Graph() map[string][]string {
+	mp := fun.Map[string, []string]{}
+
+	for _, pkg := range p {
+		mp.Add(pkg.PackageName, pkg.Dependencies)
+	}
+
+	fun.Invariant(len(p) == len(mp), "graph has impossible structure", len(p), len(mp))
+	return mp
+}
+
+func (p Packages) TopsortGraph() *topsort.Graph[string] {
+	graph := topsort.NewGraph[string]()
+	for node, edges := range p.Graph() {
+		for _, edge := range edges {
+			graph.AddEdge(node, edge)
+		}
+	}
+	return graph
 }
 
 func (p Packages) WriteTo(w io.Writer) (n int64, err error) {

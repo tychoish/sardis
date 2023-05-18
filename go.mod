@@ -2,10 +2,6 @@ module github.com/tychoish/sardis
 
 go 1.20
 
-replace github.com/tychoish/fun => ../fun
-
-replace github.com/tychoish/grip => ../grip
-
 require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
 	github.com/cheynewallace/tabby v1.1.1
@@ -13,20 +9,21 @@ require (
 	github.com/go-git/go-git/v5 v5.2.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nwidger/jsoncolor v0.3.2
+	github.com/stevenle/topsort/v2 v2.0.0-20221220232632-cbb1bebc3b5e
 	github.com/tychoish/birch v0.2.3-0.20230413052020-46068f63d7bb
 	github.com/tychoish/cmdr v0.3.1-0.20230510060338-8bbb1a50c23c
-	github.com/tychoish/fun v0.9.3
+	github.com/tychoish/fun v0.9.4
 	github.com/tychoish/godmenu v0.1.1
-	github.com/tychoish/grip v0.3.2
+	github.com/tychoish/grip v0.3.3
 	github.com/tychoish/grip/x/desktop v0.0.0-20230510191431-a46d828053d6
 	github.com/tychoish/grip/x/jira v0.0.0-20230510192207-dc2e7390e835
 	github.com/tychoish/grip/x/system v0.0.0-20230510192207-dc2e7390e835
 	github.com/tychoish/grip/x/telegram v0.0.0-20230510191431-a46d828053d6
 	github.com/tychoish/grip/x/twitter v0.0.0-20230510191431-a46d828053d6
 	github.com/tychoish/grip/x/xmpp v0.0.0-20230510191431-a46d828053d6
-	github.com/tychoish/jasper v0.1.1
-	github.com/tychoish/jasper/x/cli v0.0.0-20230513171300-5370c8bff7a0
-	github.com/tychoish/jasper/x/remote v0.0.0-20230513171300-5370c8bff7a0
+	github.com/tychoish/jasper v0.1.2-0.20230518041838-0cb5fdbc53e6
+	github.com/tychoish/jasper/x/cli v0.0.0-20230518041838-0cb5fdbc53e6
+	github.com/tychoish/jasper/x/remote v0.0.0-20230518041838-0cb5fdbc53e6
 	github.com/urfave/cli/v2 v2.25.3
 	go.mongodb.org/mongo-driver v1.11.6
 	golang.org/x/tools v0.6.0
@@ -90,7 +87,7 @@ require (
 	github.com/tychoish/birch/x/ftdc v0.0.0-20230413052020-46068f63d7bb // indirect
 	github.com/tychoish/birch/x/mrpc v0.0.0-20230413052020-46068f63d7bb // indirect
 	github.com/tychoish/gimlet v0.0.0-20230130001449-8987c96bb886 // indirect
-	github.com/tychoish/grip/x/metrics v0.0.0-20230510192207-dc2e7390e835 // indirect
+	github.com/tychoish/grip/x/metrics v0.0.0-20230518040011-315ea039b765 // indirect
 	github.com/tychoish/grip/x/splunk v0.0.0-20230510192207-dc2e7390e835 // indirect
 	github.com/tychoish/jasper/x/splunk v0.0.0-20230510193424-429e4caa8e98 // indirect
 	github.com/tychoish/jasper/x/track v0.0.0-20230509174929-2fe8b231212c // indirect

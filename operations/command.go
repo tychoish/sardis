@@ -45,9 +45,12 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops [
 		if !ok {
 			return fmt.Errorf("command name %q is not defined", name)
 		}
-		err := jasper.Context(ctx).CreateCommand(ctx).Directory(cmd.Directory).ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
+		err := jasper.Context(ctx).CreateCommand(ctx).
+			Directory(cmd.Directory).
+			ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
 			SetOutputSender(level.Info, grip.Sender()).
 			SetErrorSender(level.Error, grip.Sender()).
+			Background(cmd.Background).
 			Append(cmd.Command).
 			Prerequisite(func() bool {
 				grip.Info(message.Fields{

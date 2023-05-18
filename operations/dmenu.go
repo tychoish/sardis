@@ -144,8 +144,10 @@ func DMenu() *cmdr.Commander {
 						cmd = fmt.Sprintf("%s %s", menu.Command, mapping[output])
 					}
 
-					err = jasper.Context(ctx).CreateCommand(ctx).Append(cmd).
-						SetCombinedSender(level.Notice, grip.Sender()).Run(ctx)
+					err = jasper.Context(ctx).CreateCommand(ctx).
+						Append(cmd).
+						SetCombinedSender(level.Notice, grip.Sender()).
+						Run(ctx)
 					if err != nil {
 						notify.Errorf("%s running %s failed: %s", name, output, err.Error())
 						return err
@@ -165,7 +167,10 @@ func DMenu() *cmdr.Commander {
 			}
 
 			// don't notify here let the inner one do that
-			return jasper.Context(ctx).CreateCommand(ctx).Append(fmt.Sprintf("%s %s", "sardis dmenu", output)).
-				SetCombinedSender(level.Notice, grip.Sender()).Run(ctx)
+			return jasper.Context(ctx).
+				CreateCommand(ctx).
+				Append(fmt.Sprintf("%s %s", "sardis dmenu", output)).
+				SetCombinedSender(level.Notice, grip.Sender()).
+				Run(ctx)
 		}).Add)
 }

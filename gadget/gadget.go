@@ -79,7 +79,12 @@ func strptr(in string) *string { return &in }
 
 func RunTests(ctx context.Context, opts Options) error {
 	iter := WalkDirIterator(ctx, opts.RootPath, func(path string, d fs.DirEntry) (*string, error) {
-		if d.Name() != "go.mod" {
+		name := d.Name()
+		if d.Type().IsDir() && name == ".git" {
+			return nil, fs.SkipDir
+		}
+
+		if name != "go.mod" {
 			return nil, nil
 		}
 

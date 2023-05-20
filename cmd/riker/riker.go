@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/jasper/util"
-	"github.com/tychoish/sardis/daggen"
 	"github.com/tychoish/sardis/gadget"
 	"github.com/tychoish/sardis/operations"
 	"github.com/urfave/cli/v2"
@@ -36,7 +35,8 @@ func TopLevel() *cmdr.Commander {
 			Version: "v0.0.1-pre",
 		}).
 		Subcommanders(
-			cmdr.MakeCommander().SetName("daggen").
+			cmdr.MakeCommander().
+				SetName("daggen").
 				Flags(cmdr.FlagBuilder("./").
 					SetName("path").
 					SetValidate(func(path string) error {
@@ -51,7 +51,7 @@ func TopLevel() *cmdr.Commander {
 						return nil
 					}).Flag()).
 				SetAction(func(ctx context.Context, cc *cli.Context) error {
-					boops, err := daggen.Collect(ctx, cc.String("path"))
+					boops, err := gadget.Collect(ctx, cc.String("path"))
 					if err != nil {
 						return err
 					}
@@ -124,5 +124,29 @@ func TopLevel() *cmdr.Commander {
 					return opts, nil
 				}).SetAction(func(ctx context.Context, opts *gadget.Options) error {
 					return gadget.RunTests(ctx, *opts)
-				}).Add))
+				}).Add),
+			cmdr.MakeCommander().
+				SetName("gogentree").
+				SetUsage("for a go module, resolve the internal dependency graph and run go generate with dependency awareness").
+				Flags(cmdr.FlagBuilder(fun.Must(os.Getwd())).
+					SetName("path", "p").
+					SetUsage("path").
+					SetValidate(func(path string) error {
+						if strings.HasPrefix(path, "./") {
+							return fmt.Errorf("%q should not have a leading './'", path)
+						}
+						return nil
+					}).
+					Flag()).
+				With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (string, error) {
+					return cc.String("path"), nil
+				}).SetAction(func(ctx context.Context, path string) error {
+					grip.Infoln("going to run go generate here", path)
+					bo, err := gadget.GetBuildOrder(ctx, path)
+					if err != nil {
+						return err
+					}
+					return gadget.RunCommand(ctx, bo, 4, []string{"go", "generate", "./"})
+				}).Add),
+		)
 }

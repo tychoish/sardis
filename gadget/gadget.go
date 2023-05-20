@@ -27,7 +27,6 @@ import (
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/options"
-	"github.com/tychoish/sardis/daggen"
 	"github.com/tychoish/sardis/util"
 )
 
@@ -110,7 +109,7 @@ func RunTests(ctx context.Context, opts Options) error {
 		count++
 
 		shortName := filepath.Base(modulePath)
-		pkgs, err := daggen.Collect(ctx, modulePath)
+		pkgs, err := Collect(ctx, modulePath)
 		if err != nil {
 			ec.Add(err)
 			continue
@@ -230,7 +229,7 @@ type testReport struct {
 	Duration     time.Duration
 	Cached       bool
 	MissingTests bool
-	Info         daggen.PackageInfo
+	Info         PackageInfo
 }
 
 func (tr testReport) Message() message.Composer {
@@ -259,7 +258,7 @@ func (tr testReport) Message() message.Composer {
 
 func testOutputFilter(
 	mp *adt.Map[string, testReport],
-	pkgs map[string]daggen.PackageInfo,
+	pkgs map[string]PackageInfo,
 ) send.MessageFormatter {
 	return func(m message.Composer) (_ string, err error) {
 		defer func() {
@@ -304,7 +303,7 @@ func testOutputFilter(
 
 func report(
 	ctx context.Context,
-	mod daggen.PackageInfo,
+	mod PackageInfo,
 	tr testReport,
 	coverage string,
 	runtime time.Duration,

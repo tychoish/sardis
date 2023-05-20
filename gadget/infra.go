@@ -4,18 +4,32 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
 )
+
+func WithTiming(name string, op func()) {
+	start := time.Now()
+	defer func() {
+		grip.Info(message.BuildPair().
+			Pair("op", name).
+			Pair("dur", time.Since(start)))
+	}()
+
+	op()
+}
 
 // WalkDirIterator provides an alternate fun.Iterator-based interface
 // to filepath.WalkDir. The filepath.WalkDir runs in a go routnine,
@@ -43,7 +57,9 @@ func WalkDirIterator[T any](ctx context.Context, path string, fn func(p string, 
 
 					out, err := fn(p, d)
 					if err != nil {
-						ec.Add(err)
+						if !errors.Is(err, fs.SkipDir) && !errors.Is(err, fs.SkipAll) {
+							ec.Add(err)
+						}
 						return err
 					}
 					if out == nil {

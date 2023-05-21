@@ -11,7 +11,9 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/set"
 	"github.com/tychoish/grip"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/gadget"
 	"github.com/tychoish/sardis/operations"
@@ -146,7 +148,17 @@ func TopLevel() *cmdr.Commander {
 					if err != nil {
 						return err
 					}
-					return gadget.RunCommand(ctx, bo, 4, []string{"go", "generate", "./"})
+					iter := gadget.Ripgrep(ctx, jasper.Context(ctx), gadget.RipgrepArgs{
+						Types:       []string{"go"},
+						Regexp:      "go:generate",
+						Path:        "~/neon/cloud",
+						Directories: true,
+						Unique:      true,
+					})
+					limits := set.MakeNewOrdered[string]()
+					set.PopulateSet(ctx, limits, bo.Packages.ConvertPathsToPackages(iter))
+
+					return gadget.RunCommand(ctx, bo.Narrow(limits), 4, []string{"go", "generate"})
 				}).Add),
 		)
 }

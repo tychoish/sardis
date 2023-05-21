@@ -17,6 +17,25 @@ import (
 type BuildOrder struct {
 	Order    [][]string
 	Packages Packages
+	Path     string
+}
+
+func (bo *BuildOrder) Narrow(limits set.Set[string]) *BuildOrder {
+	out := &BuildOrder{Packages: bo.Packages, Path: bo.Path}
+
+	for _, group := range bo.Order {
+		ng := []string{}
+		for idx := range group {
+			if limits.Check(group[idx]) {
+				ng = append(ng, group[idx])
+			}
+		}
+		if len(ng) > 0 {
+			out.Order = append(out.Order, ng)
+		}
+	}
+
+	return out
 }
 
 func GetBuildOrder(ctx context.Context, path string) (*BuildOrder, error) {
@@ -77,6 +96,7 @@ OUTER:
 			set.PopulateSet(ctx, seen, itertool.Slice(next))
 			buildOrder = append(buildOrder, next)
 			next = nil
+			runsSinceProgress = 0
 		}
 
 		if runsSinceProgress >= queue.Len()*10 {
@@ -114,7 +134,6 @@ OUTER:
 
 		next = append(next, node)
 		runsSinceProgress = 0
-
 	}
 
 	if len(next) > 0 {
@@ -123,6 +142,6 @@ OUTER:
 	return &BuildOrder{
 		Order:    buildOrder,
 		Packages: pkgs,
+		Path:     path,
 	}, nil
-
 }

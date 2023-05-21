@@ -112,6 +112,8 @@ func Ripgrep(ctx context.Context, jpm jasper.Manager, args RipgrepArgs) fun.Iter
 
 	iter := LineIterator(strings.TrimSpace(sender.buffer.String()))
 
+	iter = fun.Transform(iter, func(in string) (string, error) { return filepath.Join(args.Path, in), nil })
+
 	if args.Directories {
 		iter = fun.Transform(iter, func(in string) (string, error) { return filepath.Dir(in), nil })
 	}

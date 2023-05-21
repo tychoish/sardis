@@ -16,6 +16,8 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
+	"github.com/tychoish/jasper"
+	"github.com/tychoish/jasper/x/track"
 )
 
 func TestGraph(t *testing.T) {
@@ -136,41 +138,68 @@ func TestGraph(t *testing.T) {
 		}
 	})
 	t.Run("OrderingReport", func(t *testing.T) {
-		testt.Context(t)
-		ctx := testt.Context(t)
+		report := func(t *testing.T, graph *BuildOrder) {
+			builder := grip.Build().Level(level.Notice)
 
-		graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
-		assert.NotError(t, err)
-		builder := grip.Build().Level(level.Notice)
+			msg := builder.PairBuilder().
+				Pair("pkgs", len(graph.Packages)).
+				Pair("groups", len(graph.Order))
 
-		msg := builder.PairBuilder().
-			Pair("pkgs", len(graph.Packages)).
-			Pair("groups", len(graph.Order))
+			observed := 0
 
-		var longest int
-		for idx, group := range graph.Order {
-			grip.Info(message.MakeKV(
-				message.KV("idx", idx),
-				message.KV("size", len(group)),
-				message.KV("group", group),
-			))
+			var longest int
+			for idx, group := range graph.Order {
+				observed += len(group)
+				grip.Info(message.MakeKV(
+					message.KV("idx", idx),
+					message.KV("size", len(group)),
+					message.KV("group", group),
+				))
 
-			if len(group) > longest {
-				longest = len(group)
+				if len(group) > longest {
+					longest = len(group)
+				}
 			}
-		}
-		msg.Pair("longest", longest)
-
-		var numSingle int
-		for _, group := range graph.Order {
-			if len(group) > 1 {
-				numSingle++
+			msg.Pair("longest", longest)
+			msg.Pair("observed", observed)
+			var numSingle int
+			for _, group := range graph.Order {
+				if len(group) > 1 {
+					numSingle++
+				}
+				testt.Log(t, group)
+				check.NotZero(t, len(group))
 			}
-			testt.Log(t, group)
-			check.NotZero(t, len(group))
+
+			builder.Send()
 		}
 
-		builder.Send()
+		t.Run("Full", func(t *testing.T) {
+			ctx := testt.Context(t)
+			graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
+			assert.NotError(t, err)
+
+			report(t, graph)
+		})
+		t.Run("Narrowed", func(t *testing.T) {
+			ctx := testt.Context(t)
+			jpm := jasper.NewManager(jasper.ManagerOptions{ID: t.Name(), Synchronized: true, MaxProcs: 64, Tracker: fun.Must(track.New(t.Name()))})
+
+			graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
+			assert.NotError(t, err)
+
+			iter := Ripgrep(ctx, jpm, RipgrepArgs{
+				Types:       []string{"go"},
+				Regexp:      "go:generate",
+				Path:        "~/neon/cloud",
+				Directories: true,
+				Unique:      true,
+			})
+
+			limits := set.MakeNewOrdered[string]()
+			set.PopulateSet(ctx, limits, graph.Packages.ConvertPathsToPackages(iter))
+			report(t, graph.Narrow(limits))
+		})
 	})
 }
 

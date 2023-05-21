@@ -66,6 +66,20 @@ func (p Packages) IndexByPackageName() fun.Map[string, PackageInfo] {
 	return out
 }
 
+func (p Packages) ConvertPathsToPackages(iter fun.Iterator[string]) fun.Iterator[string] {
+	index := p.IndexByLocalDirectory()
+	return fun.Transform(iter, func(path string) (string, error) {
+		return index[path].PackageName, nil
+	})
+}
+
+func (p Packages) ConvertPackagesToPaths(iter fun.Iterator[string]) fun.Iterator[string] {
+	index := p.IndexByPackageName()
+	return fun.Transform(iter, func(path string) (string, error) {
+		return index[path].LocalDirectory, nil
+	})
+}
+
 func (p Packages) Graph() fun.Pairs[string, []string] {
 	mp := fun.Pairs[string, []string]{}
 
@@ -91,7 +105,6 @@ func (p Packages) TopsortGraph() *topsort.Graph[string] {
 	for _, item := range p.Graph() {
 		node := item.Key
 		edges := item.Value
-
 		for _, edge := range edges {
 			graph.AddEdge(node, edge)
 		}

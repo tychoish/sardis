@@ -17,7 +17,6 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
-	"github.com/tychoish/fun/set"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -42,16 +41,6 @@ func WithTiming(name string, op func()) {
 	}()
 
 	op()
-}
-
-func prunePairs[K comparable, V any](iter fun.Iterator[fun.Pair[K, V]], limits ...K) fun.Iterator[fun.Pair[K, V]] {
-	limit := set.NewUnordered[K]()
-	fun.WorkerFunc(func(ctx context.Context) error {
-		set.PopulateSet(ctx, limit, itertool.Slice(limits))
-		return nil
-	}).MustWait().Block()
-
-	return fun.Filter(iter, func(pair fun.Pair[K, V]) bool { return limit.Check(pair.Key) })
 }
 
 type RipgrepArgs struct {

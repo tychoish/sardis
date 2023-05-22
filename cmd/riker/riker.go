@@ -143,22 +143,31 @@ func TopLevel() *cmdr.Commander {
 				With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (string, error) {
 					return cc.String("path"), nil
 				}).SetAction(func(ctx context.Context, path string) error {
-					grip.Infoln("going to run go generate here", path)
+					// TODO:
+					//   - make search paths configurable
+					//   - factor away the ripgrep iter dance
 					bo, err := gadget.GetBuildOrder(ctx, path)
 					if err != nil {
 						return err
 					}
+
 					iter := gadget.Ripgrep(ctx, jasper.Context(ctx), gadget.RipgrepArgs{
 						Types:       []string{"go"},
 						Regexp:      "go:generate",
-						Path:        "~/neon/cloud",
+						Path:        path,
 						Directories: true,
-						Unique:      true,
 					})
+
 					limits := set.MakeNewOrdered[string]()
 					set.PopulateSet(ctx, limits, bo.Packages.ConvertPathsToPackages(iter))
 
-					return gadget.RunCommand(ctx, bo.Narrow(limits), 4, []string{"go", "generate"})
+					return gadget.GoGenerate(ctx,
+						jasper.Context(ctx),
+						gadget.GoGenerateArgs{
+							Spec:            bo.Narrow(limits),
+							SearchPath:      []string{filepath.Join(path, "bin")},
+							ContinueOnError: true,
+						})
 				}).Add),
 		)
 }

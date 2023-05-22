@@ -7,9 +7,8 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
-	"github.com/tychoish/fun/pubsub"
-	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -18,55 +17,78 @@ import (
 	"github.com/tychoish/jasper/options"
 )
 
-func RunCommand(ctx context.Context, buildSpec *BuildOrder, workers int, args []string) error {
-	main := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
-	pool := srv.WorkerPool(main, itertool.Options{NumWorkers: workers, ContinueOnError: true})
+type GoGenerateArgs struct {
+	Spec            *BuildOrder
+	SearchPath      []string
+	ContinueOnError bool
+}
 
-	if err := pool.Start(ctx); err != nil {
-		return err
-	}
+func GoGenerate(
+	ctx context.Context,
+	jpm jasper.Manager,
+	args GoGenerateArgs,
+) error {
+	ec := &erc.Collector{}
+	index := args.Spec.Packages.IndexByPackageName()
 
 	out := send.MakeWriter(send.MakePlain())
 	out.SetPriority(grip.Sender().Priority())
 
-	jpm := jasper.Context(ctx)
-	index := buildSpec.Packages.IndexByPackageName()
-
 	opStart := time.Now()
-	for groupIdx, group := range buildSpec.Order {
-		gwg := &fun.WaitGroup{}
-		gStart := time.Now()
-		for _, pkg := range group {
-			info := index[pkg]
-			gwg.Add(1)
-			main.Add(jpm.CreateCommand(ctx).
-				ID(fmt.Sprint("generate.", pkg)).
-				Directory(info.LocalDirectory).
-				PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
-				SetOutputSender(level.Debug, out).
-				SetErrorSender(level.Error, out).
-				PostHook(func(err error) error {
-					gwg.Done()
-					return err
-				}).
-				AppendArgs(args...).
-				Run)
-		}
-		gwg.Wait(ctx)
-		grip.Info(message.BuildPair().
+	var numPackages int
+	for idx, group := range args.Spec.Order {
+		group = fun.Must(itertool.CollectSlice(ctx, fun.Transform(
+			itertool.Slice(group),
+			func(in string) (string, error) {
+				return strings.Replace(index[in].LocalDirectory, args.Spec.Path, "", 1), nil
+			},
+		)))
+
+		numPackages += len(group)
+
+		cmd := append([]string{"go", "generate"}, group...)
+
+		grip.Debug(message.BuildPair().
+			Pair("group", idx).
+			Pair("packages", len(group)).
+			Pair("cmd", strings.Join(cmd, " ")))
+
+		err := jpm.CreateCommand(ctx).
+			ID(fmt.Sprint("generate.", idx)).
+			Directory(args.Spec.Path).
+			AddEnv("PATH", strings.Join(append(args.SearchPath, "$PATH"), ":")).
+			PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
+			SetOutputSender(level.Debug, out).
+			SetErrorSender(level.Error, out).
+			Add(cmd).
+			Run(ctx)
+
+		ec.Add(err)
+
+		builder := grip.Build().Level(level.Info)
+		msg := builder.PairBuilder().
 			Pair("op", "run group command").
-			Pair("dur", time.Since(gStart)).
-			Pair("group", groupIdx+1).
-			Pair("size", len(group)))
+			Pair("group", idx+1).
+			Pair("items", len(group))
+
+		if err != nil {
+			builder.Level(level.Error)
+			msg.Pair("err", err)
+		}
+
+		builder.Send()
+
+		if !args.ContinueOnError && err != nil {
+			break
+		}
 	}
 
 	grip.Notice(message.BuildPair().
-		Pair("op", "run command").
+		Pair("op", "go generate").
 		Pair("dur", time.Since(opStart)).
-		Pair("cmd", strings.Join(args, " ")).
-		Pair("size", len(buildSpec.Order)))
+		Pair("errors", ec.HasErrors()).
+		Pair("groups", len(args.Spec.Order)).
+		Pair("packages", numPackages))
 
-	pool.Close()
-
-	return pool.Wait()
+	return ec.Resolve()
 }

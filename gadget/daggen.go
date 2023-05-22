@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/stevenle/topsort/v2"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/itertool"
@@ -87,10 +86,6 @@ func (p Packages) Graph() fun.Pairs[string, []string] {
 		mp.Add(p[idx].PackageName, p[idx].Dependencies)
 	}
 
-	fun.Invariant(len(p) == len(mp), "graph has impossible structure", len(p), len(mp))
-
-	sort.Slice(mp, func(i, j int) bool { return len(mp[i].Key) > len(mp[j].Key) })
-
 	sort.SliceStable(mp, func(i, j int) bool {
 		return len(filepath.SplitList(mp[i].Key)) > len((filepath.SplitList(mp[j].Key)))
 	})
@@ -100,28 +95,14 @@ func (p Packages) Graph() fun.Pairs[string, []string] {
 	return mp
 }
 
-func (p Packages) TopsortGraph() *topsort.Graph[string] {
-	graph := topsort.NewGraph[string]()
-	for _, item := range p.Graph() {
-		node := item.Key
-		edges := item.Value
-		for _, edge := range edges {
-			graph.AddEdge(node, edge)
-		}
-	}
-	return graph
-}
-
-func (p Packages) WriteTo(w io.Writer) (n int64, err error) {
-	var size int64
-
+func (p Packages) WriteTo(w io.Writer) (size int64, err error) {
 	buf := bufpool.Get()
 	defer bufpool.Put(buf)
 
 	enc := yaml.NewEncoder(buf)
 	enc.SetIndent(5)
 	for idx, v := range p {
-		if err := enc.Encode(v); err != nil {
+		if err = enc.Encode(v); err != nil {
 			return size, fmt.Errorf("could not encode %q at %d of %d: %w",
 				v.PackageName, idx, len(p), err)
 		}
@@ -159,8 +140,7 @@ func Collect(ctx context.Context, path string) (Packages, error) {
 		Context: ctx,
 		Logf: grip.NewLogger(send.MakeAnnotating(grip.Sender(),
 			message.Fields{"pkg": path, "op": "dag-collect"})).Debugf,
-		Dir: filepath.Dir(path),
-		// Tests: true,
+		Dir:  filepath.Dir(path),
 		Mode: packages.NeedModule | packages.NeedName | packages.NeedImports | packages.NeedDeps | packages.NeedTypes,
 	}
 
@@ -191,6 +171,7 @@ func Collect(ctx context.Context, path string) (Packages, error) {
 			pkgs := set.NewUnordered[string]()
 
 			depPkgIter := filterLocal(f.Module.Path, pkg.Imports())
+
 			for depPkgIter.Next(ctx) {
 				dpkg := depPkgIter.Value()
 				set.PopulateSet(ctx, pkgs,

@@ -328,7 +328,7 @@ func report(
 	)
 	count := 0
 
-	iter := LineIterator(coverage)
+	iter := LineIterator(strings.NewReader(coverage))
 	table := tabby.New()
 
 	replacer := strings.NewReplacer(mod.ModuleName, pfx)

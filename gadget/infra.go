@@ -11,10 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/grip"
@@ -24,24 +22,6 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 )
-
-type IteratorWorker[T any] struct {
-	fun.Iterator[T]
-	adt.Atomic[fun.WorkerFunc]
-}
-
-func (iw IteratorWorker[T]) Close() error { return erc.Merge(iw.Iterator.Close(), iw.Get().Block()) }
-
-func WithTiming(name string, op func()) {
-	start := time.Now()
-	defer func() {
-		grip.Info(message.BuildPair().
-			Pair("op", name).
-			Pair("dur", time.Since(start)))
-	}()
-
-	op()
-}
 
 type RipgrepArgs struct {
 	Types         []string
@@ -99,7 +79,7 @@ func Ripgrep(ctx context.Context, jpm jasper.Manager, args RipgrepArgs) fun.Iter
 		SetErrorSender(level.Error, grip.Sender()).
 		Run(ctx))
 
-	iter := LineIterator(strings.TrimSpace(sender.buffer.String()))
+	iter := LineIterator(sender.buffer)
 
 	iter = fun.Transform(iter, func(in string) (string, error) { return filepath.Join(args.Path, in), nil })
 
@@ -125,17 +105,15 @@ func Ripgrep(ctx context.Context, jpm jasper.Manager, args RipgrepArgs) fun.Iter
 func WalkDirIterator[T any](ctx context.Context, path string, fn func(p string, d fs.DirEntry) (*T, error)) fun.Iterator[T] {
 	once := &sync.Once{}
 	ec := &erc.Collector{}
-	localCtx, cancel := context.WithCancel(ctx)
 	var pipe chan T
 
 	return fun.Generator(func(ctx context.Context) (T, error) {
 		once.Do(func() {
 			pipe = make(chan T)
 			go func() {
-				defer cancel()
 				_ = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 					if err != nil {
-						return err
+						return fs.SkipAll
 					}
 
 					out, err := fn(p, d)
@@ -149,34 +127,20 @@ func WalkDirIterator[T any](ctx context.Context, path string, fn func(p string, 
 						return nil
 					}
 
-					select {
-					case pipe <- *out:
-						return nil
-					case <-ctx.Done():
-						return ctx.Err()
-					}
+					return fun.Blocking(pipe).Send().Write(ctx, *out)
 				})
-
 			}()
 		})
 		if ec.HasErrors() {
 			return fun.ZeroOf[T](), ec.Resolve()
 		}
-		select {
-		case <-localCtx.Done():
-			return fun.ZeroOf[T](), localCtx.Err()
-		case out, ok := <-pipe:
-			if !ok {
-				return fun.ZeroOf[T](), io.EOF
-			}
-			return out, nil
-		}
+
+		return fun.Blocking(pipe).Recieve().Read(ctx)
 	})
 }
 
-func LineIterator(str string) fun.Iterator[string] {
-	scanner := bufio.NewScanner(strings.NewReader(str))
-
+func LineIterator(in io.Reader) fun.Iterator[string] {
+	scanner := bufio.NewScanner(in)
 	return fun.Generator(func(ctx context.Context) (string, error) {
 		if !scanner.Scan() {
 			return "", erc.Merge(io.EOF, scanner.Err())
@@ -185,6 +149,7 @@ func LineIterator(str string) fun.Iterator[string] {
 	})
 }
 
+// TODO: move to grip when we have a risky.Ignore
 type bufsend struct {
 	send.Base
 	buffer *bytes.Buffer
@@ -192,10 +157,10 @@ type bufsend struct {
 
 func (b *bufsend) Send(m message.Composer) {
 	if send.ShouldLog(b, m) {
+		// TODO: this can never error so avoid the extra code
+		// TODO: just write \n rather than sprintln
 		if _, err := b.buffer.Write([]byte(fmt.Sprintln(m.String()))); err != nil {
 			b.ErrorHandler()(err, m)
 		}
-
 	}
-
 }

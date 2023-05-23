@@ -40,7 +40,7 @@ func GoGenerate(
 		group = fun.Must(itertool.CollectSlice(ctx, fun.Transform(
 			itertool.Slice(group),
 			func(in string) (string, error) {
-				return strings.Replace(index[in].LocalDirectory, args.Spec.Path, "", 1), nil
+				return strings.Replace(index[in].LocalDirectory, args.Spec.Path, ".", 1), nil
 			},
 		)))
 

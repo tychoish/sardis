@@ -130,44 +130,54 @@ func TopLevel() *cmdr.Commander {
 			cmdr.MakeCommander().
 				SetName("gogentree").
 				SetUsage("for a go module, resolve the internal dependency graph and run go generate with dependency awareness").
-				Flags(cmdr.FlagBuilder(fun.Must(os.Getwd())).
-					SetName("path", "p").
-					SetUsage("path").
-					SetValidate(func(path string) error {
-						if strings.HasPrefix(path, "./") {
-							return fmt.Errorf("%q should not have a leading './'", path)
-						}
-						return nil
-					}).
-					Flag()).
-				With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (string, error) {
-					return cc.String("path"), nil
-				}).SetAction(func(ctx context.Context, path string) error {
+				Flags(
+					cmdr.FlagBuilder(fun.Must(os.Getwd())).
+						SetName("path", "p").
+						SetUsage("path of go module to run go generate in").
+						SetValidate(func(path string) error {
+							if strings.HasPrefix(path, "./") {
+								return fmt.Errorf("%q should not have a leading './'", path)
+							}
+							return nil
+						}).
+						Flag(),
+					cmdr.FlagBuilder(false).
+						SetName("all", "a").
+						SetUsage("run go generate in all packages not just ones with 'go:generate' comments").
+						Flag(),
+				).
+				SetAction(func(ctx context.Context, cc *cli.Context) error {
+					path := cc.String("path")
+					filterInputTree := !cc.Bool("all")
 					// TODO:
 					//   - make search paths configurable
 					//   - factor away the ripgrep iter dance
-					bo, err := gadget.GetBuildOrder(ctx, path)
+					bo, err := gadget.GetBuildOrder(ctx, cc.String("path"))
 					if err != nil {
 						return err
 					}
 
-					iter := gadget.Ripgrep(ctx, jasper.Context(ctx), gadget.RipgrepArgs{
-						Types:       []string{"go"},
-						Regexp:      "go:generate",
-						Path:        path,
-						Directories: true,
-					})
+					spec := bo
+					if filterInputTree {
+						iter := gadget.Ripgrep(ctx, jasper.Context(ctx), gadget.RipgrepArgs{
+							Types:       []string{"go"},
+							Regexp:      "go:generate",
+							Path:        path,
+							Directories: true,
+						})
 
-					limits := set.MakeNewOrdered[string]()
-					set.PopulateSet(ctx, limits, bo.Packages.ConvertPathsToPackages(iter))
+						limits := set.MakeNewOrdered[string]()
+						set.PopulateSet(ctx, limits, bo.Packages.ConvertPathsToPackages(iter))
+						spec = bo.Narrow(limits)
+					}
 
 					return gadget.GoGenerate(ctx,
 						jasper.Context(ctx),
 						gadget.GoGenerateArgs{
-							Spec:            bo.Narrow(limits),
+							Spec:            spec,
 							SearchPath:      []string{filepath.Join(path, "bin")},
 							ContinueOnError: true,
 						})
-				}).Add),
+				}),
 		)
 }

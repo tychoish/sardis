@@ -108,6 +108,10 @@ func TopLevel() *cmdr.Commander {
 						SetName("timeout").
 						SetUsage("timeout to set to each individual go test invocation").
 						Flag(),
+					cmdr.FlagBuilder(false).
+						SetName("compile-only", "build-all").
+						SetUsage("runs no-op test build for all packages").
+						Flag(),
 				).
 				With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (*gadget.Options, error) {
 					opts := &gadget.Options{
@@ -115,6 +119,7 @@ func TopLevel() *cmdr.Commander {
 						Recursive:   cc.Bool("recursive"),
 						PackagePath: cc.String("path"),
 						RootPath:    cc.String("module-path"),
+						CompileOnly: cc.Bool("compile-only"),
 						GoTestArgs:  cc.Args().Slice(),
 						Workers:     runtime.NumCPU(),
 					}

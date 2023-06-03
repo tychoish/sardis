@@ -36,6 +36,7 @@ type Options struct {
 	PackagePath string
 	Timeout     time.Duration
 	Recursive   bool
+	CompileOnly bool
 	GoTestArgs  []string
 	Workers     int
 }
@@ -78,6 +79,7 @@ func (opts *Options) Validate() error {
 func strptr(in string) *string { return &in }
 
 func RunTests(ctx context.Context, opts Options) error {
+	var seenOne bool
 	iter := WalkDirIterator(ctx, opts.RootPath, func(path string, d fs.DirEntry) (*string, error) {
 		name := d.Name()
 		if d.Type().IsDir() && name == ".git" {
@@ -87,8 +89,13 @@ func RunTests(ctx context.Context, opts Options) error {
 		if name != "go.mod" {
 			return nil, nil
 		}
+		if !seenOne || seenOne && opts.Recursive {
+			seenOne = true
+			return strptr(filepath.Dir(path)), nil
+		}
 
-		return strptr(filepath.Dir(path)), nil
+		// for non-recursive cases, abort early.
+		return nil, fs.SkipAll
 	})
 	jpm := jasper.Context(ctx)
 	ec := &erc.Collector{}
@@ -135,24 +142,27 @@ func RunTests(ctx context.Context, opts Options) error {
 		ec.Add(main.Add(func(ctx context.Context) error {
 			reports := &adt.Map[string, testReport]{}
 			catch := &erc.Collector{}
-			lintStart := time.Now()
-			err := jpm.CreateCommand(ctx).
-				ID(fmt.Sprint("lint.", shortName)).
-				Directory(modulePath).
-				SetOutputSender(level.Debug, out).
-				SetErrorSender(level.Error, out).
-				PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
-				Append(fmt.Sprint("golangci-lint run --allow-parallel-runners ", modulePath)).
-				Run(ctx)
-			lintDur := time.Since(lintStart)
-			catch.Add(erc.Wrapf(err, "lint errors for %q", modulePath))
+			var err error
+			if !opts.CompileOnly {
+				lintStart := time.Now()
+				err := jpm.CreateCommand(ctx).
+					ID(fmt.Sprint("lint.", shortName)).
+					Directory(modulePath).
+					SetOutputSender(level.Debug, out).
+					SetErrorSender(level.Error, out).
+					PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
+					Append(fmt.Sprint("golangci-lint run --allow-parallel-runners ", modulePath)).
+					Run(ctx)
+				lintDur := time.Since(lintStart)
+				catch.Add(erc.Wrapf(err, "lint errors for %q", modulePath))
 
-			grip.Build().Level(level.Info).
-				Pair("pkg", mod.ModuleName).
-				Pair("op", "lint").
-				Pair("ok", err == nil).
-				Pair("dur", lintDur).
-				Send()
+				grip.Build().Level(level.Info).
+					Pair("pkg", mod.ModuleName).
+					Pair("op", "lint").
+					Pair("ok", err == nil).
+					Pair("dur", lintDur).
+					Send()
+			}
 
 			sender := &bufsend{
 				buffer: &bytes.Buffer{},
@@ -163,14 +173,21 @@ func RunTests(ctx context.Context, opts Options) error {
 
 			testOut := send.MakeWriter(send.MakePlain())
 			testOut.SetPriority(grip.Sender().Priority())
-			testOut.SetFormatter(testOutputFilter(reports, pkgidx))
+			testOut.SetFormatter(testOutputFilter(opts, reports, pkgidx))
 			testOut.SetErrorHandler(func(err error, m message.Composer) {
 				grip.ErrorWhen(!errors.Is(err, io.EOF), message.WrapError(err, m))
 			})
+			args := []string{"go", "test"}
+			switch {
+			case opts.CompileOnly:
+				args = append(args, "-run=noop", fmt.Sprint("./", opts.PackagePath))
+			default:
+				args = append(args, "-p=8", "-race", "-coverprofile=coverage.out", "--timeout", opts.Timeout.String(), fmt.Sprint("./", opts.PackagePath))
+			}
 
-			args := []string{"go", "test", "-p=8", "-race", "-coverprofile=coverage.out", "--timeout", opts.Timeout.String(), fmt.Sprint("./", opts.PackagePath)}
 			args = append(args, opts.GoTestArgs...)
 			testStart := time.Now()
+
 			err = jpm.CreateCommand(ctx).
 				ID(fmt.Sprint("test.", shortName)).
 				Directory(modulePath).
@@ -191,7 +208,7 @@ func RunTests(ctx context.Context, opts Options) error {
 
 			catch.Add(err)
 
-			if err == nil {
+			if err == nil && !opts.CompileOnly {
 				grip.Warning(erc.Wrapf(jpm.CreateCommand(ctx).
 					ID(fmt.Sprint("coverage.html.", shortName)).
 					Directory(modulePath).
@@ -235,6 +252,7 @@ type testReport struct {
 	Cached       bool
 	MissingTests bool
 	Info         PackageInfo
+	CompileOnly  bool
 }
 
 func (tr testReport) Message() message.Composer {
@@ -248,8 +266,10 @@ func (tr testReport) Message() message.Composer {
 		pairs.Add("state", "untested")
 	} else {
 		priority = level.Notice
-		pairs.Add("coverage", tr.Coverage)
-		pairs.Add("dur", tr.Duration)
+		if !tr.CompileOnly {
+			pairs.Add("coverage", tr.Coverage)
+			pairs.Add("dur", tr.Duration)
+		}
 		if tr.Cached {
 			pairs.Add("cached", true)
 		}
@@ -262,6 +282,7 @@ func (tr testReport) Message() message.Composer {
 }
 
 func testOutputFilter(
+	opts Options,
 	mp *adt.Map[string, testReport],
 	pkgs map[string]PackageInfo,
 ) send.MessageFormatter {
@@ -278,11 +299,14 @@ func testOutputFilter(
 			parts := strings.Fields(mstr)
 
 			report := testReport{
-				Package:  parts[1],
-				Cached:   strings.Contains(mstr, "cached"),
-				Duration: fun.Must(time.ParseDuration(parts[2])),
-				Coverage: Percent(fun.Must(strconv.ParseFloat(parts[4][:len(parts[4])-1], 64))),
-				Info:     pkgs[parts[1]],
+				Package:     parts[1],
+				Cached:      strings.Contains(mstr, "cached"),
+				Info:        pkgs[parts[1]],
+				CompileOnly: opts.CompileOnly,
+			}
+			if !opts.CompileOnly {
+				report.Duration = fun.Must(time.ParseDuration(parts[2]))
+				report.Coverage = Percent(fun.Must(strconv.ParseFloat(parts[4][:len(parts[4])-1], 64)))
 			}
 			mp.Store(report.Package, report)
 			return "", io.EOF
@@ -293,6 +317,7 @@ func testOutputFilter(
 				Package:      parts[1],
 				Info:         pkgs[parts[1]],
 				MissingTests: true,
+				CompileOnly:  opts.CompileOnly,
 			}
 			mp.Store(report.Package, report)
 			return "", io.EOF

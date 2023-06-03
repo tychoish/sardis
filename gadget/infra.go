@@ -111,6 +111,7 @@ func WalkDirIterator[T any](ctx context.Context, path string, fn func(p string, 
 		once.Do(func() {
 			pipe = make(chan T)
 			go func() {
+				defer close(pipe)
 				_ = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 					if err != nil {
 						return fs.SkipAll

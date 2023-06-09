@@ -3,6 +3,7 @@ package gadget
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -57,13 +58,12 @@ func GoGenerate(
 			ID(fmt.Sprint("generate.", idx)).
 			Directory(args.Spec.Path).
 			AddEnv("PATH", strings.Join(append(args.SearchPath, "$PATH"), ":")).
+			AddEnv("GOBIN", filepath.Join(args.SearchPath[0], "bin")).
 			PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
 			SetOutputSender(level.Debug, out).
 			SetErrorSender(level.Error, out).
 			Add(cmd).
 			Run(ctx)
-
-		ec.Add(err)
 
 		builder := grip.Build().Level(level.Info)
 		msg := builder.PairBuilder().
@@ -74,13 +74,14 @@ func GoGenerate(
 		if err != nil {
 			builder.Level(level.Error)
 			msg.Pair("err", err)
+			builder.Send()
+			if args.ContinueOnError {
+				continue
+			}
+			break
 		}
 
 		builder.Send()
-
-		if !args.ContinueOnError && err != nil {
-			break
-		}
 	}
 
 	grip.Notice(message.BuildPair().

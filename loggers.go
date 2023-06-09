@@ -115,11 +115,7 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 	host := util.GetHostname()
 
 	defer func() {
-		desktop := desktop.MakeSender()
-		desktop.SetName("sardis")
-		desktop.SetPriority(grip.Sender().Priority())
-
-		loggers = append(loggers, desktop, root)
+		loggers = append(loggers, root)
 		sender := send.MakeMulti(loggers...)
 
 		out = grip.WithContextLogger(ctx, "remote-notify", grip.NewLogger(sender))
@@ -175,6 +171,12 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 			return erc.Wrapf(catcher.Resolve(), "telegram [%s]", conf.Settings.Telegram.Name)
 		})
 
+	}
+	if len(loggers) == 0 {
+		desktop := desktop.MakeSender()
+		desktop.SetName("sardis")
+		desktop.SetPriority(grip.Sender().Priority())
+		loggers = append(loggers, desktop)
 	}
 
 	return

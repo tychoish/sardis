@@ -13,10 +13,13 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
+	"github.com/urfave/cli/v2"
 )
 
 func Repo() *cmdr.Commander {
@@ -27,6 +30,7 @@ func Repo() *cmdr.Commander {
 			repoList(),
 			repoUpdate(),
 			repoClone(),
+			repoGithubClone(),
 			repoCleanup(),
 			repoStatus(),
 			repoFetch(),
@@ -166,11 +170,61 @@ func repoClone() *cmdr.Commander {
 	})
 }
 
+func fallbackTo[T comparable](first T, args ...T) (out T) {
+	if !fun.IsZero(first) {
+		return first
+	}
+	for _, arg := range args {
+		if !fun.IsZero(arg) {
+			return arg
+		}
+	}
+
+	return out
+}
+
+func repoGithubClone() *cmdr.Commander {
+	cmd := cmdr.MakeCommander().
+		SetName("gh-clone").Aliases("gh", "ghc").
+		SetUsage("clone a repository or all matching repositories").
+		Flags(
+			cmdr.FlagBuilder("tychoish").
+				SetName("account", "a").
+				SetUsage("name of ").
+				Flag(),
+			cmdr.FlagBuilder("").
+				SetName("repo", "r").
+				SetUsage("name of repository").
+				Flag(),
+			cmdr.FlagBuilder(fun.Must(os.Getwd())).
+				SetName("path", "p").
+				SetUsage("path to clone repo to, defaults to pwd").
+				Flag(),
+		).
+		SetAction(func(ctx context.Context, cc *cli.Context) error {
+			jpm := jasper.Context(ctx)
+			args := append(cc.Args().Slice(), "", "")
+
+			grip.Infoln(args, len(args))
+
+			account := fallbackTo(cc.String("account"), args...)
+			repo := fallbackTo(cc.String("repo"), args[1:]...)
+			repoPath := fmt.Sprintf("git@github.com:%s/%s.git", account, repo)
+
+			grip.Notice(repoPath)
+
+			return jpm.CreateCommand(ctx).
+				Directory(cc.String("path")).
+				SetCombinedSender(level.Debug, grip.Sender()).
+				AppendArgs("git", "clone", repoPath).Run(ctx)
+		})
+	return cmd
+}
+
 func repoStatus() *cmdr.Commander {
 	cmd := cmdr.MakeCommander().
 		SetName("status").
 		SetUsage("report on the status of repos")
-
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		catcher := &erc.Collector{}
 

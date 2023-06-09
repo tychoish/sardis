@@ -145,10 +145,15 @@ func TopLevel() *cmdr.Commander {
 						SetName("all", "a").
 						SetUsage("run go generate in all packages not just ones with 'go:generate' comments").
 						Flag(),
+					cmdr.FlagBuilder(false).
+						SetName("continue-on-error", "continue").
+						SetUsage("runs go generate stages in 'continue on error' model").
+						Flag(),
 				).
 				SetAction(func(ctx context.Context, cc *cli.Context) error {
 					path := cc.String("path")
 					filterInputTree := !cc.Bool("all")
+					continueOnError := !cc.Bool("continue-on-error")
 					// TODO:
 					//   - make search paths configurable
 					//   - factor away the ripgrep iter dance
@@ -171,12 +176,13 @@ func TopLevel() *cmdr.Commander {
 						spec = bo.Narrow(limits)
 					}
 
+					grip.Info(strings.Join(os.Environ(), "\n"))
 					return gadget.GoGenerate(ctx,
 						jasper.Context(ctx),
 						gadget.GoGenerateArgs{
 							Spec:            spec,
 							SearchPath:      []string{filepath.Join(path, "bin")},
-							ContinueOnError: true,
+							ContinueOnError: continueOnError,
 						})
 				}),
 		)

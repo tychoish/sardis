@@ -40,6 +40,7 @@ type Options struct {
 	CompileOnly    bool
 	UseCache       bool
 	ReportCoverage bool
+	SkipLint       bool
 	GoTestArgs     []string
 	Workers        int
 }
@@ -152,7 +153,7 @@ func RunTests(ctx context.Context, opts Options) error {
 		ec.Add(main.Add(func(ctx context.Context) error {
 			catch := &erc.Collector{}
 			var err error
-			if !opts.CompileOnly {
+			if !opts.CompileOnly || !opts.SkipLint {
 				lintStart := time.Now()
 				err := jpm.CreateCommand(ctx).
 					ID(fmt.Sprint("lint.", shortName)).

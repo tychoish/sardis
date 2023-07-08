@@ -113,6 +113,10 @@ func TopLevel() *cmdr.Commander {
 						SetUsage("runs no-op test build for all packages").
 						Flag(),
 					cmdr.FlagBuilder(false).
+						SetName("skip-lint").
+						SetUsage("skip golangci-lint").
+						Flag(),
+					cmdr.FlagBuilder(false).
 						SetName("coverage", "cover", "c").
 						SetUsage("runs tests with coverage reporting").
 						Flag(),
@@ -124,6 +128,7 @@ func TopLevel() *cmdr.Commander {
 						PackagePath:    cc.String("path"),
 						RootPath:       cc.String("module-path"),
 						CompileOnly:    cc.Bool("build"),
+						SkipLint:       cc.Bool("skip-lint"),
 						ReportCoverage: cc.Bool("coverage"),
 						UseCache:       true,
 						GoTestArgs:     cc.Args().Slice(),

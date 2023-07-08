@@ -16,11 +16,8 @@ import (
 )
 
 type repoSyncJob struct {
-	Host     string   `bson:"host" json:"host" yaml:"host"`
-	Path     string   `bson:"path" json:"path" yaml:"path"`
-	Branch   string   `bson:"branch" json:"branch" yaml:"branch"`
-	PostHook []string `bson:"post" json:"post" yaml:"post"`
-	PreHook  []string `bson:"pre" json:"pre" yaml:"pre"`
+	sardis.RepoConf
+	Host string
 
 	once adt.Once[string]
 }
@@ -31,22 +28,14 @@ const (
 )
 
 func NewLocalRepoSyncJob(repo sardis.RepoConf) fun.WorkerFunc {
-	j := &repoSyncJob{}
+	j := &repoSyncJob{RepoConf: repo}
 	j.Host = "LOCAL"
-	j.Path = repo.Path
-	j.Branch = repo.Branch
-	j.PreHook = repo.Pre
-	j.PostHook = repo.Post
 	return j.Run
 }
 
 func NewRepoSyncJob(host string, repo sardis.RepoConf) fun.WorkerFunc {
-	j := &repoSyncJob{}
+	j := &repoSyncJob{RepoConf: repo}
 	j.Host = host
-	j.Path = repo.Path
-	j.Branch = repo.Branch
-	j.PreHook = repo.Pre
-	j.PostHook = repo.Post
 	return j.Run
 }
 
@@ -55,10 +44,10 @@ func (j *repoSyncJob) buildID() string {
 		hostname := util.GetHostname()
 
 		if j.isLocal() {
-			return fmt.Sprintf("LOCAL(%s).sync", hostname)
+			return fmt.Sprintf("LOCAL(%s).sync=[%s]", hostname, j.Name)
 		}
 
-		return fmt.Sprintf("REMOTE(%s).sync.FROM(%s)", j.Host, hostname)
+		return fmt.Sprintf("REMOTE(%s).sync.(FROM(%s))=[%s]", j.Host, hostname, j.Name)
 	})
 }
 
@@ -68,24 +57,27 @@ func (j *repoSyncJob) isLocal() bool {
 
 func (j *repoSyncJob) Run(ctx context.Context) error {
 	if stat, err := os.Stat(j.Path); os.IsNotExist(err) || !stat.IsDir() {
-		return fmt.Errorf("path '%s' does not exist", j.Path)
+		return fmt.Errorf("path '%s' for %q does not exist", j.Path, j.buildID())
 	}
 
-	grip.Info(message.Fields{
-		"op": "running",
-		"id": j.buildID(),
-	})
+	grip.Info(message.BuildPair().
+		Pair("op", "repo-sync").
+		Pair("state", "started").
+		Pair("id", j.buildID()).
+		Pair("path", j.Path).
+		Pair("host", j.Host),
+	)
 
 	conf := sardis.AppConfiguration(ctx)
 
 	err := jasper.Context(ctx).
 		CreateCommand(ctx).
-		Priority(level.Info).
+		Priority(level.Debug).
 		ID(j.buildID()).
 		AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
 		Directory(j.Path).
 		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && ", j.Path)+fmt.Sprintf(syncCmdTemplate, j.buildID())).
-		Append(j.PreHook...).
+		Append(j.Pre...).
 		AppendArgs("git", "add", "-A").
 		AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", "origin").
 		Bash("git ls-files -d | xargs -r git rm --ignore-unmatch --quiet -- ").
@@ -94,15 +86,16 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 		AppendArgs("git", "push").
 		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, fmt.Sprintf(syncCmdTemplate, j.buildID()))).
 		AppendArgsWhen(!j.isLocal(), "git", "pull", "--keep", "--rebase", "--autostash", "origin").
-		Append(j.PostHook...).
+		Append(j.Post...).
 		Run(ctx)
 
-	grip.Info(message.Fields{
-		"op":     "completed repo sync",
-		"errors": err != nil,
-		"host":   j.Host,
-		"path":   j.Path,
-		"id":     j.buildID(),
-	})
+	grip.Info(message.BuildPair().
+		Pair("op", "repo-sync").
+		Pair("state", "completed").
+		Pair("errors", err != nil).
+		Pair("id", j.buildID()).
+		Pair("path", j.Path).
+		Pair("host", j.Host),
+	)
 	return err
 }

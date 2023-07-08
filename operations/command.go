@@ -47,6 +47,8 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops [
 		}
 		err := jasper.Context(ctx).CreateCommand(ctx).
 			Directory(cmd.Directory).
+			AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
+			AddEnv("ALACRITTY_SOCKET", conf.AlacrittySocket()).
 			ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
 			SetOutputSender(level.Info, grip.Sender()).
 			SetErrorSender(level.Error, grip.Sender()).
@@ -65,14 +67,15 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops [
 			PostHook(func(err error) error {
 				if err != nil {
 					notify.Error(message.WrapError(err, name))
+					grip.Critical(err)
 					return err
 				}
-				notify.Sender()
 				notify.Noticeln(name, "completed")
 				return nil
 			}).
 			Run(ctx)
 		if err != nil {
+
 			return err
 		}
 	}

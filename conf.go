@@ -116,12 +116,13 @@ type LinkConf struct {
 }
 
 type Settings struct {
-	Notification       NotifyConf       `bson:"notify" json:"notify" yaml:"notify"`
-	Telegram           telegram.Options `bson:"telegram" json:"telegram" yaml:"telegram"`
-	Credentials        CredentialsConf  `bson:"credentials" json:"credentials" yaml:"credentials"`
-	SSHAgentSocketPath string           `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
-	Logging            LoggingConf      `bson:"logging" json:"logging" yaml:"logging"`
-	ConfigPaths        []string         `bson:"config_files" json:"config_files" yaml:"config_files"`
+	Notification        NotifyConf       `bson:"notify" json:"notify" yaml:"notify"`
+	Telegram            telegram.Options `bson:"telegram" json:"telegram" yaml:"telegram"`
+	Credentials         CredentialsConf  `bson:"credentials" json:"credentials" yaml:"credentials"`
+	SSHAgentSocketPath  string           `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
+	AlacrittySocketPath string           `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
+	Logging             LoggingConf      `bson:"logging" json:"logging" yaml:"logging"`
+	ConfigPaths         []string         `bson:"config_files" json:"config_files" yaml:"config_files"`
 }
 
 type LoggingConf struct {
@@ -762,6 +763,13 @@ func (conf *CommandGroupConf) ExportCommands() map[string]CommandConf {
 		out[cmd.Alias] = cmd
 	}
 	return out
+}
+
+func (conf *Configuration) AlacrittySocket() string {
+	if conf.Settings.AlacrittySocketPath == "" {
+		conf.Settings.AlacrittySocketPath = fun.Must(sutil.GetAlacrittySocketPath())
+	}
+	return conf.Settings.AlacrittySocketPath
 }
 
 func (conf *Configuration) SSHAgentSocket() string {

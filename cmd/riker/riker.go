@@ -101,27 +101,33 @@ func TopLevel() *cmdr.Commander {
 						}).
 						Flag(),
 					cmdr.FlagBuilder(false).
-						SetName("recursive").
+						SetName("recursive", "r").
 						SetUsage("run recursively in all nested modules. Also ensures the --path ends with '...'").
 						Flag(),
 					cmdr.FlagBuilder(10*time.Second).
-						SetName("timeout").
+						SetName("timeout", "t").
 						SetUsage("timeout to set to each individual go test invocation").
 						Flag(),
 					cmdr.FlagBuilder(false).
-						SetName("compile-only", "build-all").
+						SetName("build", "compile", "b").
 						SetUsage("runs no-op test build for all packages").
+						Flag(),
+					cmdr.FlagBuilder(false).
+						SetName("coverage", "cover", "c").
+						SetUsage("runs tests with coverage reporting").
 						Flag(),
 				).
 				With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (*gadget.Options, error) {
 					opts := &gadget.Options{
-						Timeout:     cc.Duration("timeout"),
-						Recursive:   cc.Bool("recursive"),
-						PackagePath: cc.String("path"),
-						RootPath:    cc.String("module-path"),
-						CompileOnly: cc.Bool("compile-only"),
-						GoTestArgs:  cc.Args().Slice(),
-						Workers:     runtime.NumCPU(),
+						Timeout:        cc.Duration("timeout"),
+						Recursive:      cc.Bool("recursive"),
+						PackagePath:    cc.String("path"),
+						RootPath:       cc.String("module-path"),
+						CompileOnly:    cc.Bool("build"),
+						ReportCoverage: cc.Bool("coverage"),
+						UseCache:       true,
+						GoTestArgs:     cc.Args().Slice(),
+						Workers:        runtime.NumCPU(),
 					}
 
 					if err := opts.Validate(); err != nil {

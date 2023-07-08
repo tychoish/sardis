@@ -31,14 +31,16 @@ import (
 )
 
 type Options struct {
-	Notify      string
-	RootPath    string
-	PackagePath string
-	Timeout     time.Duration
-	Recursive   bool
-	CompileOnly bool
-	GoTestArgs  []string
-	Workers     int
+	Notify         string
+	RootPath       string
+	PackagePath    string
+	Timeout        time.Duration
+	Recursive      bool
+	CompileOnly    bool
+	UseCache       bool
+	ReportCoverage bool
+	GoTestArgs     []string
+	Workers        int
 }
 
 func (opts *Options) Validate() error {
@@ -71,6 +73,10 @@ func (opts *Options) Validate() error {
 
 	if !filepath.IsAbs(opts.RootPath) {
 		opts.RootPath = risky.Try(filepath.Abs, opts.RootPath)
+	}
+
+	if opts.ReportCoverage {
+		opts.CompileOnly = false
 	}
 
 	return nil
@@ -177,14 +183,19 @@ func RunTests(ctx context.Context, opts Options) error {
 			testOut.SetErrorHandler(func(err error, m message.Composer) {
 				grip.ErrorWhen(!errors.Is(err, io.EOF), message.WrapError(err, m))
 			})
-			args := []string{"go", "test"}
+			args := []string{"go", "test", "-race", "-parallel=8", fmt.Sprint("-timeout=", opts.Timeout)}
 			switch {
 			case opts.CompileOnly:
 				args = append(args, "-run=noop", fmt.Sprint("./", opts.PackagePath))
+			case opts.ReportCoverage:
+				args = append(args, "-coverprofile=coverage.out")
+			case opts.UseCache:
+				// nothing
 			default:
-				args = append(args, "-p=8", "-race", "-coverprofile=coverage.out", "--timeout", opts.Timeout.String(), fmt.Sprint("./", opts.PackagePath))
+				return fmt.Errorf("must configure coverage, cache, or compile-only")
 			}
 
+			args = append(args, fmt.Sprint("./", opts.PackagePath))
 			args = append(args, opts.GoTestArgs...)
 			testStart := time.Now()
 
@@ -208,7 +219,9 @@ func RunTests(ctx context.Context, opts Options) error {
 
 			catch.Add(err)
 
-			if err == nil && !opts.CompileOnly {
+			ec.Add(fun.Observe(ctx, reports.Iterator(), func(tr fun.Pair[string, testReport]) { allReports.Set(tr) }))
+
+			if err == nil && opts.ReportCoverage {
 				grip.Warning(erc.Wrapf(jpm.CreateCommand(ctx).
 					ID(fmt.Sprint("coverage.html.", shortName)).
 					Directory(modulePath).
@@ -227,7 +240,6 @@ func RunTests(ctx context.Context, opts Options) error {
 					Run(ctx))
 			}
 
-			ec.Add(fun.Observe(ctx, reports.Iterator(), func(tr fun.Pair[string, testReport]) { allReports.Set(tr) }))
 			dur := time.Since(start)
 			report(ctx, mod, reports.Get(mod.PackageName), strings.TrimSpace(sender.buffer.String()), dur, catch.Resolve())
 			ec.Add(fun.Observe(ctx, reports.Values(), func(tr testReport) { grip.Sender().Send(tr.Message()) }))
@@ -246,13 +258,14 @@ type Percent float64
 func (p Percent) String() string { return fmt.Sprintf("%.1f%%", p) }
 
 type testReport struct {
-	Package      string
-	Coverage     Percent
-	Duration     time.Duration
-	Cached       bool
-	MissingTests bool
-	Info         PackageInfo
-	CompileOnly  bool
+	Package         string
+	Coverage        Percent
+	Duration        time.Duration
+	Info            PackageInfo
+	CompileOnly     bool
+	CoverageEnabled bool
+	Cached          bool
+	MissingTests    bool
 }
 
 func (tr testReport) Message() message.Composer {
@@ -265,13 +278,13 @@ func (tr testReport) Message() message.Composer {
 		priority = level.Warning
 		pairs.Add("state", "untested")
 	} else {
-		priority = level.Notice
-		if !tr.CompileOnly {
-			pairs.Add("coverage", tr.Coverage)
-			pairs.Add("dur", tr.Duration)
-		}
+		priority = level.Info
 		if tr.Cached {
 			pairs.Add("cached", true)
+		} else if tr.CoverageEnabled {
+			pairs.Add("coverage", tr.Coverage)
+		} else if !tr.CompileOnly {
+			pairs.Add("dur", tr.Duration)
 		}
 	}
 
@@ -299,13 +312,16 @@ func testOutputFilter(
 			parts := strings.Fields(mstr)
 
 			report := testReport{
-				Package:     parts[1],
-				Cached:      strings.Contains(mstr, "cached"),
-				Info:        pkgs[parts[1]],
-				CompileOnly: opts.CompileOnly,
+				Package:         parts[1],
+				Cached:          strings.Contains(mstr, "cached"),
+				Info:            pkgs[parts[1]],
+				CompileOnly:     opts.CompileOnly,
+				CoverageEnabled: opts.ReportCoverage,
 			}
-			if !opts.CompileOnly {
+			if !report.Cached {
 				report.Duration = fun.Must(time.ParseDuration(parts[2]))
+			}
+			if opts.ReportCoverage {
 				report.Coverage = Percent(fun.Must(strconv.ParseFloat(parts[4][:len(parts[4])-1], 64)))
 			}
 			mp.Store(report.Package, report)
@@ -314,10 +330,11 @@ func testOutputFilter(
 			parts := strings.Fields(mstr)
 
 			report := testReport{
-				Package:      parts[1],
-				Info:         pkgs[parts[1]],
-				MissingTests: true,
-				CompileOnly:  opts.CompileOnly,
+				Package:         parts[1],
+				Info:            pkgs[parts[1]],
+				MissingTests:    true,
+				CompileOnly:     opts.CompileOnly,
+				CoverageEnabled: opts.ReportCoverage,
 			}
 			mp.Store(report.Package, report)
 			return "", io.EOF
@@ -355,7 +372,6 @@ func report(
 
 	iter := LineIterator(strings.NewReader(coverage))
 	table := tabby.New()
-
 	replacer := strings.NewReplacer(mod.ModuleName, pfx)
 	err = erc.Merge(
 		err,
@@ -390,20 +406,21 @@ func report(
 
 	pairs.Add("dur", tr.Duration)
 	pairs.Add("path", mod.LocalDirectory)
-	pairs.Add("coverage", tr.Coverage)
-	pairs.Add("funcs", count)
-
-	if numUncovered != 0 {
-		pairs.Add("uncovered", numUncovered)
-	}
-	if numCovered != count {
-		pairs.Add("covered", numCovered)
-	}
 
 	if tr.MissingTests {
 		pairs.Add("state", "no tests")
 	} else if tr.Cached {
 		pairs.Add("state", "cached")
+	} else if tr.CoverageEnabled {
+		pairs.Add("coverage", tr.Coverage)
+		pairs.Add("funcs", count)
+
+		if numUncovered != 0 {
+			pairs.Add("uncovered", numUncovered)
+		}
+		if numCovered != count {
+			pairs.Add("covered", numCovered)
+		}
 	}
 
 	if err != nil {
@@ -414,13 +431,15 @@ func report(
 	switch {
 	case tr.MissingTests:
 		msg.SetPriority(level.Warning)
-	case tr.Cached:
-		msg.SetPriority(level.Info)
 	case err != nil:
 		msg.SetPriority(level.Error)
+	case tr.Cached:
+		msg.SetPriority(level.Info)
 	default:
-		msg.SetPriority(level.Notice)
+		msg.SetPriority(level.Info)
 	}
+	grip.Sender().Send(msg)
 
 	table.Print()
+
 }

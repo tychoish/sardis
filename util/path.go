@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/user"
@@ -48,6 +49,41 @@ func TryCollapseHomedir(in string) string {
 		return strings.Replace(in, hd, "~", 1)
 	}
 	return in
+}
+
+func GetAlacrittySocketPath() (out string, err error) {
+	if path, ok := os.LookupEnv("ALACRITTY_SOCKET"); ok {
+		return path, nil
+	}
+
+	usr, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+
+	base := filepath.Join("/run/user", usr.Uid)
+	socketPrefix := filepath.Join(base, "Alacritty-:")
+	err = filepath.Walk(base,
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if info.IsDir() {
+				return nil
+			}
+			if !strings.HasPrefix(path, socketPrefix) {
+				return nil
+			}
+
+			out = path
+			return io.EOF
+		})
+	if out == "" || (err != nil && errors.Is(err, io.EOF)) {
+		return "", fmt.Errorf("no socket found: %w", err)
+	}
+
+	return out, nil
 }
 
 func GetSSHAgentPath() (out string, err error) {

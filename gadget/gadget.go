@@ -148,9 +148,8 @@ func RunTests(ctx context.Context, opts Options) error {
 			Send()
 
 		start := time.Now()
-		allReports := &adt.Map[string, testReport]{}
+		reports := &adt.Map[string, testReport]{}
 		ec.Add(main.Add(func(ctx context.Context) error {
-			reports := &adt.Map[string, testReport]{}
 			catch := &erc.Collector{}
 			var err error
 			if !opts.CompileOnly {
@@ -223,8 +222,6 @@ func RunTests(ctx context.Context, opts Options) error {
 
 			catch.Add(err)
 
-			ec.Add(reports.Iterator().Observe(ctx, func(tr dt.Pair[string, testReport]) { allReports.Set(tr) }))
-
 			if err == nil && opts.ReportCoverage {
 				grip.Warning(erc.Wrapf(jpm.CreateCommand(ctx).
 					ID(fmt.Sprint("coverage.html.", shortName)).
@@ -246,7 +243,6 @@ func RunTests(ctx context.Context, opts Options) error {
 
 			dur := time.Since(start)
 			report(ctx, mod, reports.Get(mod.PackageName), strings.TrimSpace(sender.buffer.String()), dur, catch.Resolve())
-			ec.Add(reports.Values().Observe(ctx, func(tr testReport) { grip.Sender().Send(tr.Message()) }))
 			return catch.Resolve()
 		}))
 	}
@@ -269,6 +265,7 @@ type testReport struct {
 	CompileOnly     bool
 	CoverageEnabled bool
 	Cached          bool
+	FullyCovered    bool
 	MissingTests    bool
 }
 
@@ -287,7 +284,11 @@ func (tr testReport) Message() message.Composer {
 		if tr.Cached {
 			pairs.Add("cached", true)
 		} else if tr.CoverageEnabled {
-			pairs.Add("coverage", tr.Coverage)
+			if tr.FullyCovered {
+				pairs.Add("covered", true)
+			} else {
+				pairs.Add("covered", tr.Coverage)
+			}
 		}
 	}
 	pairs.Add("dur", tr.Duration)
@@ -327,8 +328,12 @@ func testOutputFilter(
 			}
 			if opts.ReportCoverage {
 				report.Coverage = Percent(ft.Must(strconv.ParseFloat(parts[4][:len(parts[4])-1], 64)))
+				if report.Coverage == 100 {
+					report.FullyCovered = true
+				}
 			}
 			mp.Store(report.Package, report)
+			grip.Sender().Send(report.Message())
 			return "", io.EOF
 		} else if strings.HasPrefix(mstr, "?") {
 			parts := strings.Fields(mstr)
@@ -341,6 +346,7 @@ func testOutputFilter(
 				CoverageEnabled: opts.ReportCoverage,
 			}
 			mp.Store(report.Package, report)
+			grip.Sender().Send(report.Message())
 			return "", io.EOF
 		}
 
@@ -415,7 +421,12 @@ func report(
 	} else if tr.Cached {
 		pairs.Add("state", "cached")
 	} else if tr.CoverageEnabled {
-		pairs.Add("coverage", tr.Coverage)
+		if tr.Coverage == 100.0 {
+			pairs.Add("covered", true)
+		} else {
+			pairs.Add("covered", tr.Coverage)
+		}
+
 		pairs.Add("funcs", count)
 
 		if numUncovered != 0 {

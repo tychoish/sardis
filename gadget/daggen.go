@@ -12,8 +12,9 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/itertool"
-	"github.com/tychoish/fun/set"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
@@ -56,7 +57,7 @@ func (p Packages) IndexByLocalDirectory() map[string]PackageInfo {
 	return out
 }
 
-func (p Packages) IndexByPackageName() fun.Map[string, PackageInfo] {
+func (p Packages) IndexByPackageName() dt.Map[string, PackageInfo] {
 	out := make(map[string]PackageInfo, len(p))
 	for idx := range p {
 		info := p[idx]
@@ -65,32 +66,32 @@ func (p Packages) IndexByPackageName() fun.Map[string, PackageInfo] {
 	return out
 }
 
-func (p Packages) ConvertPathsToPackages(iter fun.Iterator[string]) fun.Iterator[string] {
+func (p Packages) ConvertPathsToPackages(iter *fun.Iterator[string]) *fun.Iterator[string] {
 	index := p.IndexByLocalDirectory()
-	return fun.Transform(iter, func(path string) (string, error) {
+	return fun.ConvertIterator(iter, func(_ context.Context, path string) (string, error) {
 		return index[path].PackageName, nil
 	})
 }
 
-func (p Packages) ConvertPackagesToPaths(iter fun.Iterator[string]) fun.Iterator[string] {
+func (p Packages) ConvertPackagesToPaths(iter *fun.Iterator[string]) *fun.Iterator[string] {
 	index := p.IndexByPackageName()
-	return fun.Transform(iter, func(path string) (string, error) {
+	return fun.ConvertIterator(iter, func(_ context.Context, path string) (string, error) {
 		return index[path].LocalDirectory, nil
 	})
 }
 
-func (p Packages) Graph() fun.Pairs[string, []string] {
-	mp := fun.Pairs[string, []string]{}
+func (p Packages) Graph() *dt.Pairs[string, []string] {
+	mp := &dt.Pairs[string, []string]{}
 
 	for idx := range p {
 		mp.Add(p[idx].PackageName, p[idx].Dependencies)
 	}
 
-	sort.SliceStable(mp, func(i, j int) bool {
-		return len(filepath.SplitList(mp[i].Key)) > len((filepath.SplitList(mp[j].Key)))
-	})
+	// sort.SliceStable(mp, func(i, j int) bool {
+	// 	return len(filepath.SplitList(mp[i].Key)) > len((filepath.SplitList(mp[j].Key)))
+	// })
 
-	sort.SliceStable(mp, func(i, j int) bool { return len(mp[i].Value) < len(mp[j].Value) })
+	// sort.SliceStable(mp, func(i, j int) bool { return len(mp[i].Value) < len(mp[j].Value) })
 
 	return mp
 }
@@ -126,7 +127,7 @@ func (info PackageInfo) String() string {
 
 	enc := yaml.NewEncoder(buf)
 	enc.SetIndent(5)
-	fun.InvariantMust(enc.Encode(info))
+	fun.Invariant.Must(enc.Encode(info))
 
 	return buf.String()
 }
@@ -155,9 +156,9 @@ func Collect(ctx context.Context, path string) (Packages, error) {
 
 	sort.Slice(files, func(i, j int) bool { return files[i].PkgPath < files[j].PkgPath })
 
-	seen := &fun.Map[string, PackageInfo]{}
+	seen := &dt.Map[string, PackageInfo]{}
 	for _, f := range files {
-		fun.Invariant(f.Module != nil, "should always collect module information")
+		fun.Invariant.OK(f.Module != nil, "should always collect module information")
 
 		info := PackageInfo{
 			PackageName:    f.PkgPath,
@@ -168,26 +169,26 @@ func Collect(ctx context.Context, path string) (Packages, error) {
 		pkgIter := filterLocal(f.Module.Path, f.Types.Imports())
 		for pkgIter.Next(ctx) {
 			pkg := pkgIter.Value()
-			pkgs := set.NewUnordered[string]()
+			pkgs := &dt.Set[string]{}
 
 			depPkgIter := filterLocal(f.Module.Path, pkg.Imports())
 
 			for depPkgIter.Next(ctx) {
 				dpkg := depPkgIter.Value()
-				set.PopulateSet(ctx, pkgs,
-					fun.Transform(
+				pkgs.Populate(
+					fun.ConvertIterator(
 						filterLocal(f.Module.Path, dpkg.Imports()),
-						func(p *types.Package) (string, error) { return p.Path(), nil },
+						func(_ context.Context, p *types.Package) (string, error) { return p.Path(), nil },
 					),
 				)
 			}
 
-			info.Dependencies = fun.Must(itertool.CollectSlice(ctx, pkgs.Iterator()))
+			info.Dependencies = ft.Must(pkgs.Iterator().Slice(ctx))
 			sort.Strings(info.Dependencies)
 		}
 		if seen.Check(info.PackageName) {
 			prev := seen.Get(info.PackageName)
-			prev.Dependencies = fun.Must(itertool.CollectSlice(ctx, itertool.Uniq(itertool.Slice(append(prev.Dependencies, info.Dependencies...)))))
+			prev.Dependencies = ft.Must(itertool.Uniq(fun.SliceIterator(append(prev.Dependencies, info.Dependencies...))).Slice(ctx))
 			info = prev
 		}
 
@@ -198,13 +199,11 @@ func Collect(ctx context.Context, path string) (Packages, error) {
 		return nil, fmt.Errorf("no packages for %q", path)
 	}
 
-	return itertool.CollectSlice(ctx, seen.Values())
+	return seen.Values().Slice(ctx)
 }
 
-func filterLocal(path string, imports []*types.Package) fun.Iterator[*types.Package] {
-	return fun.Filter(
-		itertool.Slice(imports),
-		func(p *types.Package) bool {
-			return strings.HasPrefix(p.Path(), path)
-		})
+func filterLocal(path string, imports []*types.Package) *fun.Iterator[*types.Package] {
+	return fun.SliceIterator(imports).Filter(func(p *types.Package) bool {
+		return strings.HasPrefix(p.Path(), path)
+	})
 }

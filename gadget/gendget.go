@@ -7,9 +7,7 @@ import (
 	"sort"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/itertool"
-	"github.com/tychoish/fun/seq"
-	"github.com/tychoish/fun/set"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 )
@@ -20,7 +18,7 @@ type BuildOrder struct {
 	Path     string
 }
 
-func (bo *BuildOrder) Narrow(limits set.Set[string]) *BuildOrder {
+func (bo *BuildOrder) Narrow(limits *dt.Set[string]) *BuildOrder {
 	out := &BuildOrder{Packages: bo.Packages, Path: bo.Path}
 
 	for _, group := range bo.Order {
@@ -51,11 +49,11 @@ func GetBuildOrder(ctx context.Context, path string) (*BuildOrder, error) {
 	index := pkgs.IndexByPackageName()
 	nodes := pkgs.Graph()
 
-	seen := set.NewUnordered[string]()
+	seen := &dt.Set[string]{}
 	buildOrder := [][]string{}
 
 	next := []string{}
-	queue := &seq.List[string]{}
+	queue := &dt.List[string]{}
 
 	iter := nodes.Iterator()
 	for iter.Next(ctx) {
@@ -63,7 +61,7 @@ func GetBuildOrder(ctx context.Context, path string) (*BuildOrder, error) {
 		node := item.Key
 		edges := item.Value
 		info, ok := index[node]
-		fun.Invariant(ok, "bad index")
+		fun.Invariant.OK(ok, "bad index")
 
 		if len(edges) == 0 && len(info.Dependencies) == 0 {
 			next = append(next, node)
@@ -72,7 +70,7 @@ func GetBuildOrder(ctx context.Context, path string) (*BuildOrder, error) {
 		}
 	}
 	sort.Strings(next)
-	set.PopulateSet(ctx, seen, itertool.Slice(next))
+	seen.Populate(fun.SliceIterator(next))
 	buildOrder = append(buildOrder, next)
 	next = nil
 	grip.Debug(message.Fields{
@@ -88,12 +86,12 @@ func GetBuildOrder(ctx context.Context, path string) (*BuildOrder, error) {
 OUTER:
 	for {
 		iters++
-		if len(pkgs) == 0 || seen.Len() >= len(nodes) || queue.Len() == 0 || ctx.Err() != nil {
+		if len(pkgs) == 0 || seen.Len() >= nodes.Len() || queue.Len() == 0 || ctx.Err() != nil {
 			break
 		}
 		if runsSinceProgress == queue.Len() && len(next) > 0 {
 			sort.Strings(next)
-			set.PopulateSet(ctx, seen, itertool.Slice(next))
+			seen.Populate(fun.SliceIterator(next))
 			buildOrder = append(buildOrder, next)
 			next = nil
 			runsSinceProgress = 0
@@ -122,7 +120,7 @@ OUTER:
 		}
 
 		info, ok := index[node]
-		fun.Invariant(ok)
+		fun.Invariant.OK(ok)
 
 		for _, dep := range info.Dependencies {
 			if !seen.Check(dep) {

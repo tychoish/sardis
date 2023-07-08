@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun"
 	"github.com/tychoish/sardis"
 	"github.com/urfave/cli/v2"
 )
@@ -32,9 +31,10 @@ func addOpCommand[T cmdr.FlagTypes](
 		}
 		out := &opsCmdArgs[T]{conf: conf}
 		ops := cmdr.GetFlag[T](cc, name)
+		var zero T
 
 		if !cc.IsSet(name) {
-			switch any(fun.ZeroOf[T]()).(type) {
+			switch any(zero).(type) {
 			case []string:
 				ops = any(append(any(ops).([]string), cc.Args().Slice()...)).(T)
 			case string:

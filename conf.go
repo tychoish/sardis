@@ -11,8 +11,9 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/mitchellh/go-homedir"
-	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -188,10 +189,10 @@ type BlogConf struct {
 }
 
 type MenuConf struct {
-	Name       string                     `bson:"name" json:"name" yaml:"name"`
-	Command    string                     `bson:"command" json:"command" yaml:"command"`
-	Selections []string                   `bson:"selections" json:"selections" yaml:"selections"`
-	Aliases    []fun.Pair[string, string] `bson:"aliases" json:"aliases" yaml:"aliases"`
+	Name       string                    `bson:"name" json:"name" yaml:"name"`
+	Command    string                    `bson:"command" json:"command" yaml:"command"`
+	Selections []string                  `bson:"selections" json:"selections" yaml:"selections"`
+	Aliases    []dt.Pair[string, string] `bson:"aliases" json:"aliases" yaml:"aliases"`
 }
 
 func LoadConfiguration(fn string) (*Configuration, error) {
@@ -647,7 +648,7 @@ func (h *HostConf) Validate() error {
 	erc.When(catcher, h.Name == "", "cannot have an empty name for a host")
 	erc.When(catcher, h.Hostname == "", "cannot have an empty host name")
 	erc.When(catcher, h.Port == 0, "must specify a non-zero port number for a host")
-	erc.When(catcher, !fun.Contains(h.Protocol, []string{"ssh", "jasper"}), "host protocol must be ssh or jasper")
+	erc.When(catcher, !ft.Contains(h.Protocol, []string{"ssh", "jasper"}), "host protocol must be ssh or jasper")
 
 	if h.Protocol == "ssh" {
 		erc.When(catcher, h.User == "", "must specify user for ssh hosts")
@@ -767,14 +768,14 @@ func (conf *CommandGroupConf) ExportCommands() map[string]CommandConf {
 
 func (conf *Configuration) AlacrittySocket() string {
 	if conf.Settings.AlacrittySocketPath == "" {
-		conf.Settings.AlacrittySocketPath = fun.Must(sutil.GetAlacrittySocketPath())
+		conf.Settings.AlacrittySocketPath = ft.Must(sutil.GetAlacrittySocketPath())
 	}
 	return conf.Settings.AlacrittySocketPath
 }
 
 func (conf *Configuration) SSHAgentSocket() string {
 	if conf.Settings.SSHAgentSocketPath == "" {
-		conf.Settings.SSHAgentSocketPath = fun.Must(sutil.GetSSHAgentPath())
+		conf.Settings.SSHAgentSocketPath = ft.Must(sutil.GetSSHAgentPath())
 	}
 	return conf.Settings.SSHAgentSocketPath
 }

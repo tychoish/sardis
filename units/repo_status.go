@@ -16,8 +16,8 @@ import (
 	"github.com/tychoish/jasper"
 )
 
-func NewRepoStatusJob(path string) fun.WorkerFunc {
-	return erc.WithCollector(func(ctx context.Context, ec *erc.Collector) error {
+func NewRepoStatusJob(path string) fun.Worker {
+	return func(ctx context.Context) error {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return fmt.Errorf("cannot check status %s, no repository exists", path)
 		}
@@ -29,6 +29,7 @@ func NewRepoStatusJob(path string) fun.WorkerFunc {
 		logger := grip.Context(ctx)
 		sender := logger.Sender()
 
+		ec := &erc.Collector{}
 		ec.Add(cmd.CreateCommand(ctx).Priority(level.Debug).
 			Directory(path).
 			SetOutputSender(level.Debug, sender).
@@ -46,9 +47,8 @@ func NewRepoStatusJob(path string) fun.WorkerFunc {
 			"errors": ec.HasErrors(),
 		})
 
-		return nil
-	})
-
+		return ec.Resolve()
+	}
 }
 
 func doOtherStat(path string, logger grip.Logger) error {

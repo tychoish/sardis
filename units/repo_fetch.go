@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
@@ -14,8 +15,11 @@ import (
 	"github.com/tychoish/sardis"
 )
 
-func NewRepoFetchJob(conf sardis.RepoConf) fun.WorkerFunc {
-	return erc.WithCollector(func(ctx context.Context, ec *erc.Collector) error {
+func NewRepoFetchJob(conf sardis.RepoConf) fun.Worker {
+	return func(ctx context.Context) (err error) {
+		ec := &erc.Collector{}
+		defer func() { ec.Add(err); err = ec.Resolve() }()
+
 		start := time.Now()
 		defer func() {
 			grip.Notice(message.Fields{
@@ -53,7 +57,7 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.WorkerFunc {
 			// SetOutputSender(level.Info, sender).
 			// SetErrorSender(level.Warning, sender)
 
-		if conf.LocalSync && fun.Contains("mail", conf.Tags) {
+		if conf.LocalSync && ft.Contains("mail", conf.Tags) {
 			cmd.Append(conf.Pre...)
 		}
 
@@ -62,5 +66,5 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.WorkerFunc {
 
 		ec.Add(cmd.Run(ctx))
 		return nil
-	})
+	}
 }

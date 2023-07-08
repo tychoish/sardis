@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -38,12 +38,12 @@ func GoGenerate(
 	opStart := time.Now()
 	var numPackages int
 	for idx, group := range args.Spec.Order {
-		group = fun.Must(itertool.CollectSlice(ctx, fun.Transform(
-			itertool.Slice(group),
-			func(in string) (string, error) {
+		fun.ConvertIterator(
+			dt.Sliceify(group).Iterator(),
+			func(_ context.Context, in string) (string, error) {
 				return strings.Replace(index[in].LocalDirectory, args.Spec.Path, ".", 1), nil
 			},
-		)))
+		)
 
 		numPackages += len(group)
 

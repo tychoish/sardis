@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
@@ -17,7 +17,7 @@ func TestRipgrep(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	jpm := jasper.NewManager(jasper.ManagerOptions{ID: t.Name(), Synchronized: true, MaxProcs: 64, Tracker: fun.Must(track.New(t.Name()))})
+	jpm := jasper.NewManager(jasper.ManagerOptions{ID: t.Name(), Synchronized: true, MaxProcs: 64, Tracker: ft.Must(track.New(t.Name()))})
 	args := RipgrepArgs{
 		Types:       []string{"go"},
 		Regexp:      "go:generate",

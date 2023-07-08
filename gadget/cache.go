@@ -10,13 +10,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 )
 
-var fileCache = adt.Map[string, []byte]{}
+var fileCache = &adt.Map[string, []byte]{}
 
 func populateCache(ctx context.Context, root string) error {
 	start := time.Now()
@@ -34,7 +35,7 @@ func populateCache(ctx context.Context, root string) error {
 			return nil, fs.SkipDir
 		}
 
-		if fileCache.Contains(path) || !strings.HasSuffix(path, ".go") {
+		if fileCache.Check(path) || !strings.HasSuffix(path, ".go") {
 			return nil, nil
 		}
 		countFilesReturned.Add(1)
@@ -55,7 +56,7 @@ func populateCache(ctx context.Context, root string) error {
 	}()
 	return itertool.ParallelForEach(ctx, goFilesIter, func(ctx context.Context, path string) error {
 		countFilesChecked.Add(1)
-		if fileCache.Contains(path) {
+		if fileCache.Check(path) {
 			return nil
 		}
 		f, err := os.Open(path)
@@ -71,6 +72,6 @@ func populateCache(ctx context.Context, root string) error {
 		countFilesRead.Add(1)
 		fileCache.Store(path, data)
 		return nil
-	}, itertool.Options{NumWorkers: runtime.NumCPU(), ContinueOnError: true})
+	}, fun.WorkerGroupConfSet(&fun.WorkerGroupConf{NumWorkers: runtime.NumCPU(), ContinueOnError: true}))
 
 }

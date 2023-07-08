@@ -12,7 +12,7 @@ import (
 	"github.com/tychoish/sardis"
 )
 
-func NewSystemServiceSetupJob(conf sardis.SystemdServiceConf) fun.WorkerFunc {
+func NewSystemServiceSetupJob(conf sardis.SystemdServiceConf) fun.Worker {
 	return func(ctx context.Context) error {
 		ec := &erc.Collector{}
 

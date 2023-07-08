@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
 	"github.com/urfave/cli/v2"
@@ -25,7 +25,7 @@ func bulkCreateTickets() *cmdr.Commander {
 	return cmdr.MakeCommander().SetName("create").
 		SetUsage("create tickets").
 		With(cmdr.SpecBuilder(ResolveConfiguration).SetMiddleware(sardis.WithConfiguration).Add).
-		Flags(cmdr.FlagBuilder(fun.Must(os.Getwd())).
+		Flags(cmdr.FlagBuilder(ft.Must(os.Getwd())).
 			SetName(pathFlagName).
 			SetUsage("specify the name of a file that holds jira tickets").
 			SetValidate(func(path string) error {

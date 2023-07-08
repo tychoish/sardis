@@ -14,7 +14,7 @@ import (
 	"github.com/tychoish/sardis"
 )
 
-func NewSymlinkCreateJob(conf sardis.LinkConf) fun.WorkerFunc {
+func NewSymlinkCreateJob(conf sardis.LinkConf) fun.Worker {
 	return func(ctx context.Context) (err error) {
 		ec := &erc.Collector{}
 		defer func() { err = ec.Resolve() }()

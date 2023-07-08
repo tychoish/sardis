@@ -14,7 +14,7 @@ import (
 	"github.com/tychoish/sardis"
 )
 
-func NewArchFetchAurJob(name string, update bool) fun.WorkerFunc {
+func NewArchFetchAurJob(name string, update bool) fun.Worker {
 	return func(ctx context.Context) error {
 		if name == "" {
 			return errors.New("name is not specified")

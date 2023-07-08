@@ -16,7 +16,7 @@ import (
 	"github.com/tychoish/sardis"
 )
 
-func NewRepoCloneJob(rconf sardis.RepoConf) fun.WorkerFunc {
+func NewRepoCloneJob(rconf sardis.RepoConf) fun.Worker {
 	return func(ctx context.Context) (err error) {
 		ec := &erc.Collector{}
 		defer func() { err = ec.Resolve() }()

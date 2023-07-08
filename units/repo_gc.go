@@ -13,7 +13,7 @@ import (
 	"github.com/tychoish/jasper"
 )
 
-func NewRepoCleanupJob(path string) fun.WorkerFunc {
+func NewRepoCleanupJob(path string) fun.Worker {
 	return func(ctx context.Context) error {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return fmt.Errorf("cannot cleanup %s, no repository exists", path)

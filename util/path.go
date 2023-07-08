@@ -26,7 +26,7 @@ func Apply[T any](fn func(T) T, in []T) []T {
 
 func TryExpandHomeDirs(in []string) []string { return Apply(jutil.TryExpandHomedir, in) }
 
-func GetDirectoryContents(path string) (fun.Iterator[string], error) {
+func GetDirectoryContents(path string) (*fun.Iterator[string], error) {
 	dir, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -37,7 +37,7 @@ func GetDirectoryContents(path string) (fun.Iterator[string], error) {
 			return "", err
 		}
 
-		fun.Invariant(len(dir) == 1, "impossible return value from ReadDir")
+		fun.Invariant.OK(len(dir) == 1, "impossible return value from ReadDir")
 
 		return filepath.Join(path, dir[0].Name()), nil
 	}), nil

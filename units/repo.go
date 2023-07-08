@@ -11,7 +11,7 @@ import (
 	"github.com/tychoish/sardis"
 )
 
-func SyncRepo(ec *erc.Collector, repo sardis.RepoConf) fun.WorkerFunc {
+func SyncRepo(ec *erc.Collector, repo sardis.RepoConf) fun.Worker {
 	hostname := util.GetHostname()
 	hasMirrors := false
 

@@ -9,7 +9,7 @@ import (
 	"github.com/tychoish/jasper"
 )
 
-func NewArchInstallPackageJob(names []string) fun.WorkerFunc {
+func NewArchInstallPackageJob(names []string) fun.Worker {
 	return func(ctx context.Context) error {
 		args := append([]string{"pacman", "--sync", "--refresh"}, names...)
 

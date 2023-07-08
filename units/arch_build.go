@@ -14,7 +14,7 @@ import (
 	"github.com/tychoish/sardis"
 )
 
-func NewArchAbsBuildJob(name string) fun.WorkerFunc {
+func NewArchAbsBuildJob(name string) fun.Worker {
 	return func(ctx context.Context) error {
 		if name == "" {
 			return errors.New("name is not specified")

@@ -9,9 +9,9 @@ import (
 
 	"github.com/cheynewallace/tabby"
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/itertool"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -171,11 +171,11 @@ func repoClone() *cmdr.Commander {
 }
 
 func fallbackTo[T comparable](first T, args ...T) (out T) {
-	if !fun.IsZero(first) {
+	if first != out {
 		return first
 	}
 	for _, arg := range args {
-		if !fun.IsZero(arg) {
+		if arg != out {
 			return arg
 		}
 	}
@@ -196,7 +196,7 @@ func repoGithubClone() *cmdr.Commander {
 				SetName("repo", "r").
 				SetUsage("name of repository").
 				Flag(),
-			cmdr.FlagBuilder(fun.Must(os.Getwd())).
+			cmdr.FlagBuilder(ft.Must(os.Getwd())).
 				SetName("path", "p").
 				SetUsage("path to clone repo to, defaults to pwd").
 				Flag(),
@@ -228,12 +228,10 @@ func repoStatus() *cmdr.Commander {
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		catcher := &erc.Collector{}
 
-		catcher.Add(fun.Observe(ctx,
-			itertool.Slice(args.conf.GetTaggedRepos(args.ops...)),
-			func(conf sardis.RepoConf) {
-				grip.Info(conf.Name)
-				catcher.Add(units.NewRepoStatusJob(conf.Path).Run(ctx))
-			}))
+		dt.Sliceify(args.conf.GetTaggedRepos(args.ops...)).Observe(func(conf sardis.RepoConf) {
+			grip.Info(conf.Name)
+			catcher.Add(units.NewRepoStatusJob(conf.Path).Run(ctx))
+		})
 
 		return catcher.Resolve()
 	})

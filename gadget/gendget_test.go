@@ -9,6 +9,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/set"
 	"github.com/tychoish/fun/testt"
@@ -183,7 +184,7 @@ func TestGraph(t *testing.T) {
 		})
 		t.Run("Narrowed", func(t *testing.T) {
 			ctx := testt.Context(t)
-			jpm := jasper.NewManager(jasper.ManagerOptions{ID: t.Name(), Synchronized: true, MaxProcs: 64, Tracker: fun.Must(track.New(t.Name()))})
+			jpm := jasper.NewManager(jasper.ManagerOptions{ID: t.Name(), Synchronized: true, MaxProcs: 64, Tracker: ft.Must(track.New(t.Name()))})
 
 			graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
 			assert.NotError(t, err)

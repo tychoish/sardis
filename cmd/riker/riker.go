@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/set"
+	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
@@ -74,7 +74,7 @@ func TopLevel() *cmdr.Commander {
 						SetUsage("path of top-level workpace for gadget to look for go.mod").
 						SetValidate(func(path string) error {
 							if path == "./" {
-								path = fun.Must(os.Getwd())
+								path = ft.Must(os.Getwd())
 							}
 
 							if strings.HasSuffix(path, "...") {
@@ -142,7 +142,7 @@ func TopLevel() *cmdr.Commander {
 				SetName("gogentree").
 				SetUsage("for a go module, resolve the internal dependency graph and run go generate with dependency awareness").
 				Flags(
-					cmdr.FlagBuilder(fun.Must(os.Getwd())).
+					cmdr.FlagBuilder(ft.Must(os.Getwd())).
 						SetName("path", "p").
 						SetUsage("path of go module to run go generate in").
 						SetValidate(func(path string) error {
@@ -182,8 +182,8 @@ func TopLevel() *cmdr.Commander {
 							Directories: true,
 						})
 
-						limits := set.MakeNewOrdered[string]()
-						set.PopulateSet(ctx, limits, bo.Packages.ConvertPathsToPackages(iter))
+						limits := &dt.Set[string]{}
+						limits.Populate(bo.Packages.ConvertPathsToPackages(iter))
 						spec = bo.Narrow(limits)
 					}
 

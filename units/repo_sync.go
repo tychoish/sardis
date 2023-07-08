@@ -27,20 +27,20 @@ const (
 	syncCmdTemplate         = remoteUpdateCmdTemplate + " && git commit -a -m 'auto-update: (%s)'; git push"
 )
 
-func NewLocalRepoSyncJob(repo sardis.RepoConf) fun.WorkerFunc {
+func NewLocalRepoSyncJob(repo sardis.RepoConf) fun.Worker {
 	j := &repoSyncJob{RepoConf: repo}
 	j.Host = "LOCAL"
 	return j.Run
 }
 
-func NewRepoSyncJob(host string, repo sardis.RepoConf) fun.WorkerFunc {
+func NewRepoSyncJob(host string, repo sardis.RepoConf) fun.Worker {
 	j := &repoSyncJob{RepoConf: repo}
 	j.Host = host
 	return j.Run
 }
 
 func (j *repoSyncJob) buildID() string {
-	return j.once.Do(func() string {
+	j.once.Do(func() string {
 		hostname := util.GetHostname()
 
 		if j.isLocal() {
@@ -49,6 +49,7 @@ func (j *repoSyncJob) buildID() string {
 
 		return fmt.Sprintf("REMOTE(%s).sync.(FROM(%s))=[%s]", j.Host, hostname, j.Name)
 	})
+	return j.once.Resolve()
 }
 
 func (j *repoSyncJob) isLocal() bool {

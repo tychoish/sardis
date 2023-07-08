@@ -16,8 +16,9 @@ import (
 	"github.com/cheynewallace/tabby"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/itertool"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/srv"
@@ -106,8 +107,10 @@ func RunTests(ctx context.Context, opts Options) error {
 	jpm := jasper.Context(ctx)
 	ec := &erc.Collector{}
 
-	main := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
-	pool := srv.WorkerPool(main, itertool.Options{NumWorkers: opts.Workers, ContinueOnError: true})
+	main := pubsub.NewUnlimitedQueue[fun.Worker]()
+	pool := srv.WorkerPool(main,
+		fun.WorkerGroupConfSet(&fun.WorkerGroupConf{NumWorkers: opts.Workers, ContinueOnError: true}),
+	)
 	if err := pool.Start(ctx); err != nil {
 		return err
 	}
@@ -219,7 +222,7 @@ func RunTests(ctx context.Context, opts Options) error {
 
 			catch.Add(err)
 
-			ec.Add(fun.Observe(ctx, reports.Iterator(), func(tr fun.Pair[string, testReport]) { allReports.Set(tr) }))
+			ec.Add(reports.Iterator().Observe(ctx, func(tr dt.Pair[string, testReport]) { allReports.Set(tr) }))
 
 			if err == nil && opts.ReportCoverage {
 				grip.Warning(erc.Wrapf(jpm.CreateCommand(ctx).
@@ -242,7 +245,7 @@ func RunTests(ctx context.Context, opts Options) error {
 
 			dur := time.Since(start)
 			report(ctx, mod, reports.Get(mod.PackageName), strings.TrimSpace(sender.buffer.String()), dur, catch.Resolve())
-			ec.Add(fun.Observe(ctx, reports.Values(), func(tr testReport) { grip.Sender().Send(tr.Message()) }))
+			ec.Add(reports.Values().Observe(ctx, func(tr testReport) { grip.Sender().Send(tr.Message()) }))
 			return catch.Resolve()
 		}))
 	}
@@ -271,7 +274,7 @@ type testReport struct {
 func (tr testReport) Message() message.Composer {
 	var priority level.Priority
 
-	pairs := fun.Pairs[string, any]{}
+	pairs := &dt.Pairs[string, any]{}
 	pairs.Add("pkg", tr.Package)
 
 	if tr.MissingTests {
@@ -288,7 +291,7 @@ func (tr testReport) Message() message.Composer {
 		}
 	}
 
-	out := message.MakeKV(pairs...)
+	out := message.MakePairs(pairs)
 	out.SetPriority(priority)
 
 	return out
@@ -319,10 +322,10 @@ func testOutputFilter(
 				CoverageEnabled: opts.ReportCoverage,
 			}
 			if !report.Cached {
-				report.Duration = fun.Must(time.ParseDuration(parts[2]))
+				report.Duration = ft.Must(time.ParseDuration(parts[2]))
 			}
 			if opts.ReportCoverage {
-				report.Coverage = Percent(fun.Must(strconv.ParseFloat(parts[4][:len(parts[4])-1], 64)))
+				report.Coverage = Percent(ft.Must(strconv.ParseFloat(parts[4][:len(parts[4])-1], 64)))
 			}
 			mp.Store(report.Package, report)
 			return "", io.EOF
@@ -356,7 +359,7 @@ func report(
 	runtime time.Duration,
 	err error,
 ) {
-	pwd := fun.Must(os.Getwd())
+	pwd := ft.Must(os.Getwd())
 	pfx := mod.LocalDirectory
 	if pwd == pfx {
 		pfx = ""
@@ -373,9 +376,9 @@ func report(
 	iter := LineIterator(strings.NewReader(coverage))
 	table := tabby.New()
 	replacer := strings.NewReplacer(mod.ModuleName, pfx)
-	err = erc.Merge(
+	err = erc.Join(
 		err,
-		fun.Observe(ctx, iter, func(in string) {
+		iter.Observe(ctx, func(in string) {
 			cols := strings.Fields(replacer.Replace(in))
 			if cols[0] == "total:" {
 				// we read this out of the go.test line
@@ -396,7 +399,7 @@ func report(
 			table.AddLine(cols[0], cols[1], cols[2])
 		}))
 
-	pairs := fun.MakePairs[string, any]()
+	pairs := &dt.Pairs[string, any]{}
 
 	pairs.Add("pkg", mod.PackageName)
 
@@ -427,7 +430,7 @@ func report(
 		pairs.Add("err", err)
 	}
 
-	msg := message.MakeKV(pairs...)
+	msg := message.MakePairs(pairs)
 	switch {
 	case tr.MissingTests:
 		msg.SetPriority(level.Warning)

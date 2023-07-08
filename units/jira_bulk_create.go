@@ -14,8 +14,8 @@ import (
 	"github.com/tychoish/sardis/util"
 )
 
-func NewBulkCreateJiraTicketJob(path string) fun.WorkerFunc {
-	return erc.WithCollector(func(ctx context.Context, ec *erc.Collector) error {
+func NewBulkCreateJiraTicketJob(path string) fun.Worker {
+	return func(ctx context.Context) error {
 		data := struct {
 			Priority level.Priority `bson:"priority" json:"priority" yaml:"priority"`
 			Tickets  []jira.Issue   `bson:"tickets" json:"tickets" yaml:"tickets"`
@@ -31,7 +31,7 @@ func NewBulkCreateJiraTicketJob(path string) fun.WorkerFunc {
 		conf := sardis.AppConfiguration(ctx)
 		ctx = sardis.WithJiraIssue(ctx, conf)
 		logger := sardis.JiraIssue(ctx)
-
+		ec := &erc.Collector{}
 		msgs := make([]message.Composer, len(data.Tickets))
 		for idx := range data.Tickets {
 			msg := jira.MakeIssue(&data.Tickets[idx])
@@ -43,7 +43,7 @@ func NewBulkCreateJiraTicketJob(path string) fun.WorkerFunc {
 		}
 
 		if ec.HasErrors() {
-			return nil
+			return ec.Resolve()
 		}
 
 		for idx, msg := range msgs {
@@ -73,5 +73,5 @@ func NewBulkCreateJiraTicketJob(path string) fun.WorkerFunc {
 			"errors": ec.HasErrors(),
 		})
 		return nil
-	})
+	}
 }

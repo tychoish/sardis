@@ -117,6 +117,7 @@ func RunTests(ctx context.Context, opts Options) error {
 
 	out := send.MakeWriter(send.MakePlain())
 	out.SetPriority(grip.Sender().Priority())
+	out.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
 	count := 0
 	for iter.Next(ctx) {
@@ -157,7 +158,7 @@ func RunTests(ctx context.Context, opts Options) error {
 				err := jpm.CreateCommand(ctx).
 					ID(fmt.Sprint("lint.", shortName)).
 					Directory(modulePath).
-					SetOutputSender(level.Debug, out).
+					SetOutputSender(level.Info, out).
 					SetErrorSender(level.Error, out).
 					PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
 					Append(fmt.Sprint("golangci-lint run --allow-parallel-runners ", modulePath)).
@@ -274,9 +275,10 @@ type testReport struct {
 func (tr testReport) Message() message.Composer {
 	var priority level.Priority
 
+	// TODO: could move coverage or duration (plus padding?) to
+	// the beginning of the line so it works better as columns
 	pairs := &dt.Pairs[string, any]{}
 	pairs.Add("pkg", tr.Package)
-
 	if tr.MissingTests {
 		priority = level.Warning
 		pairs.Add("state", "untested")
@@ -286,10 +288,9 @@ func (tr testReport) Message() message.Composer {
 			pairs.Add("cached", true)
 		} else if tr.CoverageEnabled {
 			pairs.Add("coverage", tr.Coverage)
-		} else if !tr.CompileOnly {
-			pairs.Add("dur", tr.Duration)
 		}
 	}
+	pairs.Add("dur", tr.Duration)
 
 	out := message.MakePairs(pairs)
 	out.SetPriority(priority)
@@ -376,8 +377,7 @@ func report(
 	iter := LineIterator(strings.NewReader(coverage))
 	table := tabby.New()
 	replacer := strings.NewReplacer(mod.ModuleName, pfx)
-	err = erc.Join(
-		err,
+	err = erc.Join(err,
 		iter.Observe(ctx, func(in string) {
 			cols := strings.Fields(replacer.Replace(in))
 			if cols[0] == "total:" {
@@ -401,10 +401,10 @@ func report(
 
 	pairs := &dt.Pairs[string, any]{}
 
-	pairs.Add("pkg", mod.PackageName)
+	pairs.Add("mod", mod.ModuleName)
 
 	if mod.PackageName != mod.ModuleName {
-		pairs.Add("mod", mod.ModuleName)
+		pairs.Add("pkg", mod.PackageName)
 	}
 
 	pairs.Add("dur", tr.Duration)

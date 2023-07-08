@@ -9,9 +9,8 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/itertool"
-	"github.com/tychoish/fun/set"
 	"github.com/tychoish/fun/testt"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -55,7 +54,7 @@ func TestGraph(t *testing.T) {
 		graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
 		assert.NotError(t, err)
 
-		seen := set.MakeUnordered[string](len(graph.Packages))
+		seen := &dt.Set[string]{}
 		for _, pkg := range graph.Packages {
 			seen.Add(pkg.PackageName)
 		}
@@ -68,12 +67,12 @@ func TestGraph(t *testing.T) {
 		graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
 		assert.NotError(t, err)
 
-		seen := set.MakeUnordered[string](len(graph.Packages))
+		seen := &dt.Set[string]{}
 
 		totalNodes := 0
 		for idx, group := range graph.Order {
 			totalNodes += len(group)
-			set.PopulateSet(ctx, seen, itertool.Slice(group))
+			seen.Populate(fun.SliceIterator(group))
 			grip.Info(message.MakeKV(
 				message.KV("idx", idx),
 				message.KV("size", len(group)),
@@ -90,8 +89,8 @@ func TestGraph(t *testing.T) {
 		graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
 		assert.NotError(t, err)
 
-		seen := set.MakeUnordered[string](len(graph.Packages))
-		pkgs := fun.Mapify(graph.Packages.IndexByPackageName())
+		seen := &dt.Set[string]{}
+		pkgs := dt.Mapify(graph.Packages.IndexByPackageName())
 
 		for gidx, group := range graph.Order {
 			for eidx, edge := range group {
@@ -128,7 +127,7 @@ func TestGraph(t *testing.T) {
 		graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
 		assert.NotError(t, err)
 		assert.True(t, len(graph.Order) >= 1)
-		pkgs := fun.Mapify(graph.Packages.IndexByPackageName())
+		pkgs := dt.Mapify(graph.Packages.IndexByPackageName())
 		for _, edge := range graph.Order[0] {
 			testt.Log(t, edge)
 			check.True(t, pkgs.Check(edge))
@@ -197,20 +196,20 @@ func TestGraph(t *testing.T) {
 				Unique:      true,
 			})
 
-			limits := set.MakeNewOrdered[string]()
-			set.PopulateSet(ctx, limits, graph.Packages.ConvertPathsToPackages(iter))
+			limits := &dt.Set[string]{}
+			limits.Populate(graph.Packages.ConvertPathsToPackages(iter))
 			report(t, graph.Narrow(limits))
 		})
 	})
 }
 
 func BenchmarkGadget(b *testing.B) {
-	for _, p := range fun.MakePairs(
-		fun.MakePair("Jasper", "/home/tychoish/src/jasper"),
-		fun.MakePair("Grip", "/home/tychoish/src/grip"),
-		fun.MakePair("Sardis", "/home/tychoish/src/sardis"),
-		fun.MakePair("NeonCloud", "/home/tychoish/neon/cloud"),
-	) {
+	for _, p := range dt.MakePairs(
+		dt.MakePair("Jasper", "/home/tychoish/src/jasper"),
+		dt.MakePair("Grip", "/home/tychoish/src/grip"),
+		dt.MakePair("Sardis", "/home/tychoish/src/sardis"),
+		dt.MakePair("NeonCloud", "/home/tychoish/neon/cloud"),
+	).Slice() {
 		b.Run(p.Key, func(b *testing.B) {
 			b.Run("DagGenCollect", func(b *testing.B) {
 				start := time.Now()

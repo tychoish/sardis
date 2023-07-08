@@ -79,8 +79,8 @@ func GetAlacrittySocketPath() (out string, err error) {
 			out = path
 			return io.EOF
 		})
-	if out == "" || (err != nil && errors.Is(err, io.EOF)) {
-		return "", fmt.Errorf("no socket found: %w", err)
+	if out == "" || (err != nil && !errors.Is(err, io.EOF)) {
+		return "", fmt.Errorf("no socket [%s] found: %w", out, err)
 	}
 
 	return out, nil

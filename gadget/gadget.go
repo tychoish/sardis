@@ -352,6 +352,8 @@ func testOutputFilter(
 			mp.Store(report.Package, report)
 			grip.InfoWhen(report.Info.ModuleName != report.Info.PackageName, report.Message)
 			return "", io.EOF
+		} else if strings.HasPrefix(mstr, "FAIL") {
+			return "", io.EOF
 		}
 
 		// TODO full qualify lines that start with whitespace + line

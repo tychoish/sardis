@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/itertool"
@@ -42,31 +43,22 @@ func Ripgrep(ctx context.Context, jpm jasper.Manager, args RipgrepArgs) *fun.Ite
 	sender.SetName("ripgrep")
 	sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
-	cmd := []string{"rg",
+	cmd := dt.Slice[string]{
 		"--files-with-matches",
 		"--line-buffered",
 		"--color=never",
 		"--trim",
 	}
-	if args.Invert {
-		cmd = append(cmd, "--invert-match")
-	}
-	if args.IgnoreFile != "" {
-		cmd = append(cmd, "--ignore-file", args.IgnoreFile)
-	}
-	if args.Zip {
-		cmd = append(cmd, "--search-zip")
-	}
-	if args.WordRegexp {
-		cmd = append(cmd, "--word-regexp")
-	}
-	for _, t := range args.Types {
-		cmd = append(cmd, "--type", t)
-	}
-	for _, t := range args.ExcludedTypes {
-		cmd = append(cmd, "--type-not", t)
-	}
-	cmd = append(cmd, "--regexp", args.Regexp)
+
+	dt.Sliceify(args.Types).Observe(func(t string) { cmd.Append("--type", t) })
+	dt.Sliceify(args.ExcludedTypes).Observe(func(t string) { cmd.Append("--type-not", t) })
+
+	cmd.AppendWhen(args.Invert, "--invert-match")
+	cmd.AppendWhen(args.IgnoreFile != "", "--ignore-file", args.IgnoreFile)
+	cmd.AppendWhen(args.Zip, "--search-zip")
+	cmd.AppendWhen(args.WordRegexp, "--word-regexp")
+
+	cmd.Append("--regexp", args.Regexp)
 
 	ec := &erc.Collector{}
 	ec.Add(jpm.CreateCommand(ctx).
@@ -76,12 +68,10 @@ func Ripgrep(ctx context.Context, jpm jasper.Manager, args RipgrepArgs) *fun.Ite
 		SetErrorSender(level.Error, grip.Sender()).
 		Run(ctx))
 
-	iter := itertool.Lines(sender.buffer)
-
-	iter = fun.ConvertIterator(iter, func(_ context.Context, in string) (string, error) { return filepath.Join(args.Path, in), nil })
+	iter := fun.Converter(func(in string) string { return filepath.Join(args.Path, in) }).Convert(itertool.Lines(sender.buffer))
 
 	if args.Directories {
-		iter = fun.ConvertIterator(iter, func(_ context.Context, in string) (string, error) { return filepath.Dir(in), nil })
+		iter = fun.Converter(func(in string) string { return filepath.Dir(in) }).Convert(iter)
 	}
 
 	if args.Unique {

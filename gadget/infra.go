@@ -1,19 +1,16 @@
 package gadget
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
-	"io"
 	"io/fs"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -79,7 +76,7 @@ func Ripgrep(ctx context.Context, jpm jasper.Manager, args RipgrepArgs) *fun.Ite
 		SetErrorSender(level.Error, grip.Sender()).
 		Run(ctx))
 
-	iter := LineIterator(sender.buffer)
+	iter := itertool.Lines(sender.buffer)
 
 	iter = fun.ConvertIterator(iter, func(_ context.Context, in string) (string, error) { return filepath.Join(args.Path, in), nil })
 
@@ -141,16 +138,6 @@ func WalkDirIterator[T any](ctx context.Context, path string, fn func(p string, 
 	})
 }
 
-func LineIterator(in io.Reader) *fun.Iterator[string] {
-	scanner := bufio.NewScanner(in)
-	return fun.Generator(func(ctx context.Context) (string, error) {
-		if !scanner.Scan() {
-			return "", erc.Join(io.EOF, scanner.Err())
-		}
-		return strings.TrimSpace(scanner.Text()), nil
-	})
-}
-
 // TODO: move to grip when we have a risky.Ignore
 type bufsend struct {
 	send.Base
@@ -159,10 +146,7 @@ type bufsend struct {
 
 func (b *bufsend) Send(m message.Composer) {
 	if send.ShouldLog(b, m) {
-		// TODO: this can never error so avoid the extra code
-		// TODO: just write \n rather than sprintln
-		if _, err := b.buffer.Write([]byte(fmt.Sprintln(m.String()))); err != nil {
-			b.ErrorHandler()(err, m)
-		}
+		fun.Invariant.Must(ft.IgnoreFirst(b.buffer.WriteString(m.String())))
+		fun.Invariant.Must(ft.IgnoreFirst(b.buffer.WriteString("\n")))
 	}
 }

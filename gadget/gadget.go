@@ -19,6 +19,7 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/srv"
@@ -284,7 +285,8 @@ func (tr testReport) Message() message.Composer {
 		priority = level.Info
 		if tr.Cached {
 			pairs.Add("cached", true)
-		} else if tr.CoverageEnabled {
+		}
+		if tr.CoverageEnabled {
 			if tr.FullyCovered {
 				pairs.Add("covered", true)
 			} else {
@@ -334,7 +336,7 @@ func testOutputFilter(
 				}
 			}
 			mp.Store(report.Package, report)
-			grip.Sender().Send(report.Message())
+			grip.InfoWhen(report.Info.ModuleName != report.Info.PackageName, report.Message)
 			return "", io.EOF
 		} else if strings.HasPrefix(mstr, "?") {
 			parts := strings.Fields(mstr)
@@ -342,12 +344,13 @@ func testOutputFilter(
 			report := testReport{
 				Package:         parts[1],
 				Info:            pkgs[parts[1]],
+				Cached:          strings.Contains(mstr, "cached"),
 				MissingTests:    true,
 				CompileOnly:     opts.CompileOnly,
 				CoverageEnabled: opts.ReportCoverage,
 			}
 			mp.Store(report.Package, report)
-			grip.Sender().Send(report.Message())
+			grip.InfoWhen(report.Info.ModuleName != report.Info.PackageName, report.Message)
 			return "", io.EOF
 		}
 
@@ -381,7 +384,7 @@ func report(
 	)
 	count := 0
 
-	iter := LineIterator(strings.NewReader(coverage))
+	iter := itertool.Lines(strings.NewReader(coverage))
 	table := tabby.New()
 	replacer := strings.NewReplacer(mod.ModuleName, pfx)
 	err = erc.Join(err,
@@ -414,27 +417,25 @@ func report(
 		pairs.Add("pkg", mod.PackageName)
 	}
 
-	pairs.Add("dur", tr.Duration)
 	pairs.Add("path", mod.LocalDirectory)
 
 	if tr.MissingTests {
 		pairs.Add("state", "no tests")
-	} else if tr.Cached {
+	}
+	if tr.Cached {
 		pairs.Add("state", "cached")
-	} else if tr.CoverageEnabled {
+	} else {
+		pairs.Add("state", "exec")
+	}
+	pairs.Add("dur", tr.Duration)
+
+	if tr.CoverageEnabled {
+		pairs.Add("funcs", count)
 		if tr.Coverage == 100.0 {
 			pairs.Add("covered", true)
 		} else {
-			pairs.Add("covered", tr.Coverage)
-		}
-
-		pairs.Add("funcs", count)
-
-		if numUncovered != 0 {
-			pairs.Add("uncovered", numUncovered)
-		}
-		if numCovered != count {
 			pairs.Add("covered", numCovered)
+			pairs.Add("coverage", tr.Coverage)
 		}
 	}
 

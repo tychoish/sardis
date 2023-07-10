@@ -6,6 +6,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/srv"
@@ -81,21 +82,21 @@ func NewDispatcher(conf Config) *Dispatcher {
 	})
 
 	r.middleware.Default.SetConstructor(func() *pubsub.Deque[Middleware] {
-		return fun.Must(pubsub.NewDeque[Middleware](pubsub.DequeOptions{Unlimited: true}))
+		return ft.Must(pubsub.NewDeque[Middleware](pubsub.DequeOptions{Unlimited: true}))
 	})
 
 	r.interceptor.Default.SetConstructor(func() *pubsub.Deque[Interceptor] {
-		return fun.Must(pubsub.NewDeque[Interceptor](pubsub.DequeOptions{Unlimited: true}))
+		return ft.Must(pubsub.NewDeque[Interceptor](pubsub.DequeOptions{Unlimited: true}))
 	})
 
 	// impossible for this to error, because the capacity is
 	// always greater than 1, and this will always vialidate
-	r.pipe = fun.Must(pubsub.NewDeque[Message](pubsub.DequeOptions{Capacity: conf.Workers}))
+	r.pipe = ft.Must(pubsub.NewDeque[Message](pubsub.DequeOptions{Capacity: conf.Workers}))
 
 	if r.conf.Buffer <= 0 {
 		r.outgoing = pubsub.NewUnlimitedQueue[Response]()
 	} else {
-		r.outgoing = fun.Must(pubsub.NewQueue[Response](pubsub.QueueOptions{
+		r.outgoing = ft.Must(pubsub.NewQueue[Response](pubsub.QueueOptions{
 			SoftQuota:   r.conf.Buffer,
 			HardLimit:   r.conf.Buffer + r.conf.Workers,
 			BurstCredit: float64(r.conf.Workers + 1),
@@ -112,10 +113,10 @@ func NewDispatcher(conf Config) *Dispatcher {
 	// change,) because this is called exactly once when the
 	// Dispatcher is created, nothing can error
 
-	fun.InvariantMust(r.registerBrokerService())
-	fun.InvariantMust(r.registerPipeShutdownService())
-	fun.InvariantMust(r.registerProcessResponseService())
-	fun.InvariantMust(r.registerMiddlwareService())
+	fun.Invariant.Must(r.registerBrokerService())
+	fun.Invariant.Must(r.registerPipeShutdownService())
+	fun.Invariant.Must(r.registerProcessResponseService())
+	fun.Invariant.Must(r.registerMiddlwareService())
 
 	return r
 }
@@ -130,11 +131,11 @@ func NewDispatcher(conf Config) *Dispatcher {
 // method must return true before you can use the service.
 func (r *Dispatcher) Service() *srv.Service { return r.orchestrator.Service() }
 
-// Ready produces a fun.WaitFunc that blocks until the dispatcher's
+// Ready produces a fun.Operation that blocks until the dispatcher's
 // service is ready and running (or the context passed to the wait
 // function is canceled.)
-func (r *Dispatcher) Ready() fun.WaitFunc {
-	return func(ctx context.Context) { _, _ = fun.ReadOne(ctx, r.isRunning) }
+func (r *Dispatcher) Ready() fun.Operation {
+	return fun.BlockingReceive(r.isRunning).Ignore
 }
 
 func (r *Dispatcher) AddMiddleware(key Protocol, it Middleware) error {
@@ -150,7 +151,7 @@ func (r *Dispatcher) RegisterHandler(key Protocol, hfn Handler) bool {
 }
 
 func (r *Dispatcher) OverrideHandler(key Protocol, hfn Handler) {
-	fun.WhenCall(!key.IsZero(), func() { r.handlers.Store(key, hfn) })
+	ft.WhenCall(!key.IsZero(), func() { r.handlers.Store(key, hfn) })
 }
 
 // Stream returns a channel that processes
@@ -246,7 +247,7 @@ func (r *Dispatcher) Exec(ctx context.Context, m Message) (*Response, error) {
 		return nil, err
 	}
 
-	val, err := fun.ReadOne(ctx, out)
+	val, err := fun.Blocking(out).Receive().Read(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -358,14 +359,14 @@ func (r *Dispatcher) registerProcessResponseService() error {
 						}
 
 						if err := r.doIntercept(ctx, rr.Protocol, &rr); err != nil {
-							rr.Error = erc.Merge(err, rr.Error)
+							rr.Error = erc.Join(err, rr.Error)
 						}
 
 						r.broker.Publish(ctx, rr)
 						return ctx.Err()
 
 					},
-					itertool.Options{NumWorkers: r.conf.Workers},
+					fun.WorkerGroupConfNumWorkers(r.conf.Workers),
 				)
 			}
 		},
@@ -376,7 +377,7 @@ func (r *Dispatcher) registerMiddlwareService() error {
 	return r.orchestrator.Add(&srv.Service{
 		Shutdown: r.pipe.Close,
 		Run: func(ctx context.Context) error {
-			return itertool.ParallelForEach(ctx, r.pipe.IteratorBlocking(),
+			return itertool.ParallelForEach(ctx, r.pipe.Distributor().Iterator(),
 				func(ctx context.Context, req Message) error {
 					var resp Response
 					var err error
@@ -404,7 +405,9 @@ func (r *Dispatcher) registerMiddlwareService() error {
 					}
 					return r.outgoing.Add(resp)
 				},
-				itertool.Options{NumWorkers: r.conf.Workers})
+				fun.WorkerGroupConfNumWorkers(r.conf.Workers),
+			)
+
 		},
 	})
 }

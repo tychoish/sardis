@@ -10,10 +10,9 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/itertool"
+	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/pubsub"
-	"github.com/tychoish/fun/seq"
 )
 
 // DialerFunc constructs a new connection. These functions can be
@@ -85,7 +84,7 @@ type peer[T any] struct {
 	lastObservedReset time.Time
 
 	info        *adt.Synchronized[*ConnectionInfo]
-	historic    *seq.List[ConnectionInfo]
+	historic    *dt.List[ConnectionInfo]
 	failureInfo *disconnectedPeer[T]
 }
 
@@ -202,10 +201,10 @@ func (r *Router[T]) AddPeer(opt T) error { return r.peerPipe.Add(opt) }
 
 func (r *Router[T]) Send(ep Envelope) error { return r.outgoing.PushBack(ep) }
 
-func (r *Router[T]) Stream(ctx context.Context) fun.Iterator[Envelope] {
+func (r *Router[T]) Stream(ctx context.Context) *fun.Iterator[Envelope] {
 	sub := r.incoming.Subscribe(ctx)
 	defer r.incoming.Unsubscribe(ctx, sub)
-	return itertool.Channel(sub)
+	return fun.ChannelIterator(sub)
 }
 
 func (r *Router[T]) Exec(ctx context.Context, ep Envelope) (Envelope, error) {
@@ -217,8 +216,9 @@ func (r *Router[T]) Exec(ctx context.Context, ep Envelope) (Envelope, error) {
 		return Envelope{}, err
 	}
 
+	pipe := fun.Blocking(sub).Receive()
 	for {
-		rsp, err := fun.ReadOne(ctx, sub)
+		rsp, err := pipe.Read(ctx)
 		if err != nil {
 			return Envelope{}, fmt.Errorf("message-id: %s: %w",
 				ep.Payload.ID, err)
@@ -274,7 +274,7 @@ func (r *Router[T]) createNewPeer(ctx context.Context, opts T, conn Connection) 
 		for {
 			ep, err := conn.Recieve(ctx)
 
-			if errors.Is(err, io.EOF) || erc.ContextExpired(err) {
+			if errors.Is(err, io.EOF) || ers.ContextExpired(err) {
 				return
 			}
 			if err != nil {
@@ -371,7 +371,7 @@ func (r *Router[T]) createNewPeer(ctx context.Context, opts T, conn Connection) 
 						err = ErrProtocolConflict
 					}
 				}
-				if err := erc.Merge(err, rsp.Error); err != nil {
+				if err := ers.Join(err, rsp.Error); err != nil {
 					info := p.failureInfo
 					if info == nil {
 						info = &disconnectedPeer[T]{
@@ -458,7 +458,7 @@ func (r *Router[T]) startListener(ctx context.Context) {
 		defer r.wg.Done()
 		for {
 			opts, conn, err := r.Listner.Get()(ctx)
-			if errors.Is(err, io.EOF) || erc.ContextExpired(err) {
+			if errors.Is(err, io.EOF) || ers.ContextExpired(err) {
 				return
 			} else if err != nil {
 				r.ErrorObserver.Get()(err)

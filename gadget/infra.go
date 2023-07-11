@@ -36,14 +36,13 @@ type RipgrepArgs struct {
 
 func Ripgrep(ctx context.Context, jpm jasper.Manager, args RipgrepArgs) *fun.Iterator[string] {
 	args.Path = util.TryExpandHomedir(args.Path)
-	sender := &bufsend{
-		buffer: &bytes.Buffer{},
-	}
+	sender := &bufsend{}
 	sender.SetPriority(level.Info)
 	sender.SetName("ripgrep")
 	sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
 	cmd := dt.Slice[string]{
+		"rg",
 		"--files-with-matches",
 		"--line-buffered",
 		"--color=never",
@@ -60,15 +59,14 @@ func Ripgrep(ctx context.Context, jpm jasper.Manager, args RipgrepArgs) *fun.Ite
 
 	cmd.Append("--regexp", args.Regexp)
 
-	ec := &erc.Collector{}
-	ec.Add(jpm.CreateCommand(ctx).
+	grip.Error(jpm.CreateCommand(ctx).
 		Directory(args.Path).
 		Add(cmd).
 		SetOutputSender(level.Info, sender).
 		SetErrorSender(level.Error, grip.Sender()).
 		Run(ctx))
 
-	iter := fun.Converter(func(in string) string { return filepath.Join(args.Path, in) }).Convert(itertool.Lines(sender.buffer))
+	iter := fun.Converter(func(in string) string { return filepath.Join(args.Path, in) }).Convert(itertool.Lines(&sender.buffer))
 
 	if args.Directories {
 		iter = fun.Converter(func(in string) string { return filepath.Dir(in) }).Convert(iter)
@@ -128,10 +126,9 @@ func WalkDirIterator[T any](ctx context.Context, path string, fn func(p string, 
 	})
 }
 
-// TODO: move to grip when we have a risky.Ignore
 type bufsend struct {
 	send.Base
-	buffer *bytes.Buffer
+	buffer bytes.Buffer
 }
 
 func (b *bufsend) Send(m message.Composer) {

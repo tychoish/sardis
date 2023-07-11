@@ -21,7 +21,7 @@ func TestRipgrep(t *testing.T) {
 	args := RipgrepArgs{
 		Types:       []string{"go"},
 		Regexp:      "go:generate",
-		Path:        "~/neon/cloud",
+		Path:        "/home/tychoish/neon/cloud",
 		Directories: true,
 		Unique:      true,
 	}
@@ -33,6 +33,7 @@ func TestRipgrep(t *testing.T) {
 		count++
 		grip.Info(iter.Value())
 	}
+	grip.Error(iter.Close())
 	grip.Info(message.Fields{
 		"path":  args.Path,
 		"count": count,

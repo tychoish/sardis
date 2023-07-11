@@ -1,7 +1,6 @@
 package gadget
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -154,6 +153,7 @@ func RunTests(ctx context.Context, opts Options) error {
 		ec.Add(main.Add(func(ctx context.Context) error {
 			catch := &erc.Collector{}
 			var err error
+
 			if !opts.CompileOnly || !opts.SkipLint {
 				lintStart := time.Now()
 				err := jpm.CreateCommand(ctx).
@@ -175,9 +175,7 @@ func RunTests(ctx context.Context, opts Options) error {
 					Send()
 			}
 
-			sender := &bufsend{
-				buffer: &bytes.Buffer{},
-			}
+			sender := &bufsend{}
 			sender.SetPriority(level.Info)
 			sender.SetName("coverage.report")
 			sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))

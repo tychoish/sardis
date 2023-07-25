@@ -59,21 +59,24 @@ func Ripgrep(ctx context.Context, jpm jasper.Manager, args RipgrepArgs) *fun.Ite
 
 	cmd.Append("--regexp", args.Regexp)
 
-	grip.Error(jpm.CreateCommand(ctx).
+	err := jpm.CreateCommand(ctx).
 		Directory(args.Path).
 		Add(cmd).
 		SetOutputSender(level.Info, sender).
 		SetErrorSender(level.Error, grip.Sender()).
-		Run(ctx))
+		Run(ctx)
 
-	iter := fun.Converter(func(in string) string { return filepath.Join(args.Path, in) }).Convert(itertool.Lines(&sender.buffer))
-
-	if args.Directories {
-		iter = fun.Converter(func(in string) string { return filepath.Dir(in) }).Convert(iter)
-	}
+	iter := fun.Converter(func(in string) string {
+		in = filepath.Join(args.Path, in)
+		if args.Directories {
+			return filepath.Dir(in)
+		}
+		return in
+	}).Convert(itertool.Lines(&sender.buffer))
+	iter.AddError(err)
 
 	if args.Unique {
-		iter = itertool.Uniq(iter)
+		return itertool.Uniq(iter)
 	}
 
 	return iter

@@ -87,6 +87,16 @@ func (opts *Options) Validate() error {
 func strptr(in string) *string { return &in }
 
 func RunTests(ctx context.Context, opts Options) error {
+	start := time.Now()
+	defer func() {
+		grip.Build().Level(level.Info).
+			Pair("app", "gadget").
+			Pair("op", "run-tests").
+			Pair("workers", opts.Workers).
+			Pair("dur", time.Since(start)).
+			Send()
+	}()
+
 	var seenOne bool
 	iter := WalkDirIterator(ctx, opts.RootPath, func(path string, d fs.DirEntry) (*string, error) {
 		name := d.Name()
@@ -117,7 +127,7 @@ func RunTests(ctx context.Context, opts Options) error {
 	}
 
 	out := send.MakeWriter(send.MakePlain())
-	out.SetPriority(grip.Sender().Priority())
+	out.SetPriority(level.Debug)
 	out.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
 	count := 0
@@ -153,27 +163,6 @@ func RunTests(ctx context.Context, opts Options) error {
 		ec.Add(main.Add(func(ctx context.Context) error {
 			catch := &erc.Collector{}
 			var err error
-
-			if !opts.CompileOnly || !opts.SkipLint {
-				lintStart := time.Now()
-				err := jpm.CreateCommand(ctx).
-					ID(fmt.Sprint("lint.", shortName)).
-					Directory(modulePath).
-					SetOutputSender(level.Info, out).
-					SetErrorSender(level.Error, out).
-					PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
-					Append(fmt.Sprint("golangci-lint run --allow-parallel-runners ", modulePath)).
-					Run(ctx)
-				lintDur := time.Since(lintStart)
-				catch.Add(erc.Wrapf(err, "lint errors for %q", modulePath))
-
-				grip.Build().Level(level.Info).
-					Pair("pkg", mod.ModuleName).
-					Pair("op", "lint").
-					Pair("ok", err == nil).
-					Pair("dur", lintDur).
-					Send()
-			}
 
 			sender := &bufsend{}
 			sender.SetPriority(level.Info)
@@ -245,6 +234,29 @@ func RunTests(ctx context.Context, opts Options) error {
 			report(ctx, mod, reports.Get(mod.PackageName), strings.TrimSpace(sender.buffer.String()), dur, catch.Resolve())
 			return catch.Resolve()
 		}))
+		if !opts.CompileOnly || !opts.SkipLint {
+			ec.Add(main.Add(func(ctx context.Context) error {
+				lintStart := time.Now()
+				err := jpm.CreateCommand(ctx).
+					ID(fmt.Sprint("lint.", shortName)).
+					Directory(modulePath).
+					SetOutputSender(level.Info, out).
+					SetErrorSender(level.Error, out).
+					AppendArgs("golangci-lint", "run", "--allow-parallel-runners").
+					Run(ctx)
+				lintDur := time.Since(lintStart)
+
+				grip.Build().Level(level.Info).
+					Pair("pkg", mod.ModuleName).
+					Pair("op", "lint").
+					Pair("ok", err == nil).
+					Pair("dur", lintDur).
+					Send()
+
+				return erc.Wrapf(err, "lint errors for %q", modulePath)
+			}))
+
+		}
 	}
 
 	ec.Add(main.Close())

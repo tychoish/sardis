@@ -77,7 +77,7 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 		ID(j.buildID()).
 		AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
 		Directory(j.Path).
-		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && ", j.Path)+fmt.Sprintf(syncCmdTemplate, j.buildID())).
+		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, fmt.Sprintf(syncCmdTemplate, j.buildID()))).
 		Append(j.Pre...).
 		AppendArgs("git", "add", "-A").
 		AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", "origin").

@@ -90,15 +90,7 @@ func TopLevel() *cmdr.Commander {
 						}).Flag(),
 					cmdr.FlagBuilder("...").
 						SetName("path", "p").
-						SetUsage(fmt.Sprintln("path to pass to go test without leading slashes.",
-							"(the same path is passed to all invocations, which doesn't always make ",
-							"sense when recursive is true)")).
-						SetValidate(func(path string) error {
-							if strings.HasPrefix(path, "./") {
-								return fmt.Errorf("%q should not have a leading './'", path)
-							}
-							return nil
-						}).
+						SetUsage(fmt.Sprintln("path to pass to go test without leading slashes.")).
 						Flag(),
 					cmdr.FlagBuilder(false).
 						SetName("recursive", "r").

@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
@@ -45,16 +47,19 @@ type Options struct {
 	Workers        int
 }
 
-func (opts *Options) Validate() error {
+func (opts *Options) Validate() (err error) {
+	defer func() { err = ers.ParsePanic(recover()) }()
+
 	ec := &erc.Collector{}
 
 	erc.When(ec, opts.Workers < 1, "gadget options cannot specify 0 or fewer workers")
 	erc.When(ec, opts.Timeout < time.Second, "timeout should be at least a second")
 	erc.Whenf(ec, strings.HasSuffix(opts.RootPath, "..."), "root path [%s] should not have ...", opts.RootPath)
 
-	if ec.HasErrors() {
-		return ec.Resolve()
-	}
+	erc.When(ec, opts.Recursive && (opts.PackagePath != "" && opts.PackagePath != "./"),
+		"recursive gadget calls must not specify a limiting path")
+
+	fun.Invariant.Must(ec.Resolve())
 
 	if strings.HasPrefix(opts.PackagePath, "./") {
 		switch len(opts.PackagePath) {
@@ -130,6 +135,31 @@ func RunTests(ctx context.Context, opts Options) error {
 	out.SetPriority(level.Debug)
 	out.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
+	if !opts.CompileOnly || !opts.SkipLint {
+		ec.Add(main.Add(func(ctx context.Context) error {
+			name := filepath.Base(opts.RootPath)
+			start := time.Now()
+			err := jpm.CreateCommand(ctx).
+				ID(fmt.Sprint("lint.", name)).
+				Directory(opts.RootPath).
+				SetOutputSender(level.Info, out).
+				SetErrorSender(level.Error, out).
+				AppendArgs("golangci-lint", "run", "--allow-parallel-runners").
+				Run(ctx)
+
+			dur := time.Since(start)
+
+			grip.Build().Level(level.Info).
+				Pair("project", name).
+				Pair("op", "lint").
+				Pair("ok", err == nil).
+				Pair("dur", dur).
+				Send()
+
+			return erc.Wrapf(err, "lint errors for %q", opts.RootPath)
+		}))
+	}
+
 	count := 0
 	for iter.Next(ctx) {
 		modulePath := iter.Value()
@@ -164,18 +194,18 @@ func RunTests(ctx context.Context, opts Options) error {
 			catch := &erc.Collector{}
 			var err error
 
-			sender := &bufsend{}
-			sender.SetPriority(level.Info)
-			sender.SetName("coverage.report")
-			sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
-
 			testOut := send.MakeWriter(send.MakePlain())
 			testOut.SetPriority(grip.Sender().Priority())
 			testOut.SetFormatter(testOutputFilter(opts, reports, pkgidx))
 			testOut.SetErrorHandler(func(err error, m message.Composer) {
 				grip.ErrorWhen(!errors.Is(err, io.EOF), message.WrapError(err, m))
 			})
-			args := []string{"go", "test", "-race", "-parallel=8", fmt.Sprint("-timeout=", opts.Timeout)}
+			args := []string{
+				"go", "test", "-race",
+				fmt.Sprintf("-parallel=%d", runtime.NumCPU()),
+				fmt.Sprint("-timeout=", opts.Timeout),
+			}
+
 			switch {
 			case opts.CompileOnly:
 				args = append(args, "-run=noop", fmt.Sprint("./", opts.PackagePath))
@@ -189,8 +219,8 @@ func RunTests(ctx context.Context, opts Options) error {
 
 			args = append(args, fmt.Sprint("./", opts.PackagePath))
 			args = append(args, opts.GoTestArgs...)
-			testStart := time.Now()
 
+			testStart := time.Now()
 			err = jpm.CreateCommand(ctx).
 				ID(fmt.Sprint("test.", shortName)).
 				Directory(modulePath).
@@ -200,18 +230,23 @@ func RunTests(ctx context.Context, opts Options) error {
 				Bash("go mod tidy || true").
 				Add(args).
 				Run(ctx)
-			testDur := time.Since(testStart)
+			dur := time.Since(testStart)
 
 			grip.Build().Level(level.Info).
-				Pair("pkg", mod.ModuleName).
+				Pair("project", filepath.Base(opts.RootPath)).
 				Pair("op", "test").
 				Pair("ok", err == nil).
-				Pair("dur", testDur).
+				Pair("dur", dur).
 				Send()
 
 			catch.Add(err)
 
+			sender := &bufsend{}
 			if err == nil && opts.ReportCoverage {
+				sender.SetPriority(level.Info)
+				sender.SetName("coverage.report")
+				sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
+
 				grip.Warning(erc.Wrapf(jpm.CreateCommand(ctx).
 					ID(fmt.Sprint("coverage.html.", shortName)).
 					Directory(modulePath).
@@ -230,33 +265,9 @@ func RunTests(ctx context.Context, opts Options) error {
 					Run(ctx))
 			}
 
-			dur := time.Since(start)
-			report(ctx, mod, reports.Get(mod.PackageName), strings.TrimSpace(sender.buffer.String()), dur, catch.Resolve())
+			report(ctx, mod, reports.Get(mod.PackageName), strings.TrimSpace(sender.buffer.String()), time.Since(start), catch.Resolve())
 			return catch.Resolve()
 		}))
-		if !opts.CompileOnly || !opts.SkipLint {
-			ec.Add(main.Add(func(ctx context.Context) error {
-				lintStart := time.Now()
-				err := jpm.CreateCommand(ctx).
-					ID(fmt.Sprint("lint.", shortName)).
-					Directory(modulePath).
-					SetOutputSender(level.Info, out).
-					SetErrorSender(level.Error, out).
-					AppendArgs("golangci-lint", "run", "--allow-parallel-runners").
-					Run(ctx)
-				lintDur := time.Since(lintStart)
-
-				grip.Build().Level(level.Info).
-					Pair("pkg", mod.ModuleName).
-					Pair("op", "lint").
-					Pair("ok", err == nil).
-					Pair("dur", lintDur).
-					Send()
-
-				return erc.Wrapf(err, "lint errors for %q", modulePath)
-			}))
-
-		}
 	}
 
 	ec.Add(main.Close())
@@ -346,7 +357,7 @@ func testOutputFilter(
 				}
 			}
 			mp.Store(report.Package, report)
-			grip.InfoWhen(report.Info.ModuleName != report.Info.PackageName, report.Message)
+			grip.Info(report.Message)
 			return "", io.EOF
 		} else if strings.HasPrefix(mstr, "?") {
 			parts := strings.Fields(mstr)
@@ -360,7 +371,7 @@ func testOutputFilter(
 				CoverageEnabled: opts.ReportCoverage,
 			}
 			mp.Store(report.Package, report)
-			grip.InfoWhen(report.Info.ModuleName != report.Info.PackageName, report.Message)
+			grip.Info(report.Message)
 			return "", io.EOF
 		} else if strings.HasPrefix(mstr, "FAIL") {
 			return "", io.EOF
@@ -399,75 +410,66 @@ func report(
 	iter := itertool.Lines(strings.NewReader(coverage))
 	table := tabby.New()
 	replacer := strings.NewReplacer(mod.ModuleName, pfx)
-	err = erc.Join(err,
-		iter.Observe(ctx, func(in string) {
-			cols := strings.Fields(replacer.Replace(in))
-			if cols[0] == "total:" {
-				// we read this out of the go.test line
-				return
-			}
-			count++
+	err = erc.Join(err, iter.Observe(ctx, func(in string) {
+		cols := strings.Fields(replacer.Replace(in))
+		if cols[0] == "total:" {
+			// we read this out of the go.test line
+			return
+		}
+		count++
 
-			if strings.HasSuffix(in, "100.0%") {
-				numCovered++
-				return
-			}
+		if strings.HasSuffix(in, "100.0%") {
+			numCovered++
+			return
+		}
 
-			numUncovered++
+		numUncovered++
 
-			if strings.HasPrefix(cols[0], "/") {
-				cols[0] = cols[0][1:]
-			}
-			table.AddLine(cols[0], cols[1], cols[2])
-		}))
+		if strings.HasPrefix(cols[0], "/") {
+			cols[0] = cols[0][1:]
+		}
+		table.AddLine(cols[0], cols[1], cols[2])
+	}))
 
-	pairs := &dt.Pairs[string, any]{}
-
-	pairs.Add("mod", mod.ModuleName)
+	msg := grip.Build().PairBuilder()
+	defer msg.Send()
+	msg.Pair("mod", mod.ModuleName)
 
 	if mod.PackageName != mod.ModuleName {
-		pairs.Add("pkg", mod.PackageName)
+		msg.Pair("pkg", mod.PackageName)
 	}
 
-	pairs.Add("path", mod.LocalDirectory)
+	msg.Pair("path", mod.LocalDirectory)
 
 	if tr.MissingTests {
-		pairs.Add("state", "no tests")
-	}
-	if tr.Cached {
-		pairs.Add("state", "cached")
+		msg.Pair("state", "no tests")
+	} else if tr.Cached {
+		msg.Pair("state", "cached")
 	} else {
-		pairs.Add("state", "exec")
+		msg.Pair("state", "exec")
 	}
-	pairs.Add("dur", tr.Duration)
+	msg.Pair("dur", tr.Duration)
 
 	if tr.CoverageEnabled {
-		pairs.Add("funcs", count)
+		msg.Pair("funcs", count)
 		if tr.Coverage == 100.0 {
-			pairs.Add("covered", true)
+			msg.Pair("covered", true)
 		} else {
-			pairs.Add("covered", numCovered)
-			pairs.Add("coverage", tr.Coverage)
+			msg.Pair("covered", numCovered)
+			msg.Pair("coverage", tr.Coverage)
 		}
+		table.Print()
 	}
 
-	if err != nil {
-		pairs.Add("err", err)
-	}
-
-	msg := message.MakePairs(pairs)
 	switch {
+	case err != nil:
+		msg.Pair("err", err)
+		msg.SetPriority(level.Error)
 	case tr.MissingTests:
 		msg.SetPriority(level.Warning)
-	case err != nil:
-		msg.SetPriority(level.Error)
 	case tr.Cached:
 		msg.SetPriority(level.Info)
 	default:
 		msg.SetPriority(level.Info)
 	}
-	grip.Sender().Send(msg)
-
-	table.Print()
-
 }

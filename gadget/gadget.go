@@ -124,9 +124,10 @@ func RunTests(ctx context.Context, opts Options) error {
 	ec := &erc.Collector{}
 
 	main := pubsub.NewUnlimitedQueue[fun.Worker]()
-	pool := srv.WorkerPool(main,
-		fun.WorkerGroupConfSet(&fun.WorkerGroupConf{NumWorkers: opts.Workers, ContinueOnError: true}),
-	)
+	pool := srv.WorkerPool(main, fun.WorkerGroupConfSet(&fun.WorkerGroupConf{
+		NumWorkers:      opts.Workers,
+		ContinueOnError: true,
+	}))
 	if err := pool.Start(ctx); err != nil {
 		return err
 	}
@@ -227,7 +228,6 @@ func RunTests(ctx context.Context, opts Options) error {
 				SetOutputSender(level.Debug, testOut).
 				SetErrorSender(level.Error, testOut).
 				PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
-				Bash("go mod tidy || true").
 				Add(args).
 				Run(ctx)
 			dur := time.Since(testStart)

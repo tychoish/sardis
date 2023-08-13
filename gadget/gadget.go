@@ -136,7 +136,7 @@ func RunTests(ctx context.Context, opts Options) error {
 	out.SetPriority(level.Debug)
 	out.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
-	if !opts.CompileOnly || !opts.SkipLint {
+	if !opts.CompileOnly && !opts.SkipLint {
 		ec.Add(main.Add(func(ctx context.Context) error {
 			name := filepath.Base(opts.RootPath)
 			start := time.Now()

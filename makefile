@@ -24,15 +24,15 @@ endif
 build:$(buildDir)/$(name) $(buildDir)/$(alt)
 
 $(name):$(buildDir)/$(name)
-	rm $(buildDir)/$(name)
-	ln -s $(buildDir)/$(name)
+	ln -sf $(buildDir)/$(name) || true
+
 $(buildDir)/$(name):$(srcFiles) go.mod go.sum
 	@mkdir -p $(buildDir)
 	go build -ldflags "-X github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -o $@ cmd/$(name)/$(name).go
 
 $(alt):$(buildDir)/$(alt)
-	rm $(buildDir)/$(alt)
-	ln -s $(buildDir)/$(alt)
+	ln -fs $(buildDir)/$(alt)
+
 $(buildDir)/$(alt):$(srcFiles) go.mod go.sum
 	@mkdir -p $(buildDir)
 	go build -ldflags "-X github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -o $@ cmd/$(alt)/$(alt).go

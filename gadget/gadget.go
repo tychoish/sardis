@@ -66,7 +66,7 @@ func (opts *Options) Validate() (err error) {
 		case 2:
 			opts.PackagePath = ""
 		default:
-			opts.PackagePath = opts.PackagePath[3:]
+			opts.PackagePath = opts.PackagePath[2:]
 		}
 	}
 

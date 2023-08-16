@@ -21,7 +21,6 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/srv"
@@ -203,9 +202,7 @@ func RunTests(ctx context.Context, opts Options) error {
 				testOut := send.MakeWriter(send.MakePlain())
 				testOut.SetPriority(grip.Sender().Priority())
 				testOut.SetFormatter(testOutputFilter(opts, reports, pkgidx))
-				testOut.SetErrorHandler(func(err error, m message.Composer) {
-					grip.ErrorWhen(!errors.Is(err, io.EOF), message.WrapError(err, m))
-				})
+				testOut.SetErrorHandler(func(err error) { grip.ErrorWhen(!errors.Is(err, io.EOF), err) })
 				args := []string{
 					"go", "test", "-race",
 					fmt.Sprintf("-parallel=%d", runtime.NumCPU()),
@@ -274,7 +271,7 @@ func RunTests(ctx context.Context, opts Options) error {
 				return catch.Resolve()
 			}
 		})).
-		Process(fun.BlockingProcessor(main.Add)).
+		Process(fun.MakeProcessor(main.Add)).
 		PostHook(func() { ec.Add(main.Close()); ec.Add(pool.Wait()) }).Operation(ec.Add).Run(ctx)
 
 	return ec.Resolve()
@@ -411,7 +408,7 @@ func report(
 	)
 	count := 0
 
-	iter := itertool.Lines(strings.NewReader(coverage))
+	iter := fun.HF.Lines(strings.NewReader(coverage))
 	table := tabby.New()
 	replacer := strings.NewReplacer(mod.ModuleName, pfx)
 	err = erc.Join(err, iter.Observe(ctx, func(in string) {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/set"
+	"github.com/tychoish/fun/dt"
 )
 
 func TestMessageIDs(t *testing.T) {
@@ -56,7 +56,7 @@ func TestMessageIDs(t *testing.T) {
 		defer resetCounter()
 
 		const iters = 100000
-		seen := set.MakeUnordered[MessageID](iters)
+		seen := &dt.Set[MessageID]{}
 		for i := 0; i < iters; i++ {
 			id := GenerateID()
 			seen.Add(id)

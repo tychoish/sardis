@@ -49,7 +49,7 @@ func Commander() *cmdr.Commander {
 			)).Add).
 		Middleware(sardis.WithDesktopNotify).
 		Middleware(func(ctx context.Context) context.Context {
-			jpm := jasper.NewManager(jasper.ManagerOptions{Synchronized: true})
+			jpm := jasper.NewManager(jasper.ManagerOptionSetSynchronized())
 			srv.AddCleanup(ctx, jpm.Close)
 			return jasper.WithManager(ctx, jpm)
 		}).

@@ -4,24 +4,28 @@ go 1.20
 
 require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
+	github.com/cbrgm/githubevents v1.8.0
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
 	github.com/go-git/go-git/v5 v5.2.0
+	github.com/google/go-github/v50 v50.2.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nwidger/jsoncolor v0.3.2
-	github.com/stevenle/topsort/v2 v2.0.0-20221220232632-cbb1bebc3b5e
-	github.com/tychoish/birch v0.2.3-0.20230708040754-3580810793c8
-	github.com/tychoish/cmdr v0.3.3-0.20230708042142-276f68a5ca9d
-	github.com/tychoish/fun v0.10.0
+	github.com/tychoish/birch v0.2.3-0.20230815160103-70c52db1b271
+	github.com/tychoish/cmdr v0.3.4-0.20230816161710-934a4074b45c
+	github.com/tychoish/fun v0.10.3
 	github.com/tychoish/godmenu v0.1.1
-	github.com/tychoish/grip v0.3.4
-	github.com/tychoish/grip/x/desktop v0.0.0-20230708040850-75a630d7443b
-	github.com/tychoish/grip/x/jira v0.0.0-20230708040850-75a630d7443b
-	github.com/tychoish/grip/x/system v0.0.0-20230708040850-75a630d7443b
-	github.com/tychoish/grip/x/telegram v0.0.0-20230708040850-75a630d7443b
-	github.com/tychoish/grip/x/twitter v0.0.0-20230708040850-75a630d7443b
-	github.com/tychoish/grip/x/xmpp v0.0.0-20230708040850-75a630d7443b
-	github.com/tychoish/jasper v0.1.2-0.20230708044614-2365d89ef836
+	github.com/tychoish/grip v0.3.5
+	github.com/tychoish/grip/x/desktop v0.0.0-20230815172847-a642e6ca055e
+	github.com/tychoish/grip/x/jira v0.0.0-20230815172847-a642e6ca055e
+	github.com/tychoish/grip/x/system v0.0.0-20230815172847-a642e6ca055e
+	github.com/tychoish/grip/x/telegram v0.0.0-20230815172847-a642e6ca055e
+	github.com/tychoish/grip/x/twitter v0.0.0-20230815172847-a642e6ca055e
+	github.com/tychoish/grip/x/xmpp v0.0.0-20230815172847-a642e6ca055e
+	github.com/tychoish/jasper v0.1.2-0.20230816150753-52815deca5dd
+	github.com/tychoish/jasper/x/cli v0.0.0-20230816150753-52815deca5dd
+	github.com/tychoish/jasper/x/remote v0.0.0-20230708044614-2365d89ef836
+	github.com/tychoish/jasper/x/track v0.0.0-20230509174929-2fe8b231212c
 	github.com/urfave/cli/v2 v2.25.3
 	go.mongodb.org/mongo-driver v1.11.6
 	golang.org/x/tools v0.6.0
@@ -31,7 +35,6 @@ require (
 require (
 	github.com/ProtonMail/go-crypto v0.0.0-20230217124315-7d5c6f04bbb8 // indirect
 	github.com/andygrunwald/go-jira v1.15.1 // indirect
-	github.com/cbrgm/githubevents v1.8.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cloudflare/circl v1.1.0 // indirect
 	github.com/containerd/cgroups/v3 v3.0.1 // indirect
@@ -57,7 +60,6 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.3.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/go-github/v50 v50.2.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.3.0 // indirect
@@ -86,15 +88,12 @@ require (
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
-	github.com/tychoish/birch/x/ftdc v0.0.0-20230708040754-3580810793c8 // indirect
-	github.com/tychoish/birch/x/mrpc v0.0.0-20230708044500-bd86569eda49 // indirect
+	github.com/tychoish/birch/x/ftdc v0.0.0-20230815163402-467fbef7acab // indirect
+	github.com/tychoish/birch/x/mrpc v0.0.0-20230815163402-467fbef7acab // indirect
 	github.com/tychoish/gimlet v0.0.0-20230130001449-8987c96bb886 // indirect
-	github.com/tychoish/grip/x/metrics v0.0.0-20230518040011-315ea039b765 // indirect
-	github.com/tychoish/grip/x/splunk v0.0.0-20230708040850-75a630d7443b // indirect
-	github.com/tychoish/jasper/x/cli v0.0.0-20230708044614-2365d89ef836 // indirect
-	github.com/tychoish/jasper/x/remote v0.0.0-20230708044614-2365d89ef836 // indirect
+	github.com/tychoish/grip/x/metrics v0.0.0-20230815172847-a642e6ca055e // indirect
+	github.com/tychoish/grip/x/splunk v0.0.0-20230815172847-a642e6ca055e // indirect
 	github.com/tychoish/jasper/x/splunk v0.0.0-20230510193424-429e4caa8e98 // indirect
-	github.com/tychoish/jasper/x/track v0.0.0-20230509174929-2fe8b231212c // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect

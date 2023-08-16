@@ -58,7 +58,7 @@ func TopLevel() *cmdr.Commander {
 						return err
 					}
 
-					if n, err := boops.WriteTo(os.Stdout); err != nil {
+					if n, err := boops.Packages.WriteTo(os.Stdout); err != nil {
 						return fmt.Errorf("writing to stdout %d: %w", n, err)
 					}
 

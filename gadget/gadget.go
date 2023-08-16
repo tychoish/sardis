@@ -20,6 +20,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/risky"
@@ -56,8 +57,8 @@ func (opts *Options) Validate() (err error) {
 	erc.When(ec, opts.Timeout < time.Second, "timeout should be at least a second")
 	erc.Whenf(ec, strings.HasSuffix(opts.RootPath, "..."), "root path [%s] should not have ...", opts.RootPath)
 
-	erc.When(ec, opts.Recursive && (opts.PackagePath != "" && opts.PackagePath != "./"),
-		"recursive gadget calls must not specify a limiting path")
+	erc.Whenf(ec, opts.Recursive && (opts.PackagePath != "" && opts.PackagePath != "./" && opts.PackagePath != "..."),
+		"recursive gadget calls must not specify a limiting path %q", opts.PackagePath)
 
 	fun.Invariant.Must(ec.Resolve())
 
@@ -157,121 +158,124 @@ func RunTests(ctx context.Context, opts Options) error {
 				Pair("dur", dur).
 				Send()
 
-			return erc.Wrapf(err, "lint errors for %q", opts.RootPath)
+			return ers.Wrapf(err, "lint errors for %q", opts.RootPath)
 		}))
 	}
 
 	count := 0
-	for iter.Next(ctx) {
-		modulePath := iter.Value()
+
+	pkgiter := fun.ConvertIterator(iter, func(ctx context.Context, mpath string) (*Module, error) {
 		if count != 0 && !opts.Recursive {
-			grip.Infof("module at %q is within %q but recursive mode is not enabled",
-				modulePath, opts.RootPath)
-			ec.Add(iter.Close())
-			break
+			return nil, fmt.Errorf("module at %q is within %q but recursive mode is not enabled",
+				mpath, opts.RootPath)
 		}
 		count++
 
-		shortName := filepath.Base(modulePath)
-		pkgs, err := Collect(ctx, modulePath)
-		if err != nil {
-			ec.Add(err)
-			continue
-		}
+		return Collect(ctx, mpath)
+	})
 
-		pkgidx := pkgs.IndexByPackageName()
-		mod := pkgs.IndexByLocalDirectory()[modulePath]
-
-		grip.Build().Level(level.Debug).
-			Pair("pkg", mod.ModuleName).
-			Pair("op", "populate").
-			Pair("pkgs", len(pkgs)).
-			Pair("path", util.TryCollapseHomedir(modulePath)).
-			Send()
-
-		start := time.Now()
-		reports := &adt.Map[string, testReport]{}
-		ec.Add(main.Add(func(ctx context.Context) error {
-			catch := &erc.Collector{}
-			var err error
-
-			testOut := send.MakeWriter(send.MakePlain())
-			testOut.SetPriority(grip.Sender().Priority())
-			testOut.SetFormatter(testOutputFilter(opts, reports, pkgidx))
-			testOut.SetErrorHandler(func(err error, m message.Composer) {
-				grip.ErrorWhen(!errors.Is(err, io.EOF), message.WrapError(err, m))
-			})
-			args := []string{
-				"go", "test", "-race",
-				fmt.Sprintf("-parallel=%d", runtime.NumCPU()),
-				fmt.Sprint("-timeout=", opts.Timeout),
-			}
-
-			switch {
-			case opts.CompileOnly:
-				args = append(args, "-run=noop", fmt.Sprint("./", opts.PackagePath))
-			case opts.ReportCoverage:
-				args = append(args, "-coverprofile=coverage.out")
-			case opts.UseCache:
-				// nothing
-			default:
-				return fmt.Errorf("must configure coverage, cache, or compile-only")
-			}
-
-			args = append(args, fmt.Sprint("./", opts.PackagePath))
-			args = append(args, opts.GoTestArgs...)
-
-			testStart := time.Now()
-			err = jpm.CreateCommand(ctx).
-				ID(fmt.Sprint("test.", shortName)).
-				Directory(modulePath).
-				SetOutputSender(level.Debug, testOut).
-				SetErrorSender(level.Error, testOut).
-				PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
-				Add(args).
-				Run(ctx)
-			dur := time.Since(testStart)
-
-			grip.Build().Level(level.Info).
-				Pair("project", filepath.Base(opts.RootPath)).
-				Pair("op", "test").
-				Pair("ok", err == nil).
-				Pair("dur", dur).
-				Send()
-
-			catch.Add(err)
-
-			sender := &bufsend{}
-			if err == nil && opts.ReportCoverage {
-				sender.SetPriority(level.Info)
-				sender.SetName("coverage.report")
-				sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
-
-				grip.Warning(erc.Wrapf(jpm.CreateCommand(ctx).
-					ID(fmt.Sprint("coverage.html.", shortName)).
-					Directory(modulePath).
-					PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
-					SetOutputSender(level.Debug, out).
-					SetErrorSender(level.Error, out).
-					Append("go tool cover -html=coverage.out -o coverage.html").
-					Run(ctx), "coverage html for %s", shortName))
-
-				catch.Add(jpm.CreateCommand(ctx).
-					ID(fmt.Sprint("coverage.report", modulePath)).
-					Directory(modulePath).
-					SetErrorSender(level.Error, out).
-					SetOutputSender(level.Info, sender).
-					Append("go tool cover -func=coverage.out").
-					Run(ctx))
-			}
-
-			report(ctx, mod, reports.Get(mod.PackageName), strings.TrimSpace(sender.buffer.String()), time.Since(start), catch.Resolve())
-			return catch.Resolve()
-		}))
+	if opts.Recursive {
+		pkgiter = pkgiter.ParallelBuffer(intish.Max(4, opts.Workers/2))
 	}
 
-	ec.Add(main.Close())
-	ec.Add(pool.Wait())
+	fun.ConvertIterator(
+		pkgiter,
+		fun.Converter(func(module *Module) fun.Worker {
+			return func(ctx context.Context) error {
+				pkgs := module.Packages
+				pkgidx := pkgs.IndexByPackageName()
+				mod := pkgs.IndexByLocalDirectory()[module.Path]
+				shortName := filepath.Base(module.Path)
+
+				grip.Build().Level(level.Debug).
+					Pair("pkg", mod.ModuleName).
+					Pair("op", "populate").
+					Pair("pkgs", len(pkgs)).
+					Pair("path", util.TryCollapseHomedir(module.Path)).
+					Send()
+
+				start := time.Now()
+				reports := &adt.Map[string, testReport]{}
+
+				catch := &erc.Collector{}
+				var err error
+
+				testOut := send.MakeWriter(send.MakePlain())
+				testOut.SetPriority(grip.Sender().Priority())
+				testOut.SetFormatter(testOutputFilter(opts, reports, pkgidx))
+				testOut.SetErrorHandler(func(err error, m message.Composer) {
+					grip.ErrorWhen(!errors.Is(err, io.EOF), message.WrapError(err, m))
+				})
+				args := []string{
+					"go", "test", "-race",
+					fmt.Sprintf("-parallel=%d", runtime.NumCPU()),
+					fmt.Sprint("-timeout=", opts.Timeout),
+				}
+
+				switch {
+				case opts.CompileOnly:
+					args = append(args, "-run=noop", fmt.Sprint("./", opts.PackagePath))
+				case opts.ReportCoverage:
+					args = append(args, "-coverprofile=coverage.out")
+				case opts.UseCache:
+					// nothing
+				default:
+					return fmt.Errorf("must configure coverage, cache, or compile-only")
+				}
+
+				args = append(args, fmt.Sprint("./", opts.PackagePath))
+				args = append(args, opts.GoTestArgs...)
+
+				testStart := time.Now()
+				err = jpm.CreateCommand(ctx).
+					ID(fmt.Sprint("test.", shortName)).
+					Directory(module.Path).
+					SetOutputSender(level.Debug, testOut).
+					SetErrorSender(level.Error, testOut).
+					PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
+					Add(args).
+					Run(ctx)
+				dur := time.Since(testStart)
+
+				grip.Build().Level(level.Info).
+					Pair("project", filepath.Base(opts.RootPath)).
+					Pair("op", "test").
+					Pair("ok", err == nil).
+					Pair("dur", dur).
+					Send()
+
+				catch.Add(err)
+
+				sender := &bufsend{}
+				if err == nil && opts.ReportCoverage {
+					sender.SetPriority(level.Info)
+					sender.SetName("coverage.report")
+					sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
+
+					grip.Warning(ers.Wrapf(jpm.CreateCommand(ctx).
+						ID(fmt.Sprint("coverage.html.", shortName)).
+						Directory(module.Path).
+						PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
+						SetOutputSender(level.Debug, out).
+						SetErrorSender(level.Error, out).
+						Append("go tool cover -html=coverage.out -o coverage.html").
+						Run(ctx), "coverage html for %s", shortName))
+
+					catch.Add(jpm.CreateCommand(ctx).
+						ID(fmt.Sprint("coverage.report", module.Path)).
+						Directory(module.Path).
+						SetErrorSender(level.Error, out).
+						SetOutputSender(level.Info, sender).
+						Append("go tool cover -func=coverage.out").
+						Run(ctx))
+				}
+
+				report(ctx, mod, reports.Get(mod.PackageName), strings.TrimSpace(sender.buffer.String()), time.Since(start), catch.Resolve())
+				return catch.Resolve()
+			}
+		})).
+		Process(fun.BlockingProcessor(main.Add)).
+		PostHook(func() { ec.Add(main.Close()); ec.Add(pool.Wait()) }).Operation(ec.Add).Run(ctx)
 
 	return ec.Resolve()
 }

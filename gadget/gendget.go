@@ -37,14 +37,16 @@ func (bo *BuildOrder) Narrow(limits *dt.Set[string]) *BuildOrder {
 }
 
 func GetBuildOrder(ctx context.Context, path string) (*BuildOrder, error) {
-	pkgs, err := Collect(ctx, path)
+	mod, err := Collect(ctx, path)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(pkgs) == 0 {
+	if len(mod.Packages) == 0 {
 		return nil, fmt.Errorf("no modules found in %q", path)
 	}
+
+	pkgs := mod.Packages
 
 	index := pkgs.IndexByPackageName()
 	nodes := pkgs.Graph()

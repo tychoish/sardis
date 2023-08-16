@@ -48,6 +48,11 @@ type PackageInfo struct {
 
 type Packages []PackageInfo
 
+type Module struct {
+	Path     string
+	Packages Packages
+}
+
 func (p Packages) IndexByLocalDirectory() map[string]PackageInfo {
 	out := make(map[string]PackageInfo, len(p))
 	for idx := range p {
@@ -132,7 +137,10 @@ func (info PackageInfo) String() string {
 	return buf.String()
 }
 
-func Collect(ctx context.Context, path string) (Packages, error) {
+func Collect(ctx context.Context, path string) (*Module, error) {
+	out := &Module{
+		Path: path,
+	}
 	if !strings.HasSuffix(path, "...") {
 		path = filepath.Join(path, "...")
 	}
@@ -199,7 +207,11 @@ func Collect(ctx context.Context, path string) (Packages, error) {
 		return nil, fmt.Errorf("no packages for %q", path)
 	}
 
-	return seen.Values().Slice(ctx)
+	if out.Packages, err = seen.Values().Slice(ctx); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 func filterLocal(path string, imports []*types.Package) *fun.Iterator[*types.Package] {

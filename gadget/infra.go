@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io/fs"
 	"path/filepath"
-	"sync"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
@@ -85,48 +84,41 @@ func Ripgrep(ctx context.Context, jpm jasper.Manager, args RipgrepArgs) *fun.Ite
 // WalkDirIterator provides an alternate fun.Iterator-based interface
 // to filepath.WalkDir. The filepath.WalkDir runs in a go routnine,
 // and calls a simpler walk function: where you can output an object,
-// [in most cases a string of the path] but the function is generic.
+// [in most cases a string of the path] but the function is generic
+// and you can convert or do other work as needed.
 //
 // If the first value of the walk function is nil, then the item is
 // skipped the walk will continue, otherwise--assuming that the error
 // is non-nil, it is de-referenced and returned by the iterator.
 func WalkDirIterator[T any](ctx context.Context, path string, fn func(p string, d fs.DirEntry) (*T, error)) *fun.Iterator[T] {
-	once := &sync.Once{}
 	ec := &erc.Collector{}
-	var pipe chan T
+	pipe := fun.Blocking(make(chan T))
+	send := pipe.Processor()
 
-	return fun.Generator(func(ctx context.Context) (T, error) {
-		once.Do(func() {
-			pipe = make(chan T)
-			go func() {
-				defer close(pipe)
-				_ = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
-					if err != nil {
-						return fs.SkipAll
-					}
+	init := fun.Worker(func(ctx context.Context) error {
+		return filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return fs.SkipAll
+			}
 
-					out, err := fn(p, d)
-					if err != nil {
-						if !errors.Is(err, fs.SkipDir) && !errors.Is(err, fs.SkipAll) {
-							ec.Add(err)
-						}
-						return err
-					}
-					if out == nil {
-						return nil
-					}
+			out, err := fn(p, d)
+			if err != nil {
+				if !errors.Is(err, fs.SkipDir) && !errors.Is(err, fs.SkipAll) {
+					ec.Add(err)
+				}
+				return err
+			}
+			if out == nil {
+				return nil
+			}
 
-					return fun.Blocking(pipe).Send().Write(ctx, *out)
-				})
-			}()
+			return send(ctx, *out)
 		})
-		if ec.HasErrors() {
-			var zero T
-			return zero, ec.Resolve()
-		}
 
-		return fun.Blocking(pipe).Receive().Read(ctx)
-	})
+	}).Operation(fun.HF.ErrorObserverWithoutTerminating(ec.Add)).
+		PostHook(pipe.Close).Once().Launch()
+
+	return pipe.Producer().PreHook(init).IteratorWithHook(erc.IteratorHook[T](ec))
 }
 
 type bufsend struct {

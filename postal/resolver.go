@@ -17,12 +17,19 @@ const (
 	SerializationCodecYAML       SerializationFormat = "yaml"
 )
 
-type Resolver map[SerializationFormat]SerializationCodec
+type SerializationRepresentation bool
 
-func (r Resolver) Add(codec SerializationCodec) { r[codec.Format] = codec }
+const (
+	SerializationRepresentationText   = false
+	SerializationRepresentationBinary = true
+)
 
-func DefaultResolver() Resolver {
-	r := Resolver{}
+type CodecStore map[SerializationFormat]SerializationCodec
+
+func (r CodecStore) Add(codec SerializationCodec) { r[codec.Format] = codec }
+
+func DefaultCodecStore() CodecStore {
+	r := CodecStore{}
 	r.Add(MakeCodecJSON())
 	r.Add(MakeCodecDriverBSON())
 	r.Add(MakeCodecBirchBSON())
@@ -31,39 +38,44 @@ func DefaultResolver() Resolver {
 }
 
 type SerializationCodec struct {
-	Format SerializationFormat
-	Encode func(any) ([]byte, error)
-	Decode func([]byte, any) error
+	Format         SerializationFormat
+	Encode         func(any) ([]byte, error)
+	Decode         func([]byte, any) error
+	Representation SerializationRepresentation
 }
 
 func MakeCodecJSON() SerializationCodec {
 	return SerializationCodec{
-		Format: SerializationCodecStdlibJSON,
-		Encode: json.Marshal,
-		Decode: json.Unmarshal,
+		Format:         SerializationCodecStdlibJSON,
+		Encode:         json.Marshal,
+		Decode:         json.Unmarshal,
+		Representation: SerializationRepresentationText,
 	}
 }
 
 func MakeCodecYAML() SerializationCodec {
 	return SerializationCodec{
-		Format: SerializationCodecYAML,
-		Encode: yaml.Marshal,
-		Decode: yaml.Unmarshal,
+		Format:         SerializationCodecYAML,
+		Encode:         yaml.Marshal,
+		Decode:         yaml.Unmarshal,
+		Representation: SerializationRepresentationText,
 	}
 }
 
 func MakeCodecDriverBSON() SerializationCodec {
 	return SerializationCodec{
-		Format: SerializationCodecDriverBSON,
-		Encode: bson.Marshal,
-		Decode: bson.Unmarshal,
+		Format:         SerializationCodecDriverBSON,
+		Encode:         bson.Marshal,
+		Decode:         bson.Unmarshal,
+		Representation: SerializationRepresentationBinary,
 	}
 }
 
 func MakeCodecBirchBSON() SerializationCodec {
 	return SerializationCodec{
-		Format: SerializationCodecDriverBSON,
-		Encode: func(in any) ([]byte, error) { return birch.DC.Interface(in).MarshalBSON() },
-		Decode: func(in []byte, out any) error { return birch.DC.Reader(in).Unmarshal(out) },
+		Format:         SerializationCodecDriverBSON,
+		Encode:         func(in any) ([]byte, error) { return birch.DC.Interface(in).MarshalBSON() },
+		Decode:         func(in []byte, out any) error { return birch.DC.Reader(in).Unmarshal(out) },
+		Representation: SerializationRepresentationBinary,
 	}
 }

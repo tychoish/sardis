@@ -22,8 +22,9 @@ func (s Schema) Validate() error { return nil }
 
 type Envelope struct {
 	Schema  Schema  `db:"schema" bson:"schema" json:"schema" yaml:"schema"`
-	Payload Message `db:"schema" bson:"payload" json:"payload" yaml:"payload"`
+	Payload Message `db:"payload" bson:"payload" json:"payload" yaml:"payload"`
 
+	// internal accounting
 	cache    Job
 	registry *Registry
 	lazy     adt.Once[error]
@@ -120,11 +121,9 @@ type Registry struct {
 
 func MakeJobFactory[T Job](fn fun.Future[T]) fun.Future[Job] { return func() Job { return fn() } }
 
-func (r Registry) Register(schema Schema, fn fun.Future[Job]) { r.Factories.Add(schema, fn) }
+func (r *Registry) Register(schema Schema, fn fun.Future[Job]) { r.Factories.Add(schema, fn) }
 
-func (r *Registry) NewEnvalope() *Envelope { return &Envelope{registry: r} }
-
-func (r *Registry) BuildEnvelope(s Schema, msg Job) (*Envelope, error) {
+func (r *Registry) MakeEnvelope(s Schema, msg Job) (*Envelope, error) {
 	if err := s.Validate(); err != nil {
 		return nil, err
 	}

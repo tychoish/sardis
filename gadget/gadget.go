@@ -89,8 +89,6 @@ func (opts *Options) Validate() (err error) {
 	return nil
 }
 
-func strptr(in string) *string { return &in }
-
 func RunTests(ctx context.Context, opts Options) error {
 	start := time.Now()
 	defer func() {
@@ -114,7 +112,7 @@ func RunTests(ctx context.Context, opts Options) error {
 		}
 		if !seenOne || seenOne && opts.Recursive {
 			seenOne = true
-			return strptr(filepath.Dir(path)), nil
+			return ft.Ptr(filepath.Dir(path)), nil
 		}
 
 		// for non-recursive cases, abort early.

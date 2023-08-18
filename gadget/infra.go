@@ -92,35 +92,36 @@ func Ripgrep(ctx context.Context, jpm jasper.Manager, args RipgrepArgs) *fun.Ite
 // is non-nil, it is de-referenced and returned by the iterator.
 func WalkDirIterator[T any](ctx context.Context, path string, fn func(p string, d fs.DirEntry) (*T, error)) *fun.Iterator[T] {
 	ec := &erc.Collector{}
+
 	pipe := fun.Blocking(make(chan T))
 	send := pipe.Processor()
 
-	init := fun.Worker(
-		func(ctx context.Context) error {
-			return filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
-				if err != nil {
-					return fs.SkipAll
-				}
-
-				out, err := fn(p, d)
-				if err != nil {
-					if !errors.Is(err, fs.SkipDir) && !errors.Is(err, fs.SkipAll) {
-						ec.Add(err)
+	return pipe.Producer().PreHook(
+		fun.Worker(
+			func(ctx context.Context) error {
+				return filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+					if err != nil {
+						return fs.SkipAll
 					}
-					return err
-				}
-				if out == nil {
-					return nil
-				}
 
-				return send(ctx, *out)
-			})
+					out, err := fn(p, d)
+					if err != nil {
+						if !errors.Is(err, fs.SkipDir) && !errors.Is(err, fs.SkipAll) {
+							ec.Add(err)
+						}
+						return err
+					}
+					if out == nil {
+						return nil
+					}
 
-		}).
-		Operation(fun.HF.ErrorHandlerWithoutTerminating(ec.Add)).
-		PostHook(pipe.Close).Once().Go()
+					return send(ctx, *out)
+				})
 
-	return pipe.Producer().PreHook(init).IteratorWithHook(erc.IteratorHook[T](ec))
+			}).
+			Operation(fun.HF.ErrorHandlerWithoutTerminating(ec.Add)).
+			PostHook(pipe.Close).Once().Go(),
+	).IteratorWithHook(erc.IteratorHook[T](ec))
 }
 
 type bufsend struct {

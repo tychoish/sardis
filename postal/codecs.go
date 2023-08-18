@@ -8,15 +8,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type SerializationFormat string
-
-const (
-	SerializationCodecStdlibJSON SerializationFormat = "stdlib-json"
-	SerializationCodecBirchBSON  SerializationFormat = "birch-bson"
-	SerializationCodecDriverBSON SerializationFormat = "driver-bson"
-	SerializationCodecYAML       SerializationFormat = "yaml"
-)
-
 type SerializationRepresentation bool
 
 const (

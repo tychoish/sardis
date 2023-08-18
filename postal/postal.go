@@ -1,7 +1,9 @@
 package postal
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
@@ -9,110 +11,6 @@ import (
 )
 
 type Job interface{ Resolve() fun.Worker }
-
-type Message []byte
-
-type Schema struct {
-	Version int
-	Type    string
-	Format  SerializationFormat
-}
-
-func (s Schema) Validate() error { return nil }
-
-type Envelope struct {
-	Schema  Schema  `db:"schema" bson:"schema" json:"schema" yaml:"schema"`
-	Payload Message `db:"payload" bson:"payload" json:"payload" yaml:"payload"`
-
-	// internal accounting
-	cache    Job
-	registry *Registry
-	lazy     adt.Once[error]
-}
-
-func (e *Envelope) Job() Job           { return e.cache }
-func (e *Envelope) Worker() fun.Worker { return e.cache.Resolve() }
-
-func (e *Envelope) MarshalText() ([]byte, error) {
-	return e.marshal(SerializationRepresentationText)
-}
-func (e *Envelope) MarshalBinary() ([]byte, error) {
-	return e.marshal(SerializationRepresentationBinary)
-}
-func (e *Envelope) UnmarshalText(in []byte) error {
-	return e.unmarshal(in, SerializationRepresentationText)
-}
-func (e *Envelope) UnmarshalBinary(in []byte) error {
-	return e.unmarshal(in, SerializationRepresentationBinary)
-}
-
-func (e *Envelope) marshal(repr SerializationRepresentation) ([]byte, error) {
-	codec, ok := e.registry.Codecs[e.Schema.Format]
-	if !ok {
-		return nil, fmt.Errorf("unregistered serialization %s", e.Schema.Format)
-	}
-
-	if codec.Representation != repr {
-		return nil, fmt.Errorf("invalid encoding attempt")
-	}
-
-	return codec.Encode(e)
-}
-
-func (e *Envelope) unmarshal(in []byte, repr SerializationRepresentation) error {
-	e.Payload = in
-
-	e.lazy.Do(func() error { return nil }) // override and fire if needed
-
-	codec, ok := e.registry.Codecs[e.Schema.Format]
-	if !ok {
-		return fmt.Errorf("unregistered serialization %s", e.Schema.Format)
-	}
-
-	if codec.Representation != repr {
-		return fmt.Errorf("invalid decoding attempt")
-	}
-
-	factory, ok := e.registry.Factories.Load(e.Schema)
-	if !ok {
-		return fmt.Errorf("unregistered serialization %s", e.Schema.Format)
-	}
-
-	out := factory()
-	if err := codec.Decode(e.Payload, out); err != nil {
-		return err
-	}
-
-	e.cache = out
-	return nil
-}
-
-func (e *Envelope) Resolve(r *Registry) (Job, error) {
-	e.registry = r
-
-	if err := e.lazy.Resolve(); err != nil {
-		return nil, err
-	}
-
-	factory, ok := r.Factories.Load(e.Schema)
-	if !ok {
-		return nil, fmt.Errorf("unregistered type %s", e.Schema.Type)
-	}
-
-	out := factory()
-	codec, ok := r.Codecs[e.Schema.Format]
-	if !ok {
-		return nil, fmt.Errorf("unregistered serialization %s", e.Schema.Format)
-	}
-
-	if err := codec.Decode(e.Payload, out); err != nil {
-		return nil, err
-	}
-
-	e.cache = out
-
-	return out, nil
-}
 
 type Registry struct {
 	Codecs    CodecStore
@@ -139,6 +37,8 @@ func (r *Registry) MakeEnvelope(s Schema, msg Job) (*Envelope, error) {
 		registry: r,
 	}
 
+	e.Lock.Update(LockStatusCreated)
+
 	e.lazy.Set(func() error {
 		mbin, err := codec.Encode(msg)
 		if err != nil {
@@ -149,4 +49,131 @@ func (r *Registry) MakeEnvelope(s Schema, msg Job) (*Envelope, error) {
 	})
 
 	return e, nil
+}
+
+type Envelope struct {
+	Schema  Schema   `db:"schema" bson:"schema" json:"schema" yaml:"schema"`
+	Payload Message  `db:"payload" bson:"payload" json:"payload" yaml:"payload"`
+	Lock    LockInfo `db:"lock" bson:"lock" json:"lock" yaml:"lock"`
+
+	// internal accounting
+	cache    Job
+	registry *Registry
+	lazy     adt.Once[error]
+}
+
+type Message []byte
+
+func (e *Envelope) Worker() fun.Worker { return e.cache.Resolve() }
+
+func (e *Envelope) MarshalText() ([]byte, error) {
+	return e.marshal(SerializationRepresentationText)
+}
+func (e *Envelope) MarshalBinary() ([]byte, error) {
+	return e.marshal(SerializationRepresentationBinary)
+}
+func (e *Envelope) UnmarshalText(in []byte) error {
+	return e.unmarshal(in, SerializationRepresentationText)
+}
+func (e *Envelope) UnmarshalBinary(in []byte) error {
+	return e.unmarshal(in, SerializationRepresentationBinary)
+}
+
+func (e *Envelope) MarshalBSON() ([]byte, error) {
+	if strings.Contains(string(e.Schema.Format), "bson") {
+		return nil, errors.New("incorrect configuration")
+	}
+	return e.MarshalBinary()
+}
+
+func (e *Envelope) UnmarshalBSON(in []byte) error {
+	if strings.Contains(string(e.Schema.Format), "bson") {
+		return errors.New("incorrect configuration")
+	}
+	return e.UnmarshalBinary(in)
+}
+
+func (e *Envelope) marshal(repr SerializationRepresentation) ([]byte, error) {
+	codec, ok := e.registry.Codecs[e.Schema.Format]
+	if !ok {
+		return nil, fmt.Errorf("unregistered serialization %s", e.Schema.Format)
+	}
+
+	if codec.Representation != repr {
+		return nil, fmt.Errorf("invalid encoding attempt")
+	}
+
+	data, err := codec.Encode(e.cache)
+	if err != nil {
+		return nil, err
+	}
+
+	e.Payload = data
+
+	return codec.Encode(e)
+}
+
+func (e *Envelope) unmarshal(in []byte, repr SerializationRepresentation) error {
+	e.lazy.Do(func() error { return nil }) // override and fire if needed
+
+	codec, ok := e.registry.Codecs[e.Schema.Format]
+	if !ok {
+		return fmt.Errorf("unregistered serialization %s", e.Schema.Format)
+	}
+
+	if codec.Representation != repr {
+		return fmt.Errorf("invalid decoding attempt")
+	}
+
+	factory, ok := e.registry.Factories.Load(e.Schema)
+	if !ok {
+		return fmt.Errorf("unregistered serialization %s", e.Schema.Format)
+	}
+
+	if err := codec.Decode(in, e); err != nil {
+		return err
+	}
+
+	out := factory()
+	if err := codec.Decode(e.Payload, out); err != nil {
+		return err
+	}
+
+	e.cache = out
+	return nil
+}
+
+func (e *Envelope) Resolve(r *Registry) (Job, error) {
+	e.registry = r
+
+	if err := e.lazy.Resolve(); err != nil {
+		return nil, err
+	}
+
+	if e.cache != nil {
+		return e.cache, nil
+	}
+
+	if e.Payload == nil {
+		return nil, errors.New("missing job definition")
+	}
+
+	factory, ok := r.Factories.Load(e.Schema)
+	if !ok {
+		return nil, fmt.Errorf("unregistered type %s", e.Schema.Type)
+	}
+
+	out := factory()
+	codec, ok := r.Codecs[e.Schema.Format]
+	if !ok {
+		return nil, fmt.Errorf("unregistered serialization %s", e.Schema.Format)
+	}
+
+	if err := codec.Decode(e.Payload, out); err != nil {
+		return nil, err
+	}
+
+	e.cache = out
+
+	return out, nil
 }

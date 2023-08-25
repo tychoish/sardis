@@ -284,6 +284,8 @@ github.com/tychoish/godmenu v0.1.1/go.mod h1:Dtf6cda1ihkmn707FYZyJ+lIaXLlraSvG1i
 github.com/tychoish/grip v0.1.1/go.mod h1:Vxl3fsRs/5aAsnS3ff7/OT3C+A/kEWf08FgA2xSJfMY=
 github.com/tychoish/grip v0.3.6-0.20230824232221-fd39190c3be1 h1:by4xWnfTk0ZkdbRt1+Vw1NWA25E3TXSItOddvrFNw6k=
 github.com/tychoish/grip v0.3.6-0.20230824232221-fd39190c3be1/go.mod h1:KNReR43GI+rvv3BiBvlQ0KH8uJ2jHl4bg9gZPtm2g6U=
+github.com/tychoish/grip v0.3.6 h1:DnraGQGg8f7rVgZZirLWnZjBSYMsMvruwtmGurXH6fc=
+github.com/tychoish/grip v0.3.6/go.mod h1:KNReR43GI+rvv3BiBvlQ0KH8uJ2jHl4bg9gZPtm2g6U=
 github.com/tychoish/grip/x/desktop v0.0.0-20230815172847-a642e6ca055e h1:HsBVlsfsn8LWygvycRYgbzPfH/C01EyB1y/rMhwhmeY=
 github.com/tychoish/grip/x/desktop v0.0.0-20230815172847-a642e6ca055e/go.mod h1:L3cq6nDO0Lht6fLszsaYCJ9belLJenAgCSjYLLx/QME=
 github.com/tychoish/grip/x/jira v0.0.0-20230815172847-a642e6ca055e h1:riBpsBFuID325HBpK6QGp3GKITVY7K5V8ptzb1/SQvA=

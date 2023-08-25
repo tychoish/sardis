@@ -15,7 +15,7 @@ require (
 	github.com/tychoish/cmdr v0.3.4-0.20230824234144-380e023f6f24
 	github.com/tychoish/fun v0.10.4
 	github.com/tychoish/godmenu v0.1.1
-	github.com/tychoish/grip v0.3.6-0.20230824232221-fd39190c3be1
+	github.com/tychoish/grip v0.3.6
 	github.com/tychoish/grip/x/desktop v0.0.0-20230815172847-a642e6ca055e
 	github.com/tychoish/grip/x/jira v0.0.0-20230815172847-a642e6ca055e
 	github.com/tychoish/grip/x/system v0.0.0-20230815172847-a642e6ca055e

@@ -17,7 +17,12 @@ func TestRipgrep(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	jpm := jasper.NewManager(jasper.ManagerOptions{ID: t.Name(), Synchronized: true, MaxProcs: 64, Tracker: ft.Must(track.New(t.Name()))})
+	jpm := jasper.NewManager(jasper.ManagerOptionSet(jasper.ManagerOptions{
+		ID:           t.Name(),
+		Synchronized: true,
+		MaxProcs:     64,
+		Tracker:      ft.Must(track.New(t.Name())),
+	}))
 	args := RipgrepArgs{
 		Types:       []string{"go"},
 		Regexp:      "go:generate",

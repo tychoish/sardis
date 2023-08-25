@@ -31,8 +31,8 @@ func TestGraph(t *testing.T) {
 		assert.NotError(t, err)
 
 		buf := &bytes.Buffer{}
-		indx := gone.IndexByPackageName()
-		for _, pkg := range gtwo {
+		indx := gone.Packages.IndexByPackageName()
+		for _, pkg := range gtwo.Packages {
 			other := indx.Get(pkg.PackageName)
 			(Packages{pkg, other}).WriteTo(buf)
 			testt.Log(t, fmt.Sprintln(), buf.String())
@@ -183,7 +183,12 @@ func TestGraph(t *testing.T) {
 		})
 		t.Run("Narrowed", func(t *testing.T) {
 			ctx := testt.Context(t)
-			jpm := jasper.NewManager(jasper.ManagerOptions{ID: t.Name(), Synchronized: true, MaxProcs: 64, Tracker: ft.Must(track.New(t.Name()))})
+			jpm := jasper.NewManager(jasper.ManagerOptionSet(jasper.ManagerOptions{
+				ID:           t.Name(),
+				Synchronized: true,
+				MaxProcs:     64,
+				Tracker:      ft.Must(track.New(t.Name())),
+			}))
 
 			graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
 			assert.NotError(t, err)
@@ -215,14 +220,14 @@ func BenchmarkGadget(b *testing.B) {
 				start := time.Now()
 				ctx := testt.Context(b)
 				var (
-					pkgs Packages
-					err  error
+					mod *Module
+					err error
 				)
 				for i := 0; i < b.N; i++ {
-					pkgs, err = Collect(ctx, p.Value)
+					mod, err = Collect(ctx, p.Value)
 					check.NotError(b, err)
-					check.True(b, len(pkgs) >= 1)
-					b.Log("num-packages", len(pkgs))
+					check.True(b, len(mod.Packages) >= 1)
+					b.Log("num-packages", len(mod.Packages))
 				}
 				b.Log("duration", time.Since(start))
 			})

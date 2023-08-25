@@ -13,6 +13,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -215,7 +216,7 @@ func (conf *MenuConf) Validate() error {
 	if conf.Command != "" {
 		base := strings.Split(conf.Command, " ")[0]
 		_, err := exec.LookPath(base)
-		ec.Add(erc.Wrapf(err, "%s [%s] does not exist", base, conf.Command))
+		ec.Add(ers.Wrapf(err, "%s [%s] does not exist", base, conf.Command))
 	}
 
 	erc.Whenf(ec, len(conf.Selections) == 0 && len(conf.Aliases) == 0, "must specify options for %q", conf.Name)

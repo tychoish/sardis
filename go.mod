@@ -11,20 +11,20 @@ require (
 	github.com/google/go-github/v50 v50.2.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nwidger/jsoncolor v0.3.2
-	github.com/tychoish/birch v0.2.3-0.20230815160103-70c52db1b271
-	github.com/tychoish/cmdr v0.3.4-0.20230816161710-934a4074b45c
-	github.com/tychoish/fun v0.10.3
+	github.com/tychoish/birch v0.2.3-0.20230815163402-467fbef7acab
+	github.com/tychoish/cmdr v0.3.4-0.20230824234144-380e023f6f24
+	github.com/tychoish/fun v0.10.4
 	github.com/tychoish/godmenu v0.1.1
-	github.com/tychoish/grip v0.3.5
+	github.com/tychoish/grip v0.3.6-0.20230824232221-fd39190c3be1
 	github.com/tychoish/grip/x/desktop v0.0.0-20230815172847-a642e6ca055e
 	github.com/tychoish/grip/x/jira v0.0.0-20230815172847-a642e6ca055e
 	github.com/tychoish/grip/x/system v0.0.0-20230815172847-a642e6ca055e
 	github.com/tychoish/grip/x/telegram v0.0.0-20230815172847-a642e6ca055e
 	github.com/tychoish/grip/x/twitter v0.0.0-20230815172847-a642e6ca055e
 	github.com/tychoish/grip/x/xmpp v0.0.0-20230815172847-a642e6ca055e
-	github.com/tychoish/jasper v0.1.2-0.20230816150753-52815deca5dd
-	github.com/tychoish/jasper/x/cli v0.0.0-20230816150753-52815deca5dd
-	github.com/tychoish/jasper/x/remote v0.0.0-20230708044614-2365d89ef836
+	github.com/tychoish/jasper v0.1.2-0.20230825020900-7d32edd66d81
+	github.com/tychoish/jasper/x/cli v0.0.0-20230825020900-7d32edd66d81
+	github.com/tychoish/jasper/x/remote v0.0.0-20230825020900-7d32edd66d81
 	github.com/tychoish/jasper/x/track v0.0.0-20230509174929-2fe8b231212c
 	github.com/urfave/cli/v2 v2.25.3
 	go.mongodb.org/mongo-driver v1.11.6
@@ -88,10 +88,10 @@ require (
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
-	github.com/tychoish/birch/x/ftdc v0.0.0-20230815163402-467fbef7acab // indirect
+	github.com/tychoish/birch/x/ftdc v0.0.0-20230824231239-7522c174b74b // indirect
 	github.com/tychoish/birch/x/mrpc v0.0.0-20230815163402-467fbef7acab // indirect
 	github.com/tychoish/gimlet v0.0.0-20230130001449-8987c96bb886 // indirect
-	github.com/tychoish/grip/x/metrics v0.0.0-20230815172847-a642e6ca055e // indirect
+	github.com/tychoish/grip/x/metrics v0.0.0-20230824232221-fd39190c3be1 // indirect
 	github.com/tychoish/grip/x/splunk v0.0.0-20230815172847-a642e6ca055e // indirect
 	github.com/tychoish/jasper/x/splunk v0.0.0-20230510193424-429e4caa8e98 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect

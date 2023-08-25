@@ -409,7 +409,7 @@ func report(
 	iter := fun.HF.Lines(strings.NewReader(coverage))
 	table := tabby.New()
 	replacer := strings.NewReplacer(mod.ModuleName, pfx)
-	err = erc.Join(err, iter.Observe(ctx, func(in string) {
+	err = ers.Join(err, iter.Observe(func(in string) {
 		cols := strings.Fields(replacer.Replace(in))
 		if cols[0] == "total:" {
 			// we read this out of the go.test line
@@ -428,7 +428,7 @@ func report(
 			cols[0] = cols[0][1:]
 		}
 		table.AddLine(cols[0], cols[1], cols[2])
-	}))
+	}).Run(ctx))
 
 	msg := grip.Build().PairBuilder()
 	defer msg.Send()

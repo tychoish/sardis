@@ -17,7 +17,9 @@ type Registry struct {
 	Factories dt.Map[Schema, fun.Future[Job]]
 }
 
-func MakeJobFactory[T Job](fn fun.Future[T]) fun.Future[Job] { return func() Job { return fn() } }
+func RegisterFactory[T Job](r *Registry, s Schema, fn fun.Future[T]) {
+	r.Register(s, func() Job { return fn() })
+}
 
 func (r *Registry) Register(schema Schema, fn fun.Future[Job]) { r.Factories.Add(schema, fn) }
 

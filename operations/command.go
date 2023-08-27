@@ -100,12 +100,7 @@ func listCommands() *cmdr.Commander {
 							cmd.Directory = ""
 						}
 
-						switch {
-						case cmd.Alias != "":
-							table.AddLine(cmd.Name, group.Name, cmd.Alias, cmd.Directory)
-						default:
-							table.AddLine(cmd.Name, group.Name, cmd.Command, cmd.Directory)
-						}
+						table.AddLine(cmd.Name, group.Name, cmd.Command, cmd.Directory)
 					}
 				}
 				table.Print()

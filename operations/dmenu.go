@@ -108,6 +108,7 @@ func DMenu() *cmdr.Commander {
 
 				cmd, err := godmenu.RunDMenu(ctx, godmenu.Options{
 					Selections: opts,
+					DMenu:      conf.Settings.DMenu,
 				})
 
 				if err != nil {
@@ -133,7 +134,7 @@ func DMenu() *cmdr.Commander {
 						opts = append(opts, p.Key)
 					}
 
-					output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: opts})
+					output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: opts, DMenu: conf.Settings.DMenu})
 					if err != nil {
 						return err
 					}
@@ -157,7 +158,7 @@ func DMenu() *cmdr.Commander {
 				}
 				others = append(others, menu.Name)
 			}
-			output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: others})
+			output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: others, DMenu: conf.Settings.DMenu})
 			if err != nil {
 				return err
 			}

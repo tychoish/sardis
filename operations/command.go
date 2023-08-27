@@ -157,6 +157,7 @@ func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
 
 				cmd, err := godmenu.RunDMenu(ctx, godmenu.Options{
 					Selections: opts,
+					DMenu:      conf.Settings.DMenu,
 				})
 
 				if err != nil {

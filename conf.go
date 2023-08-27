@@ -15,6 +15,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -118,13 +119,14 @@ type LinkConf struct {
 }
 
 type Settings struct {
-	Notification        NotifyConf       `bson:"notify" json:"notify" yaml:"notify"`
-	Telegram            telegram.Options `bson:"telegram" json:"telegram" yaml:"telegram"`
-	Credentials         CredentialsConf  `bson:"credentials" json:"credentials" yaml:"credentials"`
-	SSHAgentSocketPath  string           `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
-	AlacrittySocketPath string           `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
-	Logging             LoggingConf      `bson:"logging" json:"logging" yaml:"logging"`
-	ConfigPaths         []string         `bson:"config_files" json:"config_files" yaml:"config_files"`
+	Notification        NotifyConf                  `bson:"notify" json:"notify" yaml:"notify"`
+	Telegram            telegram.Options            `bson:"telegram" json:"telegram" yaml:"telegram"`
+	Credentials         CredentialsConf             `bson:"credentials" json:"credentials" yaml:"credentials"`
+	SSHAgentSocketPath  string                      `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
+	AlacrittySocketPath string                      `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
+	Logging             LoggingConf                 `bson:"logging" json:"logging" yaml:"logging"`
+	ConfigPaths         []string                    `bson:"config_files" json:"config_files" yaml:"config_files"`
+	DMenu               *godmenu.DMenuConfiguration `bson:"dmenu" json:"dmenu" yaml:"dmenu"`
 }
 
 type LoggingConf struct {
@@ -454,7 +456,20 @@ func (conf *Settings) Validate() error {
 		}
 	}
 
+	conf.DMenu = ft.WhenDefault(conf.DMenu, defaultDMenuConf)
+
 	return catcher.Resolve()
+}
+
+func defaultDMenuConf() *godmenu.DMenuConfiguration {
+	return &godmenu.DMenuConfiguration{
+		Path:            godmenu.DefaultDmenuPath,
+		BackgroundColor: godmenu.DefaultBackgroundColor,
+		ForegroundColor: godmenu.DefaultForegroundColor,
+		Font:            "Source Code Pro-13",
+		Lines:           16,
+		Prompt:          "=>>",
+	}
 }
 
 func (conf *NotifyConf) IsZero() bool {

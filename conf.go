@@ -456,7 +456,7 @@ func (conf *Settings) Validate() error {
 		}
 	}
 
-	conf.DMenu = ft.WhenDefault(conf.DMenu, defaultDMenuConf)
+	conf.DMenu = ft.DefaultFuture(conf.DMenu, defaultDMenuConf)
 
 	return catcher.Resolve()
 }

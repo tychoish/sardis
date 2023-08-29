@@ -449,12 +449,12 @@ func report(
 	}
 
 	if tr.CoverageEnabled {
-		msg.Pair("funcs", count)
 		if tr.Coverage == 100.0 {
 			msg.Pair("covered", true)
 		} else {
-			msg.Pair("covered", numCovered)
 			msg.Pair("coverage", tr.Coverage)
+			msg.Pair("fncount", count)
+			msg.Pair("covered", numCovered)
 		}
 		table.Print()
 	}

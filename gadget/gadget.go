@@ -8,7 +8,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -30,7 +29,6 @@ import (
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/options"
-	"github.com/tychoish/sardis/util"
 )
 
 type Options struct {
@@ -72,10 +70,6 @@ func (opts *Options) Validate() (err error) {
 
 	if opts.PackagePath == "" {
 		opts.PackagePath = "..."
-	}
-
-	if opts.Recursive && !strings.HasSuffix(opts.PackagePath, "...") {
-		opts.PackagePath = filepath.Join(opts.PackagePath, "...")
 	}
 
 	if !filepath.IsAbs(opts.RootPath) {
@@ -160,117 +154,119 @@ func RunTests(ctx context.Context, opts Options) error {
 	}
 
 	count := 0
-
-	pkgiter := fun.ConvertIterator(iter, func(ctx context.Context, mpath string) (*Module, error) {
+	mods := &adt.Map[string, *Module]{}
+	moditer := fun.ConvertIterator(iter, func(ctx context.Context, mpath string) (*Module, error) {
 		if count != 0 && !opts.Recursive {
 			return nil, fmt.Errorf("module at %q is within %q but recursive mode is not enabled",
 				mpath, opts.RootPath)
 		}
 		count++
-
-		return Collect(ctx, mpath)
+		mod, err := Collect(ctx, mpath)
+		mods.Store(mpath, mod)
+		return mod, err
 	})
 
 	if opts.Recursive {
-		pkgiter = pkgiter.ParallelBuffer(intish.Max(4, opts.Workers/2))
+		moditer = moditer.ParallelBuffer(intish.Max(4, opts.Workers/2))
 	}
 
-	fun.ConvertIterator(
-		pkgiter,
-		fun.Converter(func(module *Module) fun.Worker {
-			return func(ctx context.Context) error {
-				pkgs := module.Packages
-				pkgidx := pkgs.IndexByPackageName()
-				mod := pkgs.IndexByLocalDirectory()[module.Path]
-				shortName := filepath.Base(module.Path)
+	reports := &adt.Map[string, testReport]{}
+	pkgiter := ChainSliceIterators(fun.ConvertIterator(moditer, fun.Converter(func(m *Module) []PackageInfo { return m.Packages })))
 
+	fun.ConvertIterator(pkgiter,
+		fun.Converter(func(pkg PackageInfo) fun.Worker {
+			return func(ctx context.Context) error {
+				if reports.Check(pkg.PackageName) {
+					grip.Errorln("duplicate", pkg.PackageName)
+					return nil
+				}
 				grip.Build().Level(level.Debug).
-					Pair("pkg", mod.ModuleName).
+					Pair("pkg", pkg.PackageName).
 					Pair("op", "populate").
-					Pair("pkgs", len(pkgs)).
-					Pair("path", util.TryCollapseHomedir(module.Path)).
+					Pair("mod", pkg.ModuleName).
+					Pair("path", pkg.LocalDirectory).
 					Send()
 
-				start := time.Now()
-				reports := &adt.Map[string, testReport]{}
-
 				catch := &erc.Collector{}
-				var err error
 
 				testOut := send.MakeWriter(send.MakePlain())
 				testOut.SetPriority(grip.Sender().Priority())
-				testOut.SetFormatter(testOutputFilter(opts, reports, pkgidx))
+				testOut.SetFormatter(testOutputFilter(opts, reports, pkg))
 				testOut.SetErrorHandler(func(err error) { grip.ErrorWhen(!errors.Is(err, io.EOF), err) })
 				args := []string{
 					"go", "test", "-race",
-					fmt.Sprintf("-parallel=%d", runtime.NumCPU()),
-					fmt.Sprint("-timeout=", opts.Timeout),
+					fmt.Sprintf("-parallel=%d", intish.Max(4, opts.Workers/2)),
+					fmt.Sprintf("-timeout=%s", opts.Timeout),
 				}
 
 				switch {
 				case opts.CompileOnly:
-					args = append(args, "-run=noop", fmt.Sprint("./", opts.PackagePath))
+					args = append(args, "-run=noop")
 				case opts.ReportCoverage:
-					args = append(args, "-coverprofile=coverage.out")
+					args = append(args, fmt.Sprintf("-coverprofile=%s", filepath.Join(pkg.LocalDirectory, "coverage.out")))
 				case opts.UseCache:
 					// nothing
 				default:
 					return fmt.Errorf("must configure coverage, cache, or compile-only")
 				}
 
-				args = append(args, fmt.Sprint("./", opts.PackagePath))
+				args = append(args, pkg.LocalDirectory)
 				args = append(args, opts.GoTestArgs...)
 
 				testStart := time.Now()
-				err = jpm.CreateCommand(ctx).
-					ID(fmt.Sprint("test.", shortName)).
-					Directory(module.Path).
-					SetOutputSender(level.Debug, testOut).
+				catch.Add(jpm.CreateCommand(ctx).
+					ID(fmt.Sprint("test.", pkg.PackageName)).
+					Directory(pkg.LocalDirectory).
+					SetOutputSender(level.Info, testOut).
 					SetErrorSender(level.Error, testOut).
 					PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
 					Add(args).
-					Run(ctx)
+					Run(ctx))
 				dur := time.Since(testStart)
 
-				grip.Build().Level(level.Info).
-					Pair("project", filepath.Base(opts.RootPath)).
+				grip.Build().Level(level.Debug).
+					Pair("pkg", pkg.PackageName).
 					Pair("op", "test").
-					Pair("ok", err == nil).
+					Pair("ok", !catch.HasErrors()).
 					Pair("dur", dur).
 					Send()
 
-				catch.Add(err)
+				if result, ok := reports.Load(pkg.PackageName); ok && opts.ReportCoverage {
+					catch.Add(fun.Worker(func(ctx context.Context) error {
+						catch := &erc.Collector{}
+						sender := &bufsend{}
+						sender.SetPriority(level.Info)
+						sender.SetName("coverage.report")
+						sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
-				sender := &bufsend{}
-				if err == nil && opts.ReportCoverage {
-					sender.SetPriority(level.Info)
-					sender.SetName("coverage.report")
-					sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
+						coverout := filepath.Join(result.Info.LocalDirectory, "coverage.out")
+						grip.Warning(ers.Wrapf(jpm.CreateCommand(ctx).
+							ID(fmt.Sprint("coverage.html.", result.Package)).
+							Directory(result.Info.LocalDirectory).
+							PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
+							SetOutputSender(level.Debug, out).
+							SetErrorSender(level.Error, out).
+							AppendArgs("go", "tool", "cover", "-html", coverout, "-o", fmt.Sprintf("coverage-%s.html", filepath.Base(result.Info.LocalDirectory))).
+							Run(ctx), "coverage html for %s", result.Package))
+						catch.Add(jpm.CreateCommand(ctx).
+							ID(fmt.Sprint("coverage.report", result.Package)).
+							Directory(result.Info.LocalDirectory).
+							SetErrorSender(level.Error, out).
+							SetOutputSender(level.Info, sender).
+							AppendArgs("go", "tool", "cover", "-func", coverout).
+							Run(ctx))
 
-					grip.Warning(ers.Wrapf(jpm.CreateCommand(ctx).
-						ID(fmt.Sprint("coverage.html.", shortName)).
-						Directory(module.Path).
-						PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
-						SetOutputSender(level.Debug, out).
-						SetErrorSender(level.Error, out).
-						Append("go tool cover -html=coverage.out -o coverage.html").
-						Run(ctx), "coverage html for %s", shortName))
-
-					catch.Add(jpm.CreateCommand(ctx).
-						ID(fmt.Sprint("coverage.report", module.Path)).
-						Directory(module.Path).
-						SetErrorSender(level.Error, out).
-						SetOutputSender(level.Info, sender).
-						Append("go tool cover -func=coverage.out").
-						Run(ctx))
+						report(ctx, result.Info, reports.Get(result.Info.PackageName), strings.TrimSpace(sender.buffer.String()), time.Since(start), catch.Resolve())
+						return catch.Resolve()
+					}).Run(ctx))
 				}
-
-				report(ctx, mod, reports.Get(mod.PackageName), strings.TrimSpace(sender.buffer.String()), time.Since(start), catch.Resolve())
 				return catch.Resolve()
 			}
 		})).
-		Process(fun.MakeProcessor(main.Add)).
-		PostHook(func() { ec.Add(main.Close()); ec.Add(pool.Wait()) }).Operation(ec.Add).Run(ctx)
+		Process(fun.MakeProcessor(main.Add)).Operation(ec.Add).Run(ctx)
+
+	ec.Add(main.Close())
+	ec.Add(pool.Worker().Run(ctx))
 
 	return ec.Resolve()
 }
@@ -325,7 +321,7 @@ func (tr testReport) Message() message.Composer {
 func testOutputFilter(
 	opts Options,
 	mp *adt.Map[string, testReport],
-	pkgs map[string]PackageInfo,
+	info PackageInfo,
 ) send.MessageFormatter {
 	return func(m message.Composer) (_ string, err error) {
 		defer func() {
@@ -342,7 +338,7 @@ func testOutputFilter(
 			report := testReport{
 				Package:         parts[1],
 				Cached:          strings.Contains(mstr, "cached"),
-				Info:            pkgs[parts[1]],
+				Info:            info,
 				CompileOnly:     opts.CompileOnly,
 				CoverageEnabled: opts.ReportCoverage,
 			}
@@ -355,22 +351,33 @@ func testOutputFilter(
 					report.FullyCovered = true
 				}
 			}
+			grip.WarningWhen(mp.Check(report.Package), message.MakeLines("DUPE", report.Package))
 			mp.Store(report.Package, report)
-			grip.Info(report.Message)
+			grip.Debug(func() message.Composer {
+				m := report.Message()
+				m.Annotate("src", "filter")
+				m.Annotate("case", "pass")
+				return m
+			})
 			return "", io.EOF
 		} else if strings.HasPrefix(mstr, "?") {
 			parts := strings.Fields(mstr)
 
 			report := testReport{
 				Package:         parts[1],
-				Info:            pkgs[parts[1]],
+				Info:            info,
 				Cached:          strings.Contains(mstr, "cached"),
 				MissingTests:    true,
 				CompileOnly:     opts.CompileOnly,
 				CoverageEnabled: opts.ReportCoverage,
 			}
 			mp.Store(report.Package, report)
-			grip.Info(report.Message)
+			grip.Debug(func() message.Composer {
+				m := report.Message()
+				m.Annotate("src", "filter")
+				m.Annotate("case", "failure")
+				return m
+			})
 			return "", io.EOF
 		} else if strings.HasPrefix(mstr, "FAIL") {
 			return "", io.EOF
@@ -408,8 +415,9 @@ func report(
 
 	iter := fun.HF.Lines(strings.NewReader(coverage))
 	table := tabby.New()
-	replacer := strings.NewReplacer(mod.ModuleName, pfx)
+	replacer := strings.NewReplacer(tr.Package, pfx)
 	err = ers.Join(err, iter.Observe(func(in string) {
+
 		cols := strings.Fields(replacer.Replace(in))
 		if cols[0] == "total:" {
 			// we read this out of the go.test line
@@ -427,27 +435,21 @@ func report(
 		if strings.HasPrefix(cols[0], "/") {
 			cols[0] = cols[0][1:]
 		}
+
 		table.AddLine(cols[0], cols[1], cols[2])
 	}).Run(ctx))
 
 	msg := grip.Build().PairBuilder()
-	defer msg.Send()
-	msg.Pair("mod", mod.ModuleName)
 
 	if mod.PackageName != mod.ModuleName {
 		msg.Pair("pkg", mod.PackageName)
 	}
 
-	msg.Pair("path", mod.LocalDirectory)
-
 	if tr.MissingTests {
 		msg.Pair("state", "no tests")
 	} else if tr.Cached {
 		msg.Pair("state", "cached")
-	} else {
-		msg.Pair("state", "exec")
 	}
-	msg.Pair("dur", tr.Duration)
 
 	if tr.CoverageEnabled {
 		msg.Pair("funcs", count)
@@ -460,6 +462,7 @@ func report(
 		table.Print()
 	}
 
+	msg.Pair("dur", tr.Duration)
 	switch {
 	case err != nil:
 		msg.Pair("err", err)
@@ -471,4 +474,5 @@ func report(
 	default:
 		msg.SetPriority(level.Info)
 	}
+	msg.Send()
 }

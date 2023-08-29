@@ -10,6 +10,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/grip"
@@ -134,4 +135,18 @@ func (b *bufsend) Send(m message.Composer) {
 		fun.Invariant.Must(ft.IgnoreFirst(b.buffer.WriteString(m.String())))
 		fun.Invariant.Must(ft.IgnoreFirst(b.buffer.WriteString("\n")))
 	}
+}
+
+func ChainSliceIterators[T any](iter *fun.Iterator[[]T]) *fun.Iterator[T] {
+	pipe := fun.Blocking(make(chan T))
+	send := pipe.Processor()
+	ec := &erc.Collector{}
+	closepipe := ft.Once(pipe.Close)
+
+	errHandler := ec.Handler().Join(func(err error) { ft.WhenCall(ers.IsTerminating(err), closepipe) })
+	return pipe.Producer().PreHook(fun.Operation(func(ctx context.Context) {
+		iter.Observe(func(in []T) {
+			dt.Sliceify(in).Process(send).Observe(ctx, errHandler)
+		}).Observe(ctx, errHandler)
+	}).PostHook(closepipe).Go().Once()).IteratorWithHook(erc.IteratorHook[T](ec))
 }

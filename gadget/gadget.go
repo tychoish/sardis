@@ -440,10 +440,7 @@ func report(
 	}).Run(ctx))
 
 	msg := grip.Build().PairBuilder()
-
-	if mod.PackageName != mod.ModuleName {
-		msg.Pair("pkg", mod.PackageName)
-	}
+	msg.Pair("pkg", mod.PackageName)
 
 	if tr.MissingTests {
 		msg.Pair("state", "no tests")

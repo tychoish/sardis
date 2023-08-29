@@ -28,14 +28,16 @@ $(name):$(buildDir)/$(name)
 
 $(buildDir)/$(name):$(srcFiles) go.mod go.sum
 	@mkdir -p $(buildDir)
-	go build -ldflags "-X github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -o $@ cmd/$(name)/$(name).go
+	# go build -ldflags "-X github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -o $@ cmd/$(name)/$(name).go
+	go build -o $@ cmd/$(name)/$(name).go
 
 $(alt):$(buildDir)/$(alt)
 	ln -fs $(buildDir)/$(alt)
 
 $(buildDir)/$(alt):$(srcFiles) go.mod go.sum
 	@mkdir -p $(buildDir)
-	go build -ldflags "-X github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -o $@ cmd/$(alt)/$(alt).go
+	# go build -ldflags "-X github.com/tychoish/sardis.BuildRevision=`git rev-parse HEAD`" -o $@ cmd/$(alt)/$(alt).go
+	go build -o $@ cmd/$(alt)/$(alt).go
 
 
 benchmark:

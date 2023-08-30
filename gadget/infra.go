@@ -3,7 +3,6 @@ package gadget
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io/fs"
 	"path/filepath"
 
@@ -97,8 +96,8 @@ func WalkDirIterator[T any](path string, fn func(p string, d fs.DirEntry) (*T, e
 	pipe := fun.Blocking(make(chan T))
 	send := pipe.Processor()
 
-	return pipe.Producer().PreHook(
-		fun.Worker(
+	return pipe.Producer().
+		PreHook(fun.Worker(
 			func(ctx context.Context) error {
 				return filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 					if err != nil {
@@ -106,23 +105,17 @@ func WalkDirIterator[T any](path string, fn func(p string, d fs.DirEntry) (*T, e
 					}
 
 					out, err := fn(p, d)
-					if err != nil {
-						if !errors.Is(err, fs.SkipDir) && !errors.Is(err, fs.SkipAll) {
-							ec.Add(err)
-						}
+					if err != nil || out == nil {
+						erc.When(ec, !ers.Is(err, fs.SkipDir, fs.SkipAll), err)
 						return err
 					}
-					if out == nil {
-						return nil
-					}
-
 					return send(ctx, *out)
 				})
-
 			}).
 			Operation(fun.HF.ErrorHandlerWithoutTerminating(ec.Add)).
-			PostHook(pipe.Close).Once().Go(),
-	).IteratorWithHook(erc.IteratorHook[T](ec))
+			PostHook(pipe.Close).
+			Go().Once(),
+		).IteratorWithHook(erc.IteratorHook[T](ec))
 }
 
 type bufsend struct {

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cheynewallace/tabby"
+
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
@@ -95,7 +96,7 @@ func RunTests(ctx context.Context, opts Options) error {
 	}()
 
 	var seenOne bool
-	iter := WalkDirIterator(ctx, opts.RootPath, func(path string, d fs.DirEntry) (*string, error) {
+	iter := WalkDirIterator(opts.RootPath, func(path string, d fs.DirEntry) (*string, error) {
 		name := d.Name()
 		if d.Type().IsDir() && name == ".git" {
 			return nil, fs.SkipDir
@@ -131,7 +132,7 @@ func RunTests(ctx context.Context, opts Options) error {
 	if !opts.CompileOnly && !opts.SkipLint {
 		ec.Add(main.Add(func(ctx context.Context) error {
 			name := filepath.Base(opts.RootPath)
-			start := time.Now()
+			startLint := time.Now()
 			err := jpm.CreateCommand(ctx).
 				ID(fmt.Sprint("lint.", name)).
 				Directory(opts.RootPath).
@@ -140,7 +141,7 @@ func RunTests(ctx context.Context, opts Options) error {
 				AppendArgs("golangci-lint", "run", "--allow-parallel-runners").
 				Run(ctx)
 
-			dur := time.Since(start)
+			dur := time.Since(startLint)
 
 			grip.Build().Level(level.Info).
 				Pair("project", name).
@@ -431,11 +432,8 @@ func report(
 		}
 
 		numUncovered++
-		cols[0] = strings.TrimPrefix(cols[0], "/")
 
-		if strings.HasPrefix(cols[0], "/") {
-			cols[0] = cols[0][1:]
-		}
+		cols[0] = strings.TrimPrefix(cols[0], "/")
 
 		table.AddLine(cols[0], cols[1], cols[2])
 	}).Run(ctx))
@@ -460,7 +458,9 @@ func report(
 		table.Print()
 	}
 
+	msg.Pair("wal", runtime)
 	msg.Pair("dur", tr.Duration)
+
 	switch {
 	case err != nil:
 		msg.Pair("err", err)

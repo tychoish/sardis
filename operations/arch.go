@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 
+	"github.com/urfave/cli/v2"
+
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
-	"github.com/urfave/cli/v2"
 )
 
 const nameFlagName = "name"
@@ -30,7 +31,7 @@ func ArchLinux() *cmdr.Commander {
 func fetchAur() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("fetch").
-		SetUsage("donwload source to build directory").
+		SetUsage("download source to build directory").
 		Flags(cmdr.FlagBuilder([]string{}).
 			SetName(nameFlagName, "n").
 			SetUsage("specify the name of a package").

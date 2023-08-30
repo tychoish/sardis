@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/urfave/cli/v2"
+
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
-	"github.com/urfave/cli/v2"
 )
 
 func Jira() *cmdr.Commander {

@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/urfave/cli/v2"
+
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/sardis"
-	"github.com/urfave/cli/v2"
 )
 
 type opsCmdArgs[T cmdr.FlagTypes] struct {

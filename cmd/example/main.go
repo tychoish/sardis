@@ -10,10 +10,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/urfave/cli/v2"
+
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
-	"github.com/urfave/cli/v2"
 )
 
 type ServiceConfig struct {

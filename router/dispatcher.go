@@ -148,7 +148,7 @@ func (r *Dispatcher) AddInterceptor(key Protocol, it Interceptor) error {
 }
 
 func (r *Dispatcher) RegisterHandler(key Protocol, hfn Handler) bool {
-	return !key.IsZero() && r.handlers.EnsureStore(key, hfn) // short circut
+	return !key.IsZero() && r.handlers.EnsureStore(key, hfn) // short circuit
 }
 
 func (r *Dispatcher) OverrideHandler(key Protocol, hfn Handler) {

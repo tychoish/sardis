@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/tychoish/birch"
 	"go.mongodb.org/mongo-driver/bson"
+
+	"github.com/tychoish/birch"
 )
 
 func TestInterBSON(t *testing.T) {

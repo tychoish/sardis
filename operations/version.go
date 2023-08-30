@@ -3,11 +3,12 @@ package operations
 import (
 	"context"
 
+	"github.com/urfave/cli/v2"
+
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
-	"github.com/urfave/cli/v2"
 )
 
 func Version() *cmdr.Commander {

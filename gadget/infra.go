@@ -91,7 +91,7 @@ func Ripgrep(ctx context.Context, jpm jasper.Manager, args RipgrepArgs) *fun.Ite
 // If the first value of the walk function is nil, then the item is
 // skipped the walk will continue, otherwise--assuming that the error
 // is non-nil, it is de-referenced and returned by the iterator.
-func WalkDirIterator[T any](ctx context.Context, path string, fn func(p string, d fs.DirEntry) (*T, error)) *fun.Iterator[T] {
+func WalkDirIterator[T any](path string, fn func(p string, d fs.DirEntry) (*T, error)) *fun.Iterator[T] {
 	ec := &erc.Collector{}
 
 	pipe := fun.Blocking(make(chan T))

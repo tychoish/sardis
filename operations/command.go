@@ -8,6 +8,8 @@ import (
 
 	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
 	"github.com/cheynewallace/tabby"
+	"github.com/urfave/cli/v2"
+
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
@@ -16,7 +18,6 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
-	"github.com/urfave/cli/v2"
 )
 
 const commandFlagName = "command"

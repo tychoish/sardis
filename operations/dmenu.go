@@ -8,13 +8,14 @@ import (
 	"strings"
 
 	"github.com/cheynewallace/tabby"
+	"github.com/urfave/cli/v2"
+
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
-	"github.com/urfave/cli/v2"
 )
 
 func listMenus() *cmdr.Commander {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/coreos/go-systemd/journal"
 	"github.com/nwidger/jsoncolor"
+
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/srv"
@@ -26,12 +27,12 @@ import (
 )
 
 func WithAppLogger(ctx context.Context, conf *Configuration) context.Context {
-	sender := SetupLogging(ctx, conf)
+	sender := SetupLogging(conf)
 	grip.SetSender(sender)
 	return grip.WithLogger(ctx, grip.NewLogger(sender))
 }
 
-func SetupLogging(ctx context.Context, conf *Configuration) send.Sender {
+func SetupLogging(conf *Configuration) send.Sender {
 	var sender send.Sender
 
 	if conf.Settings.Logging.EnableJSONFormating || conf.Settings.Logging.EnableJSONColorFormatting {

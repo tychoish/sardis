@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/urfave/cli/v2"
+
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ft"
@@ -17,7 +19,6 @@ import (
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/gadget"
 	"github.com/tychoish/sardis/operations"
-	"github.com/urfave/cli/v2"
 )
 
 func main() {

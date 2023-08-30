@@ -3,13 +3,14 @@ package operations
 import (
 	"context"
 
+	"github.com/urfave/cli/v2"
+
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
-	"github.com/urfave/cli/v2"
 )
 
 func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configuration, error) {

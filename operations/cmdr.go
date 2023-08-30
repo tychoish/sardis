@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/urfave/cli/v2"
+
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
@@ -12,7 +14,6 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
-	"github.com/urfave/cli/v2"
 )
 
 func Commander() *cmdr.Commander {

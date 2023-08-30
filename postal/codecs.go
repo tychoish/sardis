@@ -3,9 +3,10 @@ package postal
 import (
 	"encoding/json"
 
-	"github.com/tychoish/birch"
 	"go.mongodb.org/mongo-driver/bson"
 	"gopkg.in/yaml.v3"
+
+	"github.com/tychoish/birch"
 )
 
 type SerializationRepresentation bool

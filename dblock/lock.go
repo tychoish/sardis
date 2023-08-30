@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/ers"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/ers"
 )
 
 type Configuration struct {
@@ -44,12 +45,12 @@ type mdbLockService struct {
 	client *mongo.Client
 }
 
-func NewLockService(conf *Configuration) (LockService, error) {
+func NewLockService(_ *Configuration) (LockService, error) {
 	return new(mdbLockService), nil
 
 }
 
-func (ls *mdbLockService) GetLock(ctx context.Context, name string) Lock {
+func (ls *mdbLockService) GetLock(_ context.Context, name string) Lock {
 	lock := &mdbLockImpl{
 		srv:    ls,
 		waiter: &adt.Atomic[*fun.Operation]{},
@@ -85,8 +86,8 @@ func (l *mdbLockImpl) getNextQuery(now time.Time) bson.M {
 	}
 }
 
-func (s *mdbLockService) collection() *mongo.Collection {
-	return s.client.Database(s.conf.Database).Collection(s.conf.Collection)
+func (ls *mdbLockService) collection() *mongo.Collection {
+	return ls.client.Database(ls.conf.Database).Collection(ls.conf.Collection)
 }
 
 func (l *mdbLockImpl) updateLockView(ctx context.Context) error {
@@ -126,13 +127,13 @@ func (l *mdbLockImpl) Lock() fun.Operation {
 			)
 			err = res.Err()
 			if err == nil {
-				if err := res.Decode(&l.record); err != nil {
+				if err = res.Decode(&l.record); err != nil {
 					panic(err)
 				}
 			}
 		}
 		if err == nil {
-			if err := res.Decode(&l.record); err != nil {
+			if err = res.Decode(&l.record); err != nil {
 				panic(err)
 			}
 			if !l.record.Active {

@@ -112,7 +112,7 @@ var (
 //
 // Connection handling and retry logic is implementation dependent: in
 // general users of Connections should not be concerned with ensuring
-// that peers are live and healthy. The Send/Recieve methods will
+// that peers are live and healthy. The Send/Receive methods will
 // ensure Envelopes are delivered and received,
 type Connection interface {
 	// ID provides a canonical (and hopefully stable) identifier
@@ -120,7 +120,7 @@ type Connection interface {
 	ID() string
 	Check(context.Context) error
 	Send(context.Context, Envelope) error
-	Recieve(context.Context) (Envelope, error)
+	Receive(context.Context) (Envelope, error)
 	Close() error
 }
 
@@ -153,12 +153,12 @@ type Envelope struct {
 
 	// Error indicates if any errors were observed during the
 	// routing of the message. If this message is in response to
-	// another message, the error will propogate errors from the
+	// another message, the error will propagate errors from the
 	// peer. When non-nil, these errors may contain several
 	// wrapped/aggregated errors.
 	//
 	// Connection implementations should take care to ensure that
-	// these are encoded with sufficent fidelity: though it is
+	// these are encoded with sufficient fidelity: though it is
 	// possible to encode and decode some errors between peers,
 	// for most non-local cases the error objects will differ
 	// across the protocol.
@@ -169,7 +169,7 @@ type Envelope struct {
 	ResponingTo string
 
 	// ResponseTimeout indicates a period of time (relative to the
-	// sent/recieved at time stamps), after which a sender expects
+	// sent/received at time stamps), after which a sender expects
 	// that it will not care about the response. This is
 	// *extremely* approximate and is loosely enforced by the
 	// router, and responses that exceed this timeout may still be
@@ -181,7 +181,7 @@ type Envelope struct {
 	// by either the sending or receiving peer.
 
 	// Source is the ID of the sending router, and is always
-	// overriden by the router before sending the message. Used to
+	// overridden by the router before sending the message. Used to
 	Source string
 
 	// The timing information captures the reported times of both
@@ -248,7 +248,7 @@ func (r *Router[T]) createNewPeer(ctx context.Context, opts T, conn Connection) 
 		}),
 	}
 
-	// when ensure store returns true, we allready had a
+	// when ensure store returns true, we already had a
 	// peer with the same address, let's use that one
 	if !r.store.EnsureStore(id, p) {
 		// TODO: make sure here that the peer's info
@@ -261,7 +261,7 @@ func (r *Router[T]) createNewPeer(ctx context.Context, opts T, conn Connection) 
 		_ = previous.Close()
 	}
 
-	// RECIEVE MESSAGES
+	// RECEIVE MESSAGES
 	r.wg.Add(1)
 	go func() {
 		defer func() {
@@ -272,7 +272,7 @@ func (r *Router[T]) createNewPeer(ctx context.Context, opts T, conn Connection) 
 			r.wg.Done()
 		}()
 		for {
-			ep, err := conn.Recieve(ctx)
+			ep, err := conn.Receive(ctx)
 			if errors.Is(err, io.EOF) || ers.IsExpiredContext(err) {
 				return
 			}

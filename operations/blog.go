@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/urfave/cli/v2"
+
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -12,7 +14,6 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
-	"github.com/urfave/cli/v2"
 )
 
 func Blog() *cmdr.Commander {

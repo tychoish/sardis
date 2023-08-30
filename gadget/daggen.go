@@ -10,6 +10,9 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/tools/go/packages"
+	"gopkg.in/yaml.v3"
+
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
@@ -18,8 +21,6 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
-	"golang.org/x/tools/go/packages"
-	"gopkg.in/yaml.v3"
 )
 
 var bufpool = &adt.Pool[*bytes.Buffer]{}

@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/urfave/cli/v2"
+
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/sardis"
-	"github.com/urfave/cli/v2"
 )
 
 func Tweet() *cmdr.Commander {

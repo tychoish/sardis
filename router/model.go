@@ -76,7 +76,7 @@ func (p Protocol) String() string { return fmt.Sprintf("schema=%q, version=%d", 
 
 // Middleware functions handle (and modify) the message before it is
 // passed to a handler functions. Middlewares can mutate the message
-// before the handler recieves it, and is useful for access control,
+// before the handler receives it, and is useful for access control,
 // parsing the payload, and collecting metrics. Errors returned by a
 // middleware function stop processing of a message, and are
 // propagated back to the user.

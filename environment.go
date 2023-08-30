@@ -1,5 +1,5 @@
 /*
-Package sardis holds a a number of application level constants and
+Package sardis holds a number of application level constants and
 shared configuration resources for the sardis application.
 */
 package sardis

@@ -35,7 +35,7 @@ func init() {
 
 // MessageID produces a (mostly) unique identifier for messages.  The
 // ID is composed of a unix timestamp, an atomic counter (per-process
-// lifetime), the prefix of a per-proccess hash, and a random ASCII
+// lifetime), the prefix of a per-process hash, and a random ASCII
 // character sequence of at least 16 characters (or more if the total
 // sequence is less than 32 characters), with 3 - seperators. This ID
 // has the property of being highly-likely to be unique, strictly

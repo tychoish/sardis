@@ -29,7 +29,7 @@ func PopulateCache(ctx context.Context, root string) error {
 		countFilesRead       = &atomic.Int64{}
 	)
 
-	goFilesIter := WalkDirIterator(ctx, root, func(path string, d fs.DirEntry) (*string, error) {
+	goFilesIter := WalkDirIterator(root, func(path string, d fs.DirEntry) (*string, error) {
 		countFilesConsidered.Add(1)
 		if d.IsDir() && d.Name() == ".git" {
 			return nil, fs.SkipDir

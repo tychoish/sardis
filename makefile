@@ -21,7 +21,7 @@ benchArgs += -run='Benchmark.*'
 endif
 
 
-build:$(buildDir)/$(name) $(buildDir)/$(alt)
+build:$(buildDir)/$(name)
 
 $(name):$(buildDir)/$(name)
 	ln -sf $(buildDir)/$(name) || true

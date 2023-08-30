@@ -232,14 +232,13 @@ func RunTests(ctx context.Context, opts Options) error {
 					Pair("dur", dur).
 					Send()
 
-				if result, ok := reports.Load(pkg.PackageName); ok && opts.ReportCoverage {
-					catch.Add(fun.Worker(func(ctx context.Context) error {
-						catch := &erc.Collector{}
-						sender := &bufsend{}
-						sender.SetPriority(level.Info)
-						sender.SetName("coverage.report")
-						sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
+				if result, ok := reports.Load(pkg.PackageName); ok {
+					sender := &bufsend{}
+					sender.SetPriority(level.Info)
+					sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
+					if opts.ReportCoverage {
+						sender.SetName("coverage.report")
 						coverout := filepath.Join(result.Info.LocalDirectory, "coverage.out")
 						grip.Warning(ers.Wrapf(jpm.CreateCommand(ctx).
 							ID(fmt.Sprint("coverage.html.", result.Package)).
@@ -249,18 +248,17 @@ func RunTests(ctx context.Context, opts Options) error {
 							SetErrorSender(level.Error, out).
 							AppendArgs("go", "tool", "cover", "-html", coverout, "-o", fmt.Sprintf("coverage-%s.html", filepath.Base(result.Info.LocalDirectory))).
 							Run(ctx), "coverage html for %s", result.Package))
-						catch.Add(jpm.CreateCommand(ctx).
+						ec.Add(jpm.CreateCommand(ctx).
 							ID(fmt.Sprint("coverage.report", result.Package)).
 							Directory(result.Info.LocalDirectory).
 							SetErrorSender(level.Error, out).
 							SetOutputSender(level.Info, sender).
 							AppendArgs("go", "tool", "cover", "-func", coverout).
 							Run(ctx))
-
-						report(ctx, result.Info, reports.Get(result.Info.PackageName), strings.TrimSpace(sender.buffer.String()), time.Since(start), catch.Resolve())
-						return catch.Resolve()
-					}).Run(ctx))
+					}
+					report(ctx, result.Info, reports.Get(result.Info.PackageName), strings.TrimSpace(sender.buffer.String()), time.Since(start), catch.Resolve())
 				}
+
 				return catch.Resolve()
 			}
 		})).
@@ -458,7 +456,7 @@ func report(
 		table.Print()
 	}
 
-	msg.Pair("wal", runtime)
+	msg.Pair("wal", runtime.Round(time.Microsecond))
 	msg.Pair("dur", tr.Duration)
 
 	switch {

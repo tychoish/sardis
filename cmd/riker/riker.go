@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
-	"time"
 
 	"github.com/urfave/cli/v2"
 
@@ -18,7 +16,6 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/gadget"
-	"github.com/tychoish/sardis/operations"
 )
 
 func main() {
@@ -31,7 +28,7 @@ func main() {
 }
 
 func TopLevel() *cmdr.Commander {
-	return operations.Commander().
+	return cmdr.MakeRootCommander().
 		SetAppOptions(cmdr.AppOptions{
 			Name:    "riker",
 			Usage:   "call the opts",
@@ -65,77 +62,6 @@ func TopLevel() *cmdr.Commander {
 
 					return nil
 				}),
-			cmdr.MakeCommander().
-				SetName("gadget").
-				SetUsage(fmt.Sprintln("runs go test (+lint +coverage) on a workspace",
-					"all non-flag arguments are passed directly to go test")).
-				Flags(
-					cmdr.FlagBuilder("./").
-						SetName("module-path", "m").
-						SetUsage("path of top-level workpace for gadget to look for go.mod").
-						SetValidate(func(path string) error {
-							if path == "./" {
-								path = ft.Must(os.Getwd())
-							}
-
-							if strings.HasSuffix(path, "...") {
-								grip.Warningln("module-path (working directory) should not use '...';",
-									"set go test path with '--path'")
-								return fmt.Errorf("module path %q should not have ... suffix", path)
-							}
-							if util.FileExists(util.TryExpandHomedir(path)) {
-								return nil
-							}
-							grip.Warning(fmt.Errorf("%q does not exist", path))
-							return nil
-						}).Flag(),
-					cmdr.FlagBuilder("...").
-						SetName("path", "p").
-						SetUsage(fmt.Sprintln("path to pass to go test without leading slashes.")).
-						Flag(),
-					cmdr.FlagBuilder(false).
-						SetName("recursive", "r").
-						SetUsage("run recursively in all nested modules. Also ensures the --path ends with '...'").
-						Flag(),
-					cmdr.FlagBuilder(10*time.Second).
-						SetName("timeout", "t").
-						SetUsage("timeout to set to each individual go test invocation").
-						Flag(),
-					cmdr.FlagBuilder(false).
-						SetName("build", "compile", "b").
-						SetUsage("runs no-op test build for all packages").
-						Flag(),
-					cmdr.FlagBuilder(false).
-						SetName("skip-lint").
-						SetUsage("skip golangci-lint").
-						Flag(),
-					cmdr.FlagBuilder(false).
-						SetName("coverage", "cover", "c").
-						SetUsage("runs tests with coverage reporting").
-						Flag(),
-				).
-				With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (*gadget.Options, error) {
-					opts := &gadget.Options{
-						Timeout:        cc.Duration("timeout"),
-						Recursive:      cc.Bool("recursive"),
-						PackagePath:    cc.String("path"),
-						RootPath:       cc.String("module-path"),
-						CompileOnly:    cc.Bool("build"),
-						SkipLint:       cc.Bool("skip-lint"),
-						ReportCoverage: cc.Bool("coverage"),
-						UseCache:       true,
-						GoTestArgs:     cc.Args().Slice(),
-						Workers:        runtime.NumCPU(),
-					}
-
-					if err := opts.Validate(); err != nil {
-						return nil, err
-					}
-
-					return opts, nil
-				}).SetAction(func(ctx context.Context, opts *gadget.Options) error {
-					return gadget.RunTests(ctx, *opts)
-				}).Add),
 			cmdr.MakeCommander().
 				SetName("gogentree").
 				SetUsage("for a go module, resolve the internal dependency graph and run go generate with dependency awareness").

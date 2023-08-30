@@ -62,6 +62,7 @@ func Commander() *cmdr.Commander {
 			ArchLinux(),
 			Blog(),
 			DMenu(),
+			Gadget(),
 			Jira(),
 			Notify(),
 			Repo(),

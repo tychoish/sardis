@@ -309,7 +309,7 @@ func (tr testReport) Message() message.Composer {
 			}
 		}
 	}
-	pairs.Add("dur", tr.Duration)
+	pairs.Add("dur", tr.Duration.Round(time.Millisecond))
 
 	out := message.MakePairs(pairs)
 	out.SetPriority(priority)
@@ -456,8 +456,8 @@ func report(
 		table.Print()
 	}
 
-	msg.Pair("wal", runtime.Round(time.Microsecond))
-	msg.Pair("dur", tr.Duration)
+	msg.Pair("wal", runtime.Round(time.Millisecond))
+	msg.Pair("dur", tr.Duration.Round(time.Millisecond))
 
 	switch {
 	case err != nil:

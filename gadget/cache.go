@@ -19,7 +19,7 @@ import (
 
 var fileCache = &adt.Map[string, []byte]{}
 
-func populateCache(ctx context.Context, root string) error {
+func PopulateCache(ctx context.Context, root string) error {
 	start := time.Now()
 	initSize := fileCache.Len()
 	var (

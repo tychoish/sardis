@@ -273,8 +273,7 @@ func (r *Router[T]) createNewPeer(ctx context.Context, opts T, conn Connection) 
 		}()
 		for {
 			ep, err := conn.Recieve(ctx)
-
-			if errors.Is(err, io.EOF) || ers.ContextExpired(err) {
+			if errors.Is(err, io.EOF) || ers.IsExpiredContext(err) {
 				return
 			}
 			if err != nil {
@@ -458,7 +457,7 @@ func (r *Router[T]) startListener(ctx context.Context) {
 		defer r.wg.Done()
 		for {
 			opts, conn, err := r.Listner.Get()(ctx)
-			if errors.Is(err, io.EOF) || ers.ContextExpired(err) {
+			if errors.Is(err, io.EOF) || ers.IsExpiredContext(err) {
 				return
 			} else if err != nil {
 				r.ErrorObserver.Get()(err)

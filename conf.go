@@ -719,7 +719,7 @@ func (conf *CommandGroupConf) Validate() error {
 		erc.Whenf(catcher, cmd.Name == "", "commands [%d] must have a name", idx)
 
 		cmd.Directory, err = homedir.Expand(cmd.Directory)
-		catcher.Add(erc.Wrapf(err, "command %q at %d", cmd.Name, idx))
+		catcher.Add(ers.Wrapf(err, "command %q at %d", cmd.Name, idx))
 		conf.Commands[idx] = cmd
 	}
 

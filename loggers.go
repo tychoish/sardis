@@ -11,6 +11,7 @@ import (
 	"github.com/coreos/go-systemd/journal"
 	"github.com/nwidger/jsoncolor"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
@@ -81,7 +82,7 @@ func WithTwitterLogger(ctx context.Context, conf *Configuration) context.Context
 		})
 
 		if err != nil {
-			err = erc.Wrap(err, "problem constructing twitter sender")
+			err = ers.Wrap(err, "problem constructing twitter sender")
 			if srv.HasCleanup(ctx) {
 				srv.AddCleanup(ctx, func(context.Context) error { return err })
 			} else {
@@ -132,8 +133,7 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 			})
 
 		if err != nil {
-			err = erc.Wrap(err, "setting up notify send issue logger")
-			srv.AddCleanupError(ctx, err)
+			srv.AddCleanupError(ctx, ers.Wrap(err, "setting up notify send issue logger"))
 			return
 		}
 
@@ -150,7 +150,7 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 			catcher := &erc.Collector{}
 			catcher.Add(sender.Flush(ctx))
 			catcher.Add(sender.Close())
-			return erc.Wrapf(catcher.Resolve(), "xmpp [%s]", conf.Settings.Notification.Name)
+			return ers.Wrapf(catcher.Resolve(), "xmpp [%s]", conf.Settings.Notification.Name)
 		})
 	}
 
@@ -168,7 +168,7 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 			catcher := &erc.Collector{}
 			catcher.Add(sender.Flush(ctx))
 			catcher.Add(sender.Close())
-			return erc.Wrapf(catcher.Resolve(), "telegram [%s]", conf.Settings.Telegram.Name)
+			return ers.Wrapf(catcher.Resolve(), "telegram [%s]", conf.Settings.Telegram.Name)
 		})
 
 	}
@@ -207,8 +207,7 @@ func WithJiraIssue(ctx context.Context, conf *Configuration) (out context.Contex
 		},
 	})
 	if err != nil {
-		err = erc.Wrap(err, "setting up jira issue logger")
-		srv.AddCleanupError(ctx, err)
+		srv.AddCleanupError(ctx, ers.Wrap(err, "setting up jira issue logger"))
 		return
 	}
 

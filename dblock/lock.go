@@ -112,7 +112,7 @@ func (l *mdbLockImpl) Lock() fun.Operation {
 
 	var res *mongo.SingleResult
 	for {
-		if ers.ContextExpired(err) {
+		if ers.IsExpiredContext(err) {
 			break
 		}
 		if err != nil {
@@ -227,7 +227,7 @@ func (l *mdbLockImpl) startBackgroundLockPing(ctx context.Context) chan struct{}
 func (l *mdbLockImpl) Unlock() {
 	if waiter := l.waiter.Get(); waiter != nil {
 		wf := *waiter
-		wf.Block()
+		wf.Wait()
 		return
 	}
 }

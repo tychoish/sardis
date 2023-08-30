@@ -431,6 +431,7 @@ func report(
 		}
 
 		numUncovered++
+		cols[0] = strings.TrimPrefix(cols[0], "/")
 
 		if strings.HasPrefix(cols[0], "/") {
 			cols[0] = cols[0][1:]

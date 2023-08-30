@@ -34,7 +34,7 @@ func TestGraph(t *testing.T) {
 		indx := gone.Packages.IndexByPackageName()
 		for _, pkg := range gtwo.Packages {
 			other := indx.Get(pkg.PackageName)
-			(Packages{pkg, other}).WriteTo(buf)
+			check.NotError(t, ft.IgnoreFirst((Packages{pkg, other}).WriteTo(buf)))
 			testt.Log(t, fmt.Sprintln(), buf.String())
 			buf.Reset()
 			if !indx.Check(pkg.PackageName) {
@@ -109,7 +109,7 @@ func TestGraph(t *testing.T) {
 							"didx": didx,
 						})
 						ps := Packages{pkg}
-						ps.WriteTo(send.MakeWriter(grip.Sender()))
+						ft.Ignore(ft.IgnoreFirst(ps.WriteTo(send.MakeWriter(grip.Sender()))))
 						t.Fatal("missed dependency", edge, "<==", dep, seen.Len(), len(pkgs))
 					}
 				}

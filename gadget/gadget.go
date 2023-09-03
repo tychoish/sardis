@@ -1,6 +1,7 @@
 package gadget
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
+	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/srv"
@@ -30,6 +32,7 @@ import (
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/options"
+	"github.com/tychoish/libfun"
 )
 
 type Options struct {
@@ -96,7 +99,7 @@ func RunTests(ctx context.Context, opts Options) error {
 	}()
 
 	var seenOne bool
-	iter := WalkDirIterator(opts.RootPath, func(path string, d fs.DirEntry) (*string, error) {
+	iter := libfun.WalkDirIterator(opts.RootPath, func(path string, d fs.DirEntry) (*string, error) {
 		name := d.Name()
 		if d.Type().IsDir() && name == ".git" {
 			return nil, fs.SkipDir
@@ -172,7 +175,8 @@ func RunTests(ctx context.Context, opts Options) error {
 	}
 
 	reports := &adt.Map[string, testReport]{}
-	pkgiter := ChainSliceIterators(fun.ConvertIterator(moditer, fun.Converter(func(m *Module) []PackageInfo { return m.Packages })))
+
+	pkgiter := itertool.MergeSliceIterators(fun.ConvertIterator(moditer, fun.Converter(func(m *Module) []PackageInfo { return m.Packages })))
 
 	fun.ConvertIterator(pkgiter,
 		fun.Converter(func(pkg PackageInfo) fun.Worker {
@@ -233,7 +237,8 @@ func RunTests(ctx context.Context, opts Options) error {
 					Send()
 
 				if result, ok := reports.Load(pkg.PackageName); ok {
-					sender := &bufsend{}
+					var buf bytes.Buffer
+					sender := send.MakeBytesBuffer(&buf)
 					sender.SetPriority(level.Info)
 					sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
@@ -256,7 +261,7 @@ func RunTests(ctx context.Context, opts Options) error {
 							AppendArgs("go", "tool", "cover", "-func", coverout).
 							Run(ctx))
 					}
-					report(ctx, result.Info, reports.Get(result.Info.PackageName), strings.TrimSpace(sender.buffer.String()), time.Since(start), catch.Resolve())
+					report(ctx, result.Info, reports.Get(result.Info.PackageName), strings.TrimSpace(buf.String()), time.Since(start), catch.Resolve())
 				}
 
 				return catch.Resolve()

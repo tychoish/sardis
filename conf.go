@@ -732,6 +732,7 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 	for _, group := range conf.Commands {
 		for idx := range group.Commands {
 			cmd := group.Commands[idx]
+			cmd.Alias = fmt.Sprintf("%s.%s", group.Name, cmd.Name)
 			out[cmd.Name] = cmd
 			out[cmd.Alias] = cmd
 		}
@@ -740,7 +741,7 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 		for _, operation := range menus.Selections {
 			var cmd CommandConf
 			if menus.Command == "" {
-				cmd.Name = operation
+				cmd.Name = fmt.Sprintf("%s.%s", menus.Name, operation)
 				cmd.Command = operation
 			} else {
 				cmd.Name = fmt.Sprintf("%s.%s", menus.Name, operation)
@@ -751,7 +752,7 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 		for _, alias := range menus.Aliases {
 			var cmd CommandConf
 			if menus.Command == "" {
-				cmd.Name = alias.Key
+				cmd.Name = fmt.Sprintf("%s.%s", menus.Name, alias.Key)
 				cmd.Command = alias.Value
 			} else {
 				cmd.Name = fmt.Sprintf("%s.%s", menus.Name, alias.Key)

@@ -1,6 +1,8 @@
 module github.com/tychoish/sardis
 
-go 1.20
+go 1.21.0
+
+replace github.com/tychoish/libfun => ../libfun
 
 require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
@@ -13,7 +15,7 @@ require (
 	github.com/nwidger/jsoncolor v0.3.2
 	github.com/tychoish/birch v0.2.3-0.20230815163402-467fbef7acab
 	github.com/tychoish/cmdr v0.3.4-0.20230824234144-380e023f6f24
-	github.com/tychoish/fun v0.10.6-0.20230829222630-28c89fac90df
+	github.com/tychoish/fun v0.10.7
 	github.com/tychoish/godmenu v0.1.2
 	github.com/tychoish/grip v0.3.7-0.20230829230451-7df5f5ab84f7
 	github.com/tychoish/grip/x/desktop v0.0.0-20230815172847-a642e6ca055e
@@ -24,7 +26,6 @@ require (
 	github.com/tychoish/grip/x/xmpp v0.0.0-20230815172847-a642e6ca055e
 	github.com/tychoish/jasper v0.1.2-0.20230825020900-7d32edd66d81
 	github.com/tychoish/jasper/x/cli v0.0.0-20230825020900-7d32edd66d81
-	github.com/tychoish/jasper/x/remote v0.0.0-20230825020900-7d32edd66d81
 	github.com/tychoish/jasper/x/track v0.0.0-20230509174929-2fe8b231212c
 	github.com/urfave/cli/v2 v2.25.3
 	go.mongodb.org/mongo-driver v1.11.6
@@ -93,7 +94,9 @@ require (
 	github.com/tychoish/gimlet v0.0.0-20230130001449-8987c96bb886 // indirect
 	github.com/tychoish/grip/x/metrics v0.0.0-20230824232221-fd39190c3be1 // indirect
 	github.com/tychoish/grip/x/splunk v0.0.0-20230815172847-a642e6ca055e // indirect
+	github.com/tychoish/jasper/x/remote v0.0.0-20230825020900-7d32edd66d81 // indirect
 	github.com/tychoish/jasper/x/splunk v0.0.0-20230510193424-429e4caa8e98 // indirect
+	github.com/tychoish/libfun v0.0.0-00010101000000-000000000000 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect

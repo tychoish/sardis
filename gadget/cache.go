@@ -15,6 +15,7 @@ import (
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
+	"github.com/tychoish/libfun"
 )
 
 var fileCache = &adt.Map[string, []byte]{}
@@ -29,7 +30,7 @@ func PopulateCache(ctx context.Context, root string) error {
 		countFilesRead       = &atomic.Int64{}
 	)
 
-	goFilesIter := WalkDirIterator(root, func(path string, d fs.DirEntry) (*string, error) {
+	goFilesIter := libfun.WalkDirIterator(root, func(path string, d fs.DirEntry) (*string, error) {
 		countFilesConsidered.Add(1)
 		if d.IsDir() && d.Name() == ".git" {
 			return nil, fs.SkipDir
@@ -73,5 +74,4 @@ func PopulateCache(ctx context.Context, root string) error {
 		fileCache.Store(path, data)
 		return nil
 	}, fun.WorkerGroupConfSet(&fun.WorkerGroupConf{NumWorkers: runtime.NumCPU(), ContinueOnError: true}))
-
 }

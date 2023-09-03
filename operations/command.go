@@ -11,6 +11,8 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -149,9 +151,15 @@ func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
 				}
 
 				opts := make([]string, 0, len(cmds))
+				seen := &dt.Set[string]{}
 
 				for _, cmd := range cmds {
-					opts = append(opts, cmd.Name)
+					if seen.Check(cmd.Alias) || seen.Check(cmd.Name) {
+						continue
+					}
+					key := ft.Default(cmd.Alias, cmd.Name)
+					seen.Add(key)
+					opts = append(opts, key)
 				}
 
 				sort.Strings(opts)

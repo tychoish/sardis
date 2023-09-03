@@ -32,10 +32,10 @@ func listMenus() *cmdr.Commander {
 					cmds := []string{}
 					for _, cmd := range group.Commands {
 						switch {
-						case cmd.Alias != "":
-							cmds = append(cmds, cmd.Alias)
 						case cmd.Name != "":
 							cmds = append(cmds, cmd.Name)
+						case cmd.Alias != "":
+							cmds = append(cmds, cmd.Alias)
 						default:
 							cmds = append(cmds, cmd.Command)
 						}
@@ -70,7 +70,7 @@ func DMenu() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("dmenu").
 		Subcommanders(
-			dmenuListCmds(dmenuListCommandRun).SetName("all"),
+			dmenuListCmds(dmenuListCommandAll).SetName("all"),
 			listMenus(),
 		).
 		Flags(cmdr.FlagBuilder("").

@@ -2,15 +2,8 @@ package sardis
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"net"
-	"time"
 
 	"github.com/tychoish/jasper"
-	"github.com/tychoish/jasper/options"
-	jaspercli "github.com/tychoish/jasper/x/cli"
-	"github.com/tychoish/jasper/x/remote"
 )
 
 type HostConf struct {
@@ -22,33 +15,34 @@ type HostConf struct {
 }
 
 func (h *HostConf) Jasper(ctx context.Context) (jasper.Manager, error) {
-	switch h.Protocol {
-	case "ssh":
-		remoteOpts := options.Remote{
-			RemoteConfig: options.RemoteConfig{
-				Host: h.Hostname,
-				User: h.User,
-			}}
-		clientOpts := jaspercli.ClientOptions{
-			BinaryPath: "sardis",
-			Type:       jaspercli.RPCService,
-			Port:       h.Port,
-		}
+	// switch h.Protocol {
+	// case "ssh":
+	// 	remoteOpts := options.Remote{
+	// 		RemoteConfig: options.RemoteConfig{
+	// 			Host: h.Hostname,
+	// 			User: h.User,
+	// 		}}
+	// 	clientOpts := jaspercli.ClientOptions{
+	// 		BinaryPath: "sardis",
+	// 		Type:       jaspercli.RPCService,
+	// 		Port:       h.Port,
+	// 	}
 
-		return jaspercli.NewSSHClient(remoteOpts, clientOpts, true)
-	case "jasper":
-		addrStr := fmt.Sprintf("%s:%d", h.Hostname, h.Port)
+	// 	return jaspercli.NewSSHClient(remoteOpts, clientOpts, true)
+	// case "jasper":
+	// 	addrStr := fmt.Sprintf("%s:%d", h.Hostname, h.Port)
 
-		serviceAddr, err := net.ResolveTCPAddr("tcp", addrStr)
-		if err != nil {
-			return nil, fmt.Errorf("could not resolve Jasper service address at '%s': %w", addrStr, err)
-		}
+	// 	serviceAddr, err := net.ResolveTCPAddr("tcp", addrStr)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("could not resolve Jasper service address at '%s': %w", addrStr, err)
+	// 	}
 
-		dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
+	// 	dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	// 	defer cancel()
 
-		return remote.NewRPCClient(dialCtx, serviceAddr, nil)
-	default:
-		return nil, errors.New("unsupported jasper protocol")
-	}
+	// 	return remote.NewRPCClient(dialCtx, serviceAddr, nil)
+	// default:
+	// 	return nil, errors.New("unsupported jasper protocol")
+	// }
+	panic("unsupported")
 }

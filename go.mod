@@ -17,7 +17,7 @@ require (
 	github.com/tychoish/cmdr v0.3.4-0.20230824234144-380e023f6f24
 	github.com/tychoish/fun v0.10.7
 	github.com/tychoish/godmenu v0.1.2
-	github.com/tychoish/grip v0.3.7-0.20230829230451-7df5f5ab84f7
+	github.com/tychoish/grip v0.3.7-0.20230830203959-0c04e83ea624
 	github.com/tychoish/grip/x/desktop v0.0.0-20230815172847-a642e6ca055e
 	github.com/tychoish/grip/x/jira v0.0.0-20230815172847-a642e6ca055e
 	github.com/tychoish/grip/x/system v0.0.0-20230815172847-a642e6ca055e
@@ -27,6 +27,7 @@ require (
 	github.com/tychoish/jasper v0.1.2-0.20230825020900-7d32edd66d81
 	github.com/tychoish/jasper/x/cli v0.0.0-20230825020900-7d32edd66d81
 	github.com/tychoish/jasper/x/track v0.0.0-20230509174929-2fe8b231212c
+	github.com/tychoish/libfun v0.0.0-00010101000000-000000000000
 	github.com/urfave/cli/v2 v2.25.3
 	go.mongodb.org/mongo-driver v1.11.6
 	golang.org/x/tools v0.6.0
@@ -63,7 +64,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.3.1 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
@@ -96,7 +97,6 @@ require (
 	github.com/tychoish/grip/x/splunk v0.0.0-20230815172847-a642e6ca055e // indirect
 	github.com/tychoish/jasper/x/remote v0.0.0-20230825020900-7d32edd66d81 // indirect
 	github.com/tychoish/jasper/x/splunk v0.0.0-20230510193424-429e4caa8e98 // indirect
-	github.com/tychoish/libfun v0.0.0-00010101000000-000000000000 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect

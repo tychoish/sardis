@@ -732,7 +732,6 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 	for _, group := range conf.Commands {
 		for idx := range group.Commands {
 			cmd := group.Commands[idx]
-			cmd.Alias = fmt.Sprintf("%s.%s", group.Name, cmd.Name)
 			out[cmd.Name] = cmd
 		}
 	}

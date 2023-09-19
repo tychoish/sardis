@@ -728,11 +728,19 @@ func (conf *CommandGroupConf) Validate() error {
 }
 
 func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
-	out := make(map[string]CommandConf)
+	out := dt.Mapify(map[string]CommandConf{})
 	for _, group := range conf.Commands {
 		for idx := range group.Commands {
 			cmd := group.Commands[idx]
-			out[cmd.Name] = cmd
+			if cmd.Alias == "" {
+				cmd.Alias = fmt.Sprintf("%s.%s", group.Name, cmd.Name)
+			}
+			if out.Check(cmd.Name) {
+				delete(out, cmd.Name)
+			} else {
+				out[cmd.Name] = cmd
+			}
+			out[cmd.Alias] = cmd
 		}
 	}
 	for _, menus := range conf.Menus {

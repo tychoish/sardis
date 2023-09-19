@@ -11,6 +11,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -93,7 +94,6 @@ func DMenu() *cmdr.Commander {
 			for group := range cmdGrp {
 				others = append(others, group)
 			}
-			sort.Strings(others)
 			if group, ok := cmdGrp[name]; ok {
 				cmds := group.ExportCommands()
 				opts := make([]string, 0, len(cmds))
@@ -111,8 +111,12 @@ func DMenu() *cmdr.Commander {
 					Selections: opts,
 					DMenu:      conf.Settings.DMenu,
 				})
-
-				if err != nil {
+				switch {
+				case err == nil:
+					break
+				case ers.Is(err, godmenu.ErrSelectionMissing):
+					return nil
+				default:
 					return err
 				}
 
@@ -136,9 +140,15 @@ func DMenu() *cmdr.Commander {
 					}
 
 					output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: opts, DMenu: conf.Settings.DMenu})
-					if err != nil {
+					switch {
+					case err == nil:
+						break
+					case ers.Is(err, godmenu.ErrSelectionMissing):
+						return nil
+					default:
 						return err
 					}
+
 					var cmd string
 					if menu.Command == "" {
 						cmd = mapping[output]
@@ -159,8 +169,14 @@ func DMenu() *cmdr.Commander {
 				}
 				others = append(others, menu.Name)
 			}
+			sort.Strings(others)
 			output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: others, DMenu: conf.Settings.DMenu})
-			if err != nil {
+			switch {
+			case err == nil:
+				break
+			case ers.Is(err, godmenu.ErrSelectionMissing):
+				return nil
+			default:
 				return err
 			}
 

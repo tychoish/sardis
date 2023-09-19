@@ -12,6 +12,7 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
@@ -168,8 +169,12 @@ func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
 					Selections: opts,
 					DMenu:      conf.Settings.DMenu,
 				})
-
-				if err != nil {
+				switch {
+				case err == nil:
+					break
+				case ers.Is(err, godmenu.ErrSelectionMissing):
+					return nil
+				default:
 					return err
 				}
 

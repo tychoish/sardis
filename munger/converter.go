@@ -1,6 +1,7 @@
 package munger
 
 import (
+	"bufio"
 	"context"
 	"io"
 	"io/fs"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/libfun"
 	"gopkg.in/yaml.v3"
 )
@@ -19,6 +21,21 @@ type BlogPost struct {
 	Path     string
 	Body     string
 }
+
+func (p *BlogPost) WriteTo(buf *bufio.Writer) error {
+	return fun.MakeWorker(func() error { return ft.IgnoreFirst(buf.WriteString("---")) }).Join(
+		fun.MakeWorker(func() error {
+			out, err := yaml.Marshal(p.Metadata)
+			if err != nil {
+				return err
+			}
+			return ft.IgnoreFirst(buf.Write(out))
+		}),
+		fun.MakeWorker(func() error { return ft.IgnoreFirst(buf.WriteString("---")) }),
+		fun.MakeWorker(func() error { return ft.IgnoreFirst(buf.WriteString(p.Body)) }),
+	).Wait()
+}
+
 type BlogDate struct{ time.Time }
 
 func (b *BlogDate) MarshalYAML() (any, error) {
@@ -48,7 +65,7 @@ type BlogMetadata struct {
 
 func CollectFiles(rootPath string) *fun.Iterator[BlogPost] {
 	return libfun.WalkDirIterator(rootPath, func(path string, dir fs.DirEntry) (_ *BlogPost, err error) {
-		if !strings.HasSuffix(".rst") {
+		if !strings.HasSuffix(".rst", path) {
 			return nil, nil
 		}
 
@@ -90,16 +107,30 @@ func CollectFiles(rootPath string) *fun.Iterator[BlogPost] {
 	})
 }
 
-func RstBlogPostToMarkdown(ctx context.Context, input *BlogPost) (*BlogPost, error) {
-	out, err := libfun.RunCommandWithInput(ctx, "pandoc --from=rst --to=commonmark_x", strings.NewReader(input.Body)).Slice(ctx)
-	if err != nil {
-		return nil, err
-	}
+func ConvertSite(ctx context.Context, path string) error {
+	return CollectFiles(path).Transform(func(ctx context.Context, input BlogPost) (BlogPost, error) {
+		out, err := libfun.RunCommandWithInput(ctx, "pandoc --from=rst --to=commonmark_x", strings.NewReader(input.Body)).Slice(ctx)
+		if err != nil {
+			return BlogPost{}, err
+		}
 
-	output := input
-	output.Body = strings.Join(out, "\n")
-	if output.Metadata != nil {
-		output.Metadata.Markup = "markdown"
-	}
-	return output, nil
+		output := input
+		output.Body = strings.Join(out, "\n")
+		if output.Metadata != nil {
+			output.Metadata.Markup = "markdown"
+		}
+		return output, nil
+	}).ProcessParallel(func(ctx context.Context, p BlogPost) (err error) {
+		file, err := os.Create(strings.Replace(p.Path, ".rst", "md", 1))
+		if err != nil {
+			return err
+		}
+		defer func() { err = ers.Join(err, file.Close()) }()
+		buf := bufio.NewWriter(file)
+		if err := p.WriteTo(buf); err != nil {
+			return err
+		}
+
+		return buf.Flush()
+	}).Run(ctx)
 }

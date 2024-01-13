@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/munger"
 	"github.com/tychoish/sardis/units"
 )
 
@@ -21,6 +22,7 @@ func Blog() *cmdr.Commander {
 		SetUsage("publish/manage blogging").
 		Subcommanders(
 			blogPublish(),
+			blogConvert(),
 		)
 }
 
@@ -107,4 +109,14 @@ func blogPublish() *cmdr.Commander {
 
 				return nil
 			}).Add)
+}
+
+func blogConvert() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("convert").
+		SetUsage("convert a hugo site to markdown from restructured text").
+		Flags(cmdr.FlagBuilder("~/src/blog").SetName("path").Flag()).
+		With(cmdr.SpecBuilder(func(ctx context.Context, c *cli.Context) (string, error) {
+			return c.Path("path"), nil
+		}).SetAction(munger.ConvertSite).Add)
 }

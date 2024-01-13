@@ -9,7 +9,6 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 )
@@ -49,7 +48,6 @@ func notifySend() *cmdr.Commander {
 		SetName("send").
 		SetUsage("send the remaining arguments over xmpp")
 	return addOpCommand(cmd, "message", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-		grip.Info("running op")
 		sardis.RemoteNotify(ctx).Notice(strings.Join(args.ops, " "))
 		return nil
 	})

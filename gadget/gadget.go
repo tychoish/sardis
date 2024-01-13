@@ -171,7 +171,7 @@ func RunTests(ctx context.Context, opts Options) error {
 	})
 
 	if opts.Recursive {
-		moditer = moditer.ParallelBuffer(intish.Max(4, opts.Workers/2))
+		moditer = moditer.ParallelBuffer(intish.Max(4, intish.Max(1, opts.Workers/2)))
 	}
 
 	reports := &adt.Map[string, testReport]{}
@@ -200,7 +200,7 @@ func RunTests(ctx context.Context, opts Options) error {
 				testOut.SetErrorHandler(func(err error) { grip.ErrorWhen(!errors.Is(err, io.EOF), err) })
 				args := []string{
 					"go", "test", "-race",
-					fmt.Sprintf("-parallel=%d", intish.Max(4, opts.Workers/2)),
+					fmt.Sprintf("-parallel=%d", intish.Min(4, opts.Workers/2)),
 					fmt.Sprintf("-timeout=%s", opts.Timeout),
 				}
 

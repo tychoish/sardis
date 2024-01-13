@@ -65,6 +65,10 @@ func Gadget() *cmdr.Commander {
 				SetName("coverage", "cover", "c").
 				SetUsage("runs tests with coverage reporting").
 				Flag(),
+			cmdr.FlagBuilder(runtime.NumCPU()).
+				SetName("workers", "jobs", "j").
+				SetUsage("number of parallel workers").
+				Flag(),
 		).
 		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (*gadget.Options, error) {
 			opts := &gadget.Options{
@@ -77,7 +81,7 @@ func Gadget() *cmdr.Commander {
 				ReportCoverage: cc.Bool("coverage"),
 				UseCache:       true,
 				GoTestArgs:     cc.Args().Slice(),
-				Workers:        runtime.NumCPU(),
+				Workers:        cc.Int("workers"),
 			}
 
 			if err := opts.Validate(); err != nil {

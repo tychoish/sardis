@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
+	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/munger"
 	"github.com/tychoish/sardis/units"
@@ -117,6 +118,6 @@ func blogConvert() *cmdr.Commander {
 		SetUsage("convert a hugo site to markdown from restructured text").
 		Flags(cmdr.FlagBuilder("~/src/blog").SetName("path").Flag()).
 		With(cmdr.SpecBuilder(func(ctx context.Context, c *cli.Context) (string, error) {
-			return c.Path("path"), nil
+			return util.TryExpandHomedir(c.Path("path")), nil
 		}).SetAction(munger.ConvertSite).Add)
 }

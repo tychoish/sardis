@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ft"
 	jutil "github.com/tychoish/jasper/util"
 )
 
@@ -37,7 +38,7 @@ func GetDirectoryContents(path string) (*fun.Iterator[string], error) {
 			return "", err
 		}
 
-		fun.Invariant.OK(len(dir) == 1, "impossible return value from ReadDir")
+		fun.Invariant.Ok(len(dir) == 1, "impossible return value from ReadDir")
 
 		return filepath.Join(path, dir[0].Name()), nil
 	}), nil
@@ -48,6 +49,17 @@ func TryCollapseHomedir(in string) string {
 	if strings.HasPrefix(in, hd) {
 		return strings.Replace(in, hd, "~", 1)
 	}
+	return in
+}
+
+func TryCollapsePwd(in string) string {
+	dir := ft.Must(filepath.Abs(jutil.TryExpandHomedir(in)))
+	cwd := ft.Must(os.Getwd())
+
+	if strings.HasPrefix(dir, cwd) {
+		return strings.Replace(dir, cwd, ".", 1)
+	}
+
 	return in
 }
 
@@ -96,7 +108,7 @@ func GetSSHAgentPath() (out string, err error) {
 		return "", err
 	}
 
-	if path := filepath.Join("/run/user", usr.Uid, "ssh-agent-socket"); jutil.FileExists(path) {
+	if path := filepath.Join("/run/user", usr.Uid, "ssh-agent.socket"); jutil.FileExists(path) {
 		return path, nil
 	}
 

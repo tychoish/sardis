@@ -187,7 +187,7 @@ type CommandConf struct {
 
 type BlogConf struct {
 	RepoName       string   `bson:"repo" json:"repo" yaml:"repo"`
-	Notify         bool     `bson:"notifyt" json:"notifyt" yaml:"notifyt"`
+	Notify         bool     `bson:"notify" json:"notify" yaml:"notify"`
 	Enabled        bool     `bson:"enabled" json:"enabled" yaml:"enabled"`
 	DeployCommands []string `bson:"deploy_commands" json:"deploy_commands" yaml:"deploy_commands"`
 }
@@ -196,6 +196,7 @@ type MenuConf struct {
 	Name       string                    `bson:"name" json:"name" yaml:"name"`
 	Command    string                    `bson:"command" json:"command" yaml:"command"`
 	Selections []string                  `bson:"selections" json:"selections" yaml:"selections"`
+	Notify     bool                      `bson:"notify" json:"notify" yaml:"notify"`
 	Aliases    []dt.Pair[string, string] `bson:"aliases" json:"aliases" yaml:"aliases"`
 }
 
@@ -728,7 +729,7 @@ func (conf *CommandGroupConf) Validate() error {
 }
 
 func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
-	out := dt.Mapify(map[string]CommandConf{})
+	out := dt.NewMap(map[string]CommandConf{})
 	for _, group := range conf.Commands {
 		for idx := range group.Commands {
 			cmd := group.Commands[idx]
@@ -740,6 +741,10 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 			} else {
 				out[cmd.Name] = cmd
 			}
+			if group.Notify != nil {
+				cmd.Notify = *group.Notify
+			}
+
 			out[cmd.Alias] = cmd
 		}
 	}
@@ -753,6 +758,7 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 				cmd.Name = fmt.Sprintf("%s.%s", menus.Name, operation)
 				cmd.Command = fmt.Sprintf("%s %s", menus.Command, operation)
 			}
+			cmd.Notify = menus.Notify
 			out[cmd.Name] = cmd
 		}
 		for _, alias := range menus.Aliases {
@@ -764,6 +770,7 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 				cmd.Name = fmt.Sprintf("%s.%s", menus.Name, alias.Key)
 				cmd.Command = fmt.Sprintf("%s %s", menus.Command, alias.Value)
 			}
+			cmd.Notify = menus.Notify
 			out[cmd.Name] = cmd
 		}
 	}

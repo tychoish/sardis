@@ -167,7 +167,7 @@ func Collect(ctx context.Context, path string) (*Module, error) {
 
 	seen := &dt.Map[string, PackageInfo]{}
 	for _, f := range files {
-		fun.Invariant.OK(f.Module != nil, "should always collect module information")
+		fun.Invariant.Ok(f.Module != nil, "should always collect module information")
 
 		info := PackageInfo{
 			PackageName:    f.PkgPath,

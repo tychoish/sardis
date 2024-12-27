@@ -63,7 +63,7 @@ func GetBuildOrder(ctx context.Context, path string) (*BuildOrder, error) {
 		node := item.Key
 		edges := item.Value
 		info, ok := index[node]
-		fun.Invariant.OK(ok, "bad index")
+		fun.Invariant.Ok(ok, "bad index")
 
 		if len(edges) == 0 && len(info.Dependencies) == 0 {
 			next = append(next, node)
@@ -122,7 +122,7 @@ OUTER:
 		}
 
 		info, ok := index[node]
-		fun.Invariant.OK(ok)
+		fun.Invariant.Ok(ok)
 
 		for _, dep := range info.Dependencies {
 			if !seen.Check(dep) {

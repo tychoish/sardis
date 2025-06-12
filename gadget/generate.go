@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -38,12 +37,10 @@ func GoGenerate(
 	opStart := time.Now()
 	var numPackages int
 	for idx, group := range args.Spec.Order {
-		fun.ConvertIterator(
-			dt.Sliceify(group).Iterator(),
-			func(_ context.Context, in string) (string, error) {
-				return strings.Replace(index[in].LocalDirectory, args.Spec.Path, ".", 1), nil
-			},
-		)
+		// TOOD: does this actually do anything?
+		fun.MakeConverter(func(in string) string {
+			return strings.Replace(index[in].LocalDirectory, args.Spec.Path, ".", 1)
+		}).Stream(fun.SliceStream(group))
 
 		numPackages += len(group)
 
@@ -87,7 +84,7 @@ func GoGenerate(
 	grip.Notice(message.BuildPair().
 		Pair("op", "go generate").
 		Pair("dur", time.Since(opStart)).
-		Pair("errors", ec.HasErrors()).
+		Pair("ok", ec.Ok()).
 		Pair("groups", len(args.Spec.Order)).
 		Pair("packages", numPackages))
 

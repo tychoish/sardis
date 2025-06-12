@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
@@ -51,8 +52,9 @@ type BlogMetadata struct {
 	Markup     string   `yaml:"markup"`
 }
 
-func CollectFiles(rootPath string) *fun.Iterator[BlogPost] {
-	return libfun.WalkDirIterator(rootPath, func(path string, dir fs.DirEntry) (*BlogPost, error) {
+func CollectFiles(rootPath string) *fun.Stream[BlogPost] {
+	grip.Infof("collecting blog files: %s", rootPath)
+	return libfun.WalkDirIterator(rootPath, func(path string, dir fs.DirEntry) (_ *BlogPost, err error) {
 		if !strings.HasSuffix(path, ".rst") {
 			return nil, nil
 		}
@@ -127,10 +129,18 @@ func ConvertSite(ctx context.Context, path string) error {
 
 		grip.Build().Level(level.Debug).Pair("path", util.TryCollapsePwd(p.Path)).Pair("op", "transform").Send()
 
+		return output, nil
+	}).Parallel(func(ctx context.Context, p BlogPost) (err error) {
+		defer func() { grip.Error(err) }()
+
 		file, err := os.Create(strings.Replace(p.Path, ".rst", ".md", 1))
 		if err != nil {
 			return ers.Wrap(err, p.Path)
 		}
+
+		defer func() { err = erc.Join(err, file.Close()) }()
+		grip.Infof("writing: %s", file.Name())
+
 		buf := bufio.NewWriter(file)
 
 		grip.Build().Level(level.Info).Pair("path", util.TryCollapsePwd(file.Name())).Pair("op", "writing").Send()

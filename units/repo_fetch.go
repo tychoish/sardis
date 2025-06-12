@@ -3,11 +3,11 @@ package units
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
@@ -23,11 +23,11 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.Worker {
 		start := time.Now()
 		defer func() {
 			grip.Notice(message.Fields{
-				"path":   conf.Path,
-				"repo":   conf.Remote,
-				"errors": ec.HasErrors(),
-				"op":     "repo fetch",
-				"dur":    time.Since(start).String(),
+				"path": conf.Path,
+				"repo": conf.Remote,
+				"ok":   ec.Ok(),
+				"op":   "repo fetch",
+				"dur":  time.Since(start).String(),
 			})
 		}()
 
@@ -57,7 +57,7 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.Worker {
 			// SetOutputSender(level.Info, sender).
 			// SetErrorSender(level.Warning, sender)
 
-		if conf.LocalSync && ft.Contains("mail", conf.Tags) {
+		if conf.LocalSync && slices.Contains(conf.Tags, "mail") {
 			cmd.Append(conf.Pre...)
 		}
 

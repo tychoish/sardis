@@ -42,7 +42,7 @@ func NewBulkCreateJiraTicketJob(path string) fun.Worker {
 			}
 		}
 
-		if ec.HasErrors() {
+		if !ec.Ok() {
 			return ec.Resolve()
 		}
 
@@ -68,9 +68,9 @@ func NewBulkCreateJiraTicketJob(path string) fun.Worker {
 		}
 
 		grip.Info(message.Fields{
-			"op":     "bulk crate tickets",
-			"num":    len(data.Tickets),
-			"errors": ec.HasErrors(),
+			"op":  "bulk crate tickets",
+			"num": len(data.Tickets),
+			"ok":  ec.Ok(),
 		})
 		return nil
 	}

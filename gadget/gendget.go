@@ -57,7 +57,7 @@ func GetBuildOrder(ctx context.Context, path string) (*BuildOrder, error) {
 	next := []string{}
 	queue := &dt.List[string]{}
 
-	iter := nodes.Iterator()
+	iter := nodes.Stream()
 	for iter.Next(ctx) {
 		item := iter.Value()
 		node := item.Key
@@ -72,7 +72,7 @@ func GetBuildOrder(ctx context.Context, path string) (*BuildOrder, error) {
 		}
 	}
 	sort.Strings(next)
-	seen.Populate(fun.SliceIterator(next))
+	seen.AppendStream(fun.SliceStream(next))
 	buildOrder = append(buildOrder, next)
 	next = nil
 	grip.Debug(message.Fields{
@@ -93,7 +93,7 @@ OUTER:
 		}
 		if runsSinceProgress == queue.Len() && len(next) > 0 {
 			sort.Strings(next)
-			seen.Populate(fun.SliceIterator(next))
+			seen.AppendStream(fun.SliceStream(next))
 			buildOrder = append(buildOrder, next)
 			next = nil
 			runsSinceProgress = 0

@@ -21,8 +21,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/intish"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/srv"
@@ -50,15 +48,15 @@ type Options struct {
 }
 
 func (opts *Options) Validate() (err error) {
-	defer func() { err = ers.ParsePanic(recover()) }()
+	defer func() { err = erc.ParsePanic(recover()) }()
 
 	ec := &erc.Collector{}
 
-	erc.When(ec, opts.Workers < 1, "gadget options cannot specify 0 or fewer workers")
-	erc.When(ec, opts.Timeout < time.Second, "timeout should be at least a second")
-	erc.Whenf(ec, strings.HasSuffix(opts.RootPath, "..."), "root path [%s] should not have ...", opts.RootPath)
+	ec.When(opts.Workers < 1, ers.Error("gadget options cannot specify 0 or fewer workers"))
+	ec.When(opts.Timeout < time.Second, ers.Error("timeout should be at least a second"))
+	ec.Whenf(strings.HasSuffix(opts.RootPath, "..."), "root path [%s] should not have ...", opts.RootPath)
 
-	erc.Whenf(ec, opts.Recursive && (opts.PackagePath != "" && opts.PackagePath != "./" && opts.PackagePath != "..."),
+	ec.Whenf(opts.Recursive && (opts.PackagePath != "" && opts.PackagePath != "./" && opts.PackagePath != "..."),
 		"recursive gadget calls must not specify a limiting path %q", opts.PackagePath)
 
 	fun.Invariant.Must(ec.Resolve())
@@ -141,7 +139,7 @@ func RunTests(ctx context.Context, opts Options) error {
 				Directory(opts.RootPath).
 				SetOutputSender(level.Info, out).
 				SetErrorSender(level.Error, out).
-				AppendArgs("golangci-lint", "run", "--allow-parallel-runners").
+				AppendArgs("golangci-lint", "run", "--allow-parallel-runners", "--timeout", opts.Timeout.String()).
 				Run(ctx)
 
 			dur := time.Since(startLint)
@@ -159,7 +157,7 @@ func RunTests(ctx context.Context, opts Options) error {
 
 	count := 0
 	mods := &adt.Map[string, *Module]{}
-	moditer := fun.ConvertIterator(iter, func(ctx context.Context, mpath string) (*Module, error) {
+	moditer := fun.Converter[string, *Module](func(ctx context.Context, mpath string) (*Module, error) {
 		if count != 0 && !opts.Recursive {
 			return nil, fmt.Errorf("module at %q is within %q but recursive mode is not enabled",
 				mpath, opts.RootPath)
@@ -168,106 +166,104 @@ func RunTests(ctx context.Context, opts Options) error {
 		mod, err := Collect(ctx, mpath)
 		mods.Store(mpath, mod)
 		return mod, err
-	})
+	}).Stream(iter)
 
 	if opts.Recursive {
-		moditer = moditer.ParallelBuffer(intish.Max(4, intish.Max(1, opts.Workers/2)))
+		moditer = moditer.BufferParallel(max(4, max(1, opts.Workers/2)))
 	}
 
 	reports := &adt.Map[string, testReport]{}
 
-	pkgiter := itertool.MergeSliceIterators(fun.ConvertIterator(moditer, fun.Converter(func(m *Module) []PackageInfo { return m.Packages })))
+	pkgiter := fun.MergeStreams(fun.MakeConverter(func(m *Module) *fun.Stream[PackageInfo] { return fun.SliceStream(m.Packages) }).Stream(moditer))
 
-	fun.ConvertIterator(pkgiter,
-		fun.Converter(func(pkg PackageInfo) fun.Worker {
-			return func(ctx context.Context) error {
-				if reports.Check(pkg.PackageName) {
-					grip.Errorln("duplicate", pkg.PackageName)
-					return nil
-				}
-				grip.Build().Level(level.Debug).
-					Pair("pkg", pkg.PackageName).
-					Pair("op", "populate").
-					Pair("mod", pkg.ModuleName).
-					Pair("path", pkg.LocalDirectory).
-					Send()
-
-				catch := &erc.Collector{}
-
-				testOut := send.MakeWriter(send.MakePlain())
-				testOut.SetPriority(grip.Sender().Priority())
-				testOut.SetFormatter(testOutputFilter(opts, reports, pkg))
-				testOut.SetErrorHandler(func(err error) { grip.ErrorWhen(!errors.Is(err, io.EOF), err) })
-				args := []string{
-					"go", "test", "-race",
-					fmt.Sprintf("-parallel=%d", intish.Min(4, opts.Workers/2)),
-					fmt.Sprintf("-timeout=%s", opts.Timeout),
-				}
-
-				switch {
-				case opts.CompileOnly:
-					args = append(args, "-run=noop")
-				case opts.ReportCoverage:
-					args = append(args, fmt.Sprintf("-coverprofile=%s", filepath.Join(pkg.LocalDirectory, "coverage.out")))
-				case opts.UseCache:
-					// nothing
-				default:
-					return fmt.Errorf("must configure coverage, cache, or compile-only")
-				}
-
-				args = append(args, pkg.LocalDirectory)
-				args = append(args, opts.GoTestArgs...)
-
-				testStart := time.Now()
-				catch.Add(jpm.CreateCommand(ctx).
-					ID(fmt.Sprint("test.", pkg.PackageName)).
-					Directory(pkg.LocalDirectory).
-					SetOutputSender(level.Info, testOut).
-					SetErrorSender(level.Error, testOut).
-					PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
-					Add(args).
-					Run(ctx))
-				dur := time.Since(testStart)
-
-				grip.Build().Level(level.Debug).
-					Pair("pkg", pkg.PackageName).
-					Pair("op", "test").
-					Pair("ok", !catch.HasErrors()).
-					Pair("dur", dur).
-					Send()
-
-				if result, ok := reports.Load(pkg.PackageName); ok {
-					var buf bytes.Buffer
-					sender := send.MakeBytesBuffer(&buf)
-					sender.SetPriority(level.Info)
-					sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
-
-					if opts.ReportCoverage {
-						sender.SetName("coverage.report")
-						coverout := filepath.Join(result.Info.LocalDirectory, "coverage.out")
-						grip.Warning(ers.Wrapf(jpm.CreateCommand(ctx).
-							ID(fmt.Sprint("coverage.html.", result.Package)).
-							Directory(result.Info.LocalDirectory).
-							PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
-							SetOutputSender(level.Debug, out).
-							SetErrorSender(level.Error, out).
-							AppendArgs("go", "tool", "cover", "-html", coverout, "-o", fmt.Sprintf("coverage-%s.html", filepath.Base(result.Info.LocalDirectory))).
-							Run(ctx), "coverage html for %s", result.Package))
-						ec.Add(jpm.CreateCommand(ctx).
-							ID(fmt.Sprint("coverage.report", result.Package)).
-							Directory(result.Info.LocalDirectory).
-							SetErrorSender(level.Error, out).
-							SetOutputSender(level.Info, sender).
-							AppendArgs("go", "tool", "cover", "-func", coverout).
-							Run(ctx))
-					}
-					report(ctx, result.Info, reports.Get(result.Info.PackageName), strings.TrimSpace(buf.String()), time.Since(start), catch.Resolve())
-				}
-
-				return catch.Resolve()
+	fun.MakeConverter(func(pkg PackageInfo) fun.Worker {
+		return func(ctx context.Context) error {
+			if reports.Check(pkg.PackageName) {
+				grip.Errorln("duplicate", pkg.PackageName)
+				return nil
 			}
-		})).
-		Process(fun.MakeProcessor(main.Add)).Operation(ec.Add).Run(ctx)
+			grip.Build().Level(level.Debug).
+				Pair("pkg", pkg.PackageName).
+				Pair("op", "populate").
+				Pair("mod", pkg.ModuleName).
+				Pair("path", pkg.LocalDirectory).
+				Send()
+
+			catch := &erc.Collector{}
+
+			testOut := send.MakeWriter(send.MakePlain())
+			testOut.SetPriority(grip.Sender().Priority())
+			testOut.SetFormatter(testOutputFilter(opts, reports, pkg))
+			testOut.SetErrorHandler(func(err error) { grip.ErrorWhen(!errors.Is(err, io.EOF), err) })
+			args := []string{
+				"go", "test", "-race",
+				fmt.Sprintf("-parallel=%d", min(4, opts.Workers/2)),
+				fmt.Sprintf("-timeout=%s", opts.Timeout),
+			}
+
+			switch {
+			case opts.CompileOnly:
+				args = append(args, "-run=noop")
+			case opts.ReportCoverage:
+				args = append(args, fmt.Sprintf("-coverprofile=%s", filepath.Join(pkg.LocalDirectory, "coverage.out")))
+			case opts.UseCache:
+				// nothing
+			default:
+				return fmt.Errorf("must configure coverage, cache, or compile-only")
+			}
+
+			args = append(args, pkg.LocalDirectory)
+			args = append(args, opts.GoTestArgs...)
+
+			testStart := time.Now()
+			catch.Add(jpm.CreateCommand(ctx).
+				ID(fmt.Sprint("test.", pkg.PackageName)).
+				Directory(pkg.LocalDirectory).
+				SetOutputSender(level.Info, testOut).
+				SetErrorSender(level.Error, testOut).
+				PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
+				Add(args).
+				Run(ctx))
+			dur := time.Since(testStart)
+
+			grip.Build().Level(level.Debug).
+				Pair("pkg", pkg.PackageName).
+				Pair("op", "test").
+				Pair("ok", catch.Ok()).
+				Pair("dur", dur).
+				Send()
+
+			if result, ok := reports.Load(pkg.PackageName); ok {
+				var buf bytes.Buffer
+				sender := send.MakeBytesBuffer(&buf)
+				sender.SetPriority(level.Info)
+				sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
+
+				if opts.ReportCoverage {
+					sender.SetName("coverage.report")
+					coverout := filepath.Join(result.Info.LocalDirectory, "coverage.out")
+					grip.Warning(ers.Wrapf(jpm.CreateCommand(ctx).
+						ID(fmt.Sprint("coverage.html.", result.Package)).
+						Directory(result.Info.LocalDirectory).
+						PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
+						SetOutputSender(level.Debug, out).
+						SetErrorSender(level.Error, out).
+						AppendArgs("go", "tool", "cover", "-html", coverout, "-o", fmt.Sprintf("coverage-%s.html", filepath.Base(result.Info.LocalDirectory))).
+						Run(ctx), "coverage html for %s", result.Package))
+					ec.Add(jpm.CreateCommand(ctx).
+						ID(fmt.Sprint("coverage.report", result.Package)).
+						Directory(result.Info.LocalDirectory).
+						SetErrorSender(level.Error, out).
+						SetOutputSender(level.Info, sender).
+						AppendArgs("go", "tool", "cover", "-func", coverout).
+						Run(ctx))
+				}
+				report(ctx, result.Info, reports.Get(result.Info.PackageName), strings.TrimSpace(buf.String()), time.Since(start), catch.Resolve())
+			}
+
+			return catch.Resolve()
+		}
+	}).Stream(pkgiter).ReadAll(fun.MakeHandler(main.Add).Capture()).Operation(ec.Push).Run(ctx)
 
 	ec.Add(main.Close())
 	ec.Add(pool.Worker().Run(ctx))
@@ -331,7 +327,7 @@ func testOutputFilter(
 		defer func() {
 			ec := &erc.Collector{}
 			ec.Add(err)
-			erc.Recover(ec)
+			ec.Recover()
 			err = ec.Resolve()
 		}()
 
@@ -417,10 +413,10 @@ func report(
 	)
 	count := 0
 
-	iter := fun.HF.Lines(strings.NewReader(coverage))
+	iter := fun.MAKE.Lines(strings.NewReader(coverage))
 	table := tabby.New()
 	replacer := strings.NewReplacer(tr.Package, pfx)
-	err = ers.Join(err, iter.Observe(func(in string) {
+	err = erc.Join(err, iter.ReadAll(func(in string) {
 
 		cols := strings.Fields(replacer.Replace(in))
 		if cols[0] == "total:" {

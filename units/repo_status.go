@@ -42,10 +42,10 @@ func NewRepoStatusJob(path string) fun.Worker {
 		ec.Add(doOtherStat(path, logger))
 
 		logger.Debug(message.Fields{
-			"op":     "git status",
-			"path":   path,
-			"secs":   time.Since(startAt).Seconds(),
-			"errors": ec.HasErrors(),
+			"op":   "git status",
+			"path": path,
+			"secs": time.Since(startAt).Seconds(),
+			"ok":   ec.Ok(),
 		})
 
 		return ec.Resolve()

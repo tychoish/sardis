@@ -56,10 +56,10 @@ func NewRepoCloneJob(rconf sardis.RepoConf) fun.Worker {
 			Run(ctx))
 
 		grip.Notice(message.Fields{
-			"path":   rconf.Path,
-			"repo":   rconf.Remote,
-			"errors": ec.HasErrors(),
-			"op":     "repo clone",
+			"path": rconf.Path,
+			"repo": rconf.Remote,
+			"ok":   ec.Ok(),
+			"op":   "repo clone",
 		})
 
 		return

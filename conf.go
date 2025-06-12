@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -92,11 +93,11 @@ type SystemdServiceConf struct {
 
 func (c *SystemdServiceConf) Validate() error {
 	catcher := &erc.Collector{}
-	erc.When(catcher, c.Name == "", "must specify service name")
-	erc.Whenf(catcher, c.Unit == "", "cannot specify empty unit for %q", c.Name)
-	erc.Whenf(catcher, (c.User && c.System) || (!c.User && !c.System),
+	catcher.When(c.Name == "", ers.Error("must specify service name"))
+	catcher.Whenf(c.Unit == "", "cannot specify empty unit for %q", c.Name)
+	catcher.Whenf((c.User && c.System) || (!c.User && !c.System),
 		"must specify either user or service for %q", c.Name)
-	erc.Whenf(catcher, (c.Disabled && c.Enabled) || (!c.Disabled && !c.Enabled),
+	catcher.Whenf((c.Disabled && c.Enabled) || (!c.Disabled && !c.Enabled),
 		"must specify either disabled or enabled for %q", c.Name)
 	return catcher.Resolve()
 }
@@ -177,12 +178,13 @@ type CommandGroupConf struct {
 }
 
 type CommandConf struct {
-	Name       string `bson:"name" json:"name" yaml:"name"`
-	Directory  string `bson:"directory" json:"directory" yaml:"directory"`
-	Command    string `bson:"command" json:"command" yaml:"command"`
-	Alias      string `bson:"alias" json:"alias" yaml:"alias"`
-	Notify     bool   `bson:"notify" json:"notify" yaml:"notify"`
-	Background bool   `bson:"bson" json:"bson" yaml:"bson"`
+	Name       string   `bson:"name" json:"name" yaml:"name"`
+	Directory  string   `bson:"directory" json:"directory" yaml:"directory"`
+	Alias      string   `bson:"alias" json:"alias" yaml:"alias"`
+	Command    string   `bson:"command" json:"command" yaml:"command"`
+	Commands   []string `bson:"commands" json:"commands" yaml:"commands"`
+	Notify     bool     `bson:"notify" json:"notify" yaml:"notify"`
+	Background bool     `bson:"bson" json:"bson" yaml:"bson"`
 }
 
 type BlogConf struct {
@@ -223,7 +225,7 @@ func (conf *MenuConf) Validate() error {
 		ec.Add(ers.Wrapf(err, "%s [%s] does not exist", base, conf.Command))
 	}
 
-	erc.Whenf(ec, len(conf.Selections) == 0 && len(conf.Aliases) == 0, "must specify options for %q", conf.Name)
+	ec.Whenf(len(conf.Selections) == 0 && len(conf.Aliases) == 0, "must specify options for %q", conf.Name)
 
 	return ec.Resolve()
 }
@@ -267,7 +269,7 @@ func (conf *Configuration) Validate() error {
 		}
 	}
 	for idx := range conf.Menus {
-		erc.Whenf(ec, conf.Menus[idx].Name == "", "must specify name for dmenu spec at item %d", idx)
+		ec.Whenf(conf.Menus[idx].Name == "", "must specify name for dmenu spec at item %d", idx)
 		if err := conf.Menus[idx].Validate(); err != nil {
 			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Menus[idx], err))
 		}
@@ -311,7 +313,7 @@ func (conf *Configuration) expandLinkedFiles(catcher *erc.Collector) {
 				return
 			}
 
-			erc.Whenf(catcher, len(conf.Settings.ConfigPaths) != 0,
+			catcher.Whenf(len(conf.Settings.ConfigPaths) != 0,
 				"nested file %q specified additional files %v, which is invalid",
 				fn, conf.Settings.ConfigPaths)
 			pipe <- conf
@@ -663,13 +665,13 @@ func (conf *CredentialsConf) Validate() error {
 func (h *HostConf) Validate() error {
 	catcher := &erc.Collector{}
 
-	erc.When(catcher, h.Name == "", "cannot have an empty name for a host")
-	erc.When(catcher, h.Hostname == "", "cannot have an empty host name")
-	erc.When(catcher, h.Port == 0, "must specify a non-zero port number for a host")
-	erc.When(catcher, !ft.Contains(h.Protocol, []string{"ssh", "jasper"}), "host protocol must be ssh or jasper")
+	catcher.When(h.Name == "", ers.Error("cannot have an empty name for a host"))
+	catcher.When(h.Hostname == "", ers.Error("cannot have an empty host name"))
+	catcher.When(h.Port == 0, ers.Error("must specify a non-zero port number for a host"))
+	catcher.When(!slices.Contains([]string{"ssh", "jasper"}, h.Protocol), ers.Error("host protocol must be ssh or jasper"))
 
 	if h.Protocol == "ssh" {
-		erc.When(catcher, h.User == "", "must specify user for ssh hosts")
+		catcher.When(h.User == "", ers.Error("must specify user for ssh hosts"))
 	}
 
 	return catcher.Resolve()
@@ -693,7 +695,7 @@ func (conf *CommandGroupConf) Validate() error {
 	if conf.Directory == "" {
 		conf.Directory = home
 	}
-	erc.When(catcher, conf.Name == "", "command group must have name")
+	catcher.When(conf.Name == "", ers.Error("command group must have name"))
 	shouldNotify := conf.Notify != nil && *conf.Notify
 	shouldBackground := conf.Background != nil && *conf.Background
 
@@ -702,6 +704,8 @@ func (conf *CommandGroupConf) Validate() error {
 		cmd.Notify = cmd.Notify || shouldNotify
 		cmd.Background = cmd.Background || shouldBackground
 
+		catcher.Whenf(cmd.Name == "", "commands [%d] must have a name", idx)
+
 		if cmd.Directory == "" {
 			cmd.Directory = conf.Directory
 		}
@@ -709,19 +713,26 @@ func (conf *CommandGroupConf) Validate() error {
 		if conf.Command != "" {
 			if cmd.Command == "" {
 				cmd.Command = conf.Command
-			}
-			if strings.Contains(conf.Command, "{{command}}") {
+			} else if strings.Contains(conf.Command, "{{command}}") {
 				cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
 			}
-
+			cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Alias)
 		}
 
-		erc.Whenf(catcher, cmd.Name == "", "commands [%d] must have a name", idx)
+		for idx := range cmd.Commands {
+			if strings.Contains(conf.Command, "{{command}}") {
+				cmd.Commands[idx] = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Commands[idx])
+			}
+			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
+			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
+			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{alias}}", cmd.Alias)
+		}
 
 		cmd.Directory, err = homedir.Expand(cmd.Directory)
 		catcher.Add(ers.Wrapf(err, "command %q at %d", cmd.Name, idx))
+
 		conf.Commands[idx] = cmd
 	}
 

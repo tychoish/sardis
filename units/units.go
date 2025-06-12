@@ -7,7 +7,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/itertool"
 )
 
 func DefaultPoolOpts() *fun.WorkerGroupConf {
@@ -18,13 +17,10 @@ func DefaultPoolOpts() *fun.WorkerGroupConf {
 	}
 }
 
-func SetupQueue[T any](op func(context.Context, T) error) (*dt.List[T], fun.Worker) {
+func SetupQueue[T any](op fun.Handler[T]) (*dt.List[T], fun.Worker) {
 	list := &dt.List[T]{}
 
-	return list, func(ctx context.Context) error {
-		return itertool.ParallelForEach(ctx, list.Iterator(), op,
-			fun.WorkerGroupConfSet(DefaultPoolOpts()))
-	}
+	return list, list.StreamFront().Parallel(op, fun.WorkerGroupConfSet(DefaultPoolOpts()))
 }
 
 func SetupWorkers(ec *erc.Collector) (*dt.List[fun.Worker], fun.Worker) {

@@ -12,7 +12,6 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/libfun"
@@ -55,7 +54,7 @@ func PopulateCache(ctx context.Context, root string) error {
 			"files_read":       countFilesRead.Load(),
 		})
 	}()
-	return itertool.ParallelForEach(ctx, goFilesIter, func(ctx context.Context, path string) error {
+	return goFilesIter.Parallel(func(ctx context.Context, path string) error {
 		countFilesChecked.Add(1)
 		if fileCache.Check(path) {
 			return nil
@@ -73,5 +72,5 @@ func PopulateCache(ctx context.Context, root string) error {
 		countFilesRead.Add(1)
 		fileCache.Store(path, data)
 		return nil
-	}, fun.WorkerGroupConfSet(&fun.WorkerGroupConf{NumWorkers: runtime.NumCPU(), ContinueOnError: true}))
+	}, fun.WorkerGroupConfSet(&fun.WorkerGroupConf{NumWorkers: runtime.NumCPU(), ContinueOnError: true})).Run(ctx)
 }

@@ -72,18 +72,18 @@ func (p Packages) IndexByPackageName() dt.Map[string, PackageInfo] {
 	return out
 }
 
-func (p Packages) ConvertPathsToPackages(iter *fun.Iterator[string]) *fun.Iterator[string] {
+func (p Packages) ConvertPathsToPackages(iter *fun.Stream[string]) *fun.Stream[string] {
 	index := p.IndexByLocalDirectory()
-	return fun.ConvertIterator(iter, func(_ context.Context, path string) (string, error) {
-		return index[path].PackageName, nil
-	})
+	return fun.MakeConverter(func(path string) string {
+		return index[path].PackageName
+	}).Stream(iter)
 }
 
-func (p Packages) ConvertPackagesToPaths(iter *fun.Iterator[string]) *fun.Iterator[string] {
+func (p Packages) ConvertPackagesToPaths(iter *fun.Stream[string]) *fun.Stream[string] {
 	index := p.IndexByPackageName()
-	return fun.ConvertIterator(iter, func(_ context.Context, path string) (string, error) {
-		return index[path].LocalDirectory, nil
-	})
+	return fun.MakeConverter(func(path string) string {
+		return index[path].LocalDirectory
+	}).Stream(iter)
 }
 
 func (p Packages) Graph() *dt.Pairs[string, []string] {
@@ -184,20 +184,15 @@ func Collect(ctx context.Context, path string) (*Module, error) {
 
 			for depPkgIter.Next(ctx) {
 				dpkg := depPkgIter.Value()
-				pkgs.Populate(
-					fun.ConvertIterator(
-						filterLocal(f.Module.Path, dpkg.Imports()),
-						func(_ context.Context, p *types.Package) (string, error) { return p.Path(), nil },
-					),
-				)
+				pkgs.AppendStream(fun.MakeConverter(func(p *types.Package) string { return p.Path() }).Stream(filterLocal(f.Module.Path, dpkg.Imports())))
 			}
 
-			info.Dependencies = ft.Must(pkgs.Iterator().Slice(ctx))
+			info.Dependencies = ft.Must(pkgs.Stream().Slice(ctx))
 			sort.Strings(info.Dependencies)
 		}
 		if seen.Check(info.PackageName) {
 			prev := seen.Get(info.PackageName)
-			prev.Dependencies = ft.Must(itertool.Uniq(fun.SliceIterator(append(prev.Dependencies, info.Dependencies...))).Slice(ctx))
+			prev.Dependencies = ft.Must(itertool.Uniq(fun.SliceStream(append(prev.Dependencies, info.Dependencies...))).Slice(ctx))
 			info = prev
 		}
 
@@ -215,8 +210,8 @@ func Collect(ctx context.Context, path string) (*Module, error) {
 	return out, nil
 }
 
-func filterLocal(path string, imports []*types.Package) *fun.Iterator[*types.Package] {
-	return fun.SliceIterator(imports).Filter(func(p *types.Package) bool {
+func filterLocal(path string, imports []*types.Package) *fun.Stream[*types.Package] {
+	return fun.SliceStream(imports).Filter(func(p *types.Package) bool {
 		return strings.HasPrefix(p.Path(), path)
 	})
 }

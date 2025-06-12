@@ -58,7 +58,7 @@ func NewSymlinkCreateJob(conf sardis.LinkConf) fun.Worker {
 					"old_target": target,
 					"name":       conf.Name,
 					"target":     conf.Target,
-					"err":        ec.HasErrors(),
+					"ok":         ec.Ok(),
 				})
 			} else {
 				return
@@ -91,7 +91,7 @@ func NewSymlinkCreateJob(conf sardis.LinkConf) fun.Worker {
 			"op":  "created new symbolic link",
 			"src": conf.Path,
 			"dst": conf.Target,
-			"err": ec.HasErrors(),
+			"ok":  ec.Ok(),
 		})
 		return
 	}

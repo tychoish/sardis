@@ -1,7 +1,6 @@
 package util
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -27,12 +26,12 @@ func Apply[T any](fn func(T) T, in []T) []T {
 
 func TryExpandHomeDirs(in []string) []string { return Apply(jutil.TryExpandHomedir, in) }
 
-func GetDirectoryContents(path string) (*fun.Iterator[string], error) {
+func GetDirectoryContents(path string) (*fun.Stream[string], error) {
 	dir, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	return fun.Generator(func(ctx context.Context) (string, error) {
+	return fun.MakeGenerator(func() (string, error) {
 		dir, err := dir.ReadDir(1)
 		if err != nil {
 			return "", err
@@ -41,7 +40,7 @@ func GetDirectoryContents(path string) (*fun.Iterator[string], error) {
 		fun.Invariant.Ok(len(dir) == 1, "impossible return value from ReadDir")
 
 		return filepath.Join(path, dir[0].Name()), nil
-	}), nil
+	}).Stream(), nil
 }
 
 func TryCollapseHomedir(in string) string {

@@ -58,11 +58,12 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops [
 			SetErrorSender(level.Error, grip.Sender()).
 			Background(cmd.Background).
 			Append(cmd.Command).
+			Append(cmd.Commands...).
 			Prerequisite(func() bool {
 				grip.Info(message.Fields{
 					"cmd":  name,
 					"dir":  cmd.Directory,
-					"exec": cmd.Command,
+					"cmds": cmd.Commands,
 					"num":  idx + 1,
 					"len":  len(ops),
 				})
@@ -79,7 +80,6 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops [
 			}).
 			Run(ctx)
 		if err != nil {
-
 			return err
 		}
 	}
@@ -104,7 +104,10 @@ func listCommands() *cmdr.Commander {
 							cmd.Directory = ""
 						}
 
-						table.AddLine(cmd.Name, group.Name, cmd.Command, cmd.Directory)
+						table.AddLine(cmd.Name, group.Name, cmd.Commands, cmd.Directory)
+						for _, cg := range cmd.Commands {
+							table.AddLine("", "", cg, "")
+						}
 					}
 				}
 				table.Print()

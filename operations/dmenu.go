@@ -39,6 +39,9 @@ func listMenus() *cmdr.Commander {
 							cmds = append(cmds, cmd.Alias)
 						default:
 							cmds = append(cmds, cmd.Command)
+							for _, cg := range cmd.Commands {
+								cmds = append(cmds, cg)
+							}
 						}
 					}
 					sort.Strings(cmds)

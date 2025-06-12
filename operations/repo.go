@@ -11,7 +11,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
@@ -102,7 +102,7 @@ func repoUpdate() *cmdr.Commander {
 		})
 		ec.Add(run(ctx))
 
-		if shouldNotify && !ec.HasErrors() {
+		if shouldNotify && ec.Ok() {
 			notify.Notice(message.Fields{
 				"tag":     args.ops,
 				"op":      "repo sync",
@@ -116,7 +116,7 @@ func repoUpdate() *cmdr.Commander {
 			"code":    "success",
 			"tag":     args.ops,
 			"dur_sec": time.Since(started).Seconds(),
-			"err":     ec.HasErrors(),
+			"ok":      ec.Ok(),
 			"repos":   len(repos),
 		})
 
@@ -229,10 +229,10 @@ func repoStatus() *cmdr.Commander {
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		catcher := &erc.Collector{}
 
-		dt.Sliceify(args.conf.GetTaggedRepos(args.ops...)).Observe(func(conf sardis.RepoConf) {
+		catcher.Add(fun.SliceStream(args.conf.GetTaggedRepos(args.ops...)).ReadAll(func(conf sardis.RepoConf) {
 			grip.Info(conf.Name)
 			catcher.Add(units.NewRepoStatusJob(conf.Path).Run(ctx))
-		})
+		}).Run(ctx))
 
 		return catcher.Resolve()
 	})

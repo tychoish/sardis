@@ -84,6 +84,7 @@ func repoUpdate() *cmdr.Commander {
 		ec := &erc.Collector{}
 		jobs, run := units.SetupWorkers(ec)
 
+		repoNames := make([]string, 0, len(repos))
 		for idx := range repos {
 			repo := repos[idx]
 			if repo.Disabled {
@@ -93,18 +94,21 @@ func repoUpdate() *cmdr.Commander {
 				shouldNotify = true
 			}
 			jobs.PushBack(units.SyncRepo(ec, repo))
+			repoNames = append(repoNames, repo.Name)
 		}
 
 		grip.Info(message.Fields{
 			"op":      "repo sync",
 			"message": "waiting for jobs to complete",
 			"tags":    args.ops,
+			"repos":   repoNames,
 		})
 		ec.Add(run(ctx))
 
 		if shouldNotify && ec.Ok() {
 			notify.Notice(message.Fields{
 				"tag":     args.ops,
+				"repos":   repoNames,
 				"op":      "repo sync",
 				"dur_sec": time.Since(started).Seconds(),
 			})
@@ -115,6 +119,7 @@ func repoUpdate() *cmdr.Commander {
 			"op":      "repo sync",
 			"code":    "success",
 			"tag":     args.ops,
+			"repos":   repoNames,
 			"dur_sec": time.Since(started).Seconds(),
 			"ok":      ec.Ok(),
 			"repos":   len(repos),

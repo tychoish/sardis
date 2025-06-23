@@ -104,15 +104,15 @@ func CollectFiles(rootPath string) *fun.Stream[BlogPost] {
 }
 
 func ConvertSite(ctx context.Context, path string) error {
-	return CollectFiles(path).ParallelBuffer(runtime.NumCPU()).ProcessParallel(func(ctx context.Context, p BlogPost) error {
+	return CollectFiles(path).BufferParallel(runtime.NumCPU()).Parallel(fun.NewHandler(func(ctx context.Context, p BlogPost) error {
 		var stdoutBuf bytes.Buffer
 		var stderrBuf bytes.Buffer
 
 		err := jasper.Context(ctx).
 			CreateCommand(ctx).
 			Append("pandoc --from=rst --to=commonmark_x").
-			SetOutputWriter(jutil.NewLocalBuffer(&stdoutBuf)).
-			SetErrorWriter(jutil.NewLocalBuffer(&stderrBuf)).
+			SetOutputWriter(jutil.NewLocalBuffer(stdoutBuf)).
+			SetErrorWriter(jutil.NewLocalBuffer(stderrBuf)).
 			SetInput(bytes.NewBuffer([]byte(p.Body))).
 			Run(ctx)
 		if err != nil {
@@ -129,8 +129,8 @@ func ConvertSite(ctx context.Context, path string) error {
 
 		grip.Build().Level(level.Debug).Pair("path", util.TryCollapsePwd(p.Path)).Pair("op", "transform").Send()
 
-		return output, nil
-	}).Parallel(func(ctx context.Context, p BlogPost) (err error) {
+		return nil
+	}).Join(func(ctx context.Context, p BlogPost) (err error) {
 		defer func() { grip.Error(err) }()
 
 		file, err := os.Create(strings.Replace(p.Path, ".rst", ".md", 1))
@@ -156,5 +156,5 @@ func ConvertSite(ctx context.Context, path string) error {
 		}
 
 		return nil
-	}, fun.WorkerGroupConfWorkerPerCPU()).Run(ctx)
+	}), fun.WorkerGroupConfWorkerPerCPU()).Run(ctx)
 }

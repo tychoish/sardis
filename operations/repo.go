@@ -122,7 +122,7 @@ func repoUpdate() *cmdr.Commander {
 			"repos":   repoNames,
 			"dur_sec": time.Since(started).Seconds(),
 			"ok":      ec.Ok(),
-			"repos":   len(repos),
+			"n":       len(repos),
 		})
 
 		return ec.Resolve()

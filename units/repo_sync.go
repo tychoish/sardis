@@ -45,10 +45,10 @@ func NewRepoSyncJob(host string, repo sardis.RepoConf) fun.Worker {
 		hostname := util.GetHostname()
 
 		if j.isLocal() {
-			return fmt.Sprintf("LOCAL(%s).sync=[%s]", hostname, j.Name)
+			return fmt.Sprintf("sync.LOCAL(%s).REPO(%s)", hostname, j.Name)
 		}
 
-		return fmt.Sprintf("REMOTE(%s).sync.(FROM(%s))=[%s]", j.Host, hostname, j.Name)
+		return fmt.Sprintf("sync.REMOTE(%s).SOURCE(%s).REPO(%s)", j.Host, hostname, j.Name)
 	})
 
 	return j.Run
@@ -58,7 +58,7 @@ func (j *repoSyncJob) isLocal() bool {
 	return j.Host == "" || j.Host == "LOCAL"
 }
 
-const ruler string = "------------------------------------------------------------------------"
+const ruler string = "-------------------------------"
 
 func (j *repoSyncJob) Run(ctx context.Context) error {
 	if stat, err := os.Stat(j.Path); os.IsNotExist(err) || !stat.IsDir() {
@@ -73,6 +73,7 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 	proclog.Noticeln(
 		ruler,
 		strings.ToUpper(j.RepoConf.Name), "---",
+		strings.ToUpper(j.Host), "---",
 		strings.ToUpper(j.RepoConf.Path),
 	)
 	defer proclog.Info(ruler)

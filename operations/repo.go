@@ -70,6 +70,8 @@ func repoUpdate() *cmdr.Commander {
 		SetName("update").
 		Aliases("sync")
 
+	const opName = "repo sync"
+
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		repos := args.conf.GetTaggedRepos(args.ops...)
 		if len(repos) == 0 {
@@ -98,7 +100,7 @@ func repoUpdate() *cmdr.Commander {
 		}
 
 		grip.Info(message.Fields{
-			"op":      "repo sync",
+			"op":      opName,
 			"message": "waiting for jobs to complete",
 			"tags":    args.ops,
 			"repos":   repoNames,
@@ -109,14 +111,14 @@ func repoUpdate() *cmdr.Commander {
 			notify.Notice(message.Fields{
 				"tag":     args.ops,
 				"repos":   repoNames,
-				"op":      "repo sync",
+				"op":      opName,
 				"dur_sec": time.Since(started).Seconds(),
 			})
 		}
 
 		// QUESTION: should we send notification here
 		grip.Notice(message.Fields{
-			"op":      "repo sync",
+			"op":      opName,
 			"code":    "success",
 			"tag":     args.ops,
 			"repos":   repoNames,

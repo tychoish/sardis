@@ -72,11 +72,10 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 	proclog := grip.NewLogger(procout)
 	proclog.Noticeln(
 		ruler,
-		strings.ToUpper(j.RepoConf.Name), "---",
-		strings.ToUpper(j.Host), "---",
-		strings.ToUpper(j.RepoConf.Path),
+		"repo", strings.ToUpper(j.RepoConf.Name), "---",
+		"host", strings.ToUpper(j.Host), "---",
+		"path", strings.ToUpper(j.RepoConf.Path),
 	)
-	defer proclog.Info(ruler)
 
 	grip.Info(message.BuildPair().
 		Pair("op", "repo-sync").
@@ -108,20 +107,30 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 		BashWhen(!j.isLocal(), "git fetch origin && git rebase origin/$(git rev-parse --abbrev-ref HEAD)").
 		Append(j.Post...).
 		Run(ctx)
-
-	grip.Info(message.BuildPair().
+	msg := message.BuildPair().
 		Pair("op", "repo-sync").
 		Pair("state", "completed").
 		Pair("errors", err != nil).
 		Pair("id", j.buildID.Resolve()).
 		Pair("path", j.Path).
-		Pair("host", j.Host),
-	)
+		Pair("host", j.Host)
+
 	if err != nil {
+		proclog.Noticeln(
+			ruler,
+			"repo", strings.ToUpper(j.RepoConf.Name), "---",
+			"host", strings.ToUpper(j.Host), "---",
+			"path", strings.ToUpper(j.RepoConf.Path),
+		)
+
+		grip.Error(msg)
 		grip.Error(procout.buffer.String())
+		return err
+
 	}
 
-	return err
+	grip.Info(msg)
+	return nil
 }
 
 type bufsend struct {

@@ -2,6 +2,7 @@ package operations
 
 import (
 	"context"
+	"os"
 
 	"github.com/urfave/cli/v2"
 
@@ -23,11 +24,12 @@ func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configu
 		return nil, err
 	}
 
-	conf.Settings.Logging.EnableJSONFormating = cc.Bool("jsonLog")
-	conf.Settings.Logging.DisableStandardOutput = cc.Bool("quietStdOut")
 	conf.Settings.Logging.Priority = level.FromString(cc.String("level"))
-	conf.Settings.Logging.EnableJSONColorFormatting = cc.Bool("colorJsonLog")
-	conf.Settings.Logging.DisableSyslog = cc.Bool("quietSyslog")
+
+	conf.Settings.Logging.DisableSyslog = cc.Bool("quietSyslog") || os.Getenv("SARDIS_LOG_QUIET_SYSLOG") != ""
+	conf.Settings.Logging.DisableStandardOutput = cc.Bool("quietStdOut") || os.Getenv("SARDIS_LOG_QUIET_STDOUT") != ""
+	conf.Settings.Logging.EnableJSONFormating = cc.Bool("jsonLog") || os.Getenv("SARDIS_LOG_FORMAT_JSON") != ""
+	conf.Settings.Logging.EnableJSONColorFormatting = cc.Bool("colorJsonLog") || os.Getenv("SARDIS_LOG_COLOR_JSON") != ""
 
 	return conf, nil
 }

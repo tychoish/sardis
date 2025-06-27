@@ -129,48 +129,51 @@ func DMenu() *cmdr.Commander {
 			notify := sardis.DesktopNotify(ctx)
 
 			for _, menu := range conf.Menus {
-				if menu.Name == name {
-					items := len(menu.Selections) + len(menu.Aliases)
-					mapping := make(map[string]string, len(menu.Selections)+len(menu.Aliases))
-					opts := make([]string, 0, items)
-					for _, item := range menu.Selections {
-						opts = append(opts, item)
-						mapping[item] = item
-					}
-					for _, p := range menu.Aliases {
-						mapping[p.Key] = p.Value
-						opts = append(opts, p.Key)
-					}
-
-					output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: opts, DMenu: conf.Settings.DMenu})
-					switch {
-					case err == nil:
-						break
-					case ers.Is(err, godmenu.ErrSelectionMissing):
-						return nil
-					default:
-						return err
-					}
-
-					var cmd string
-					if menu.Command == "" {
-						cmd = mapping[output]
-					} else {
-						cmd = fmt.Sprintf("%s %s", menu.Command, mapping[output])
-					}
-
-					err = jasper.Context(ctx).CreateCommand(ctx).
-						Append(cmd).
-						SetCombinedSender(level.Notice, grip.Sender()).
-						Run(ctx)
-					if err != nil {
-						notify.Errorf("%s running %s failed: %s", name, output, err.Error())
-						return err
-					}
-					notify.Noticef("%s running %s completed", name, output)
-					return nil
-				}
 				others = append(others, menu.Name)
+				if menu.Name != name {
+					continue
+				}
+
+				items := len(menu.Selections) + len(menu.Aliases)
+				mapping := make(map[string]string, len(menu.Selections)+len(menu.Aliases))
+				opts := make([]string, 0, items)
+				for _, item := range menu.Selections {
+					opts = append(opts, item)
+					mapping[item] = item
+				}
+				for _, p := range menu.Aliases {
+					mapping[p.Key] = p.Value
+					opts = append(opts, p.Key)
+				}
+
+				output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: opts, DMenu: conf.Settings.DMenu})
+				switch {
+				case err == nil:
+					break
+				case ers.Is(err, godmenu.ErrSelectionMissing):
+					return nil
+				default:
+					return err
+				}
+
+				var cmd string
+				if menu.Command == "" {
+					cmd = mapping[output]
+				} else {
+					cmd = fmt.Sprintf("%s %s", menu.Command, mapping[output])
+				}
+
+				err = jasper.Context(ctx).CreateCommand(ctx).
+					AddEnv("SARDIS_LOG_QUIET_STDOUT", "true").
+					Append(cmd).
+					SetCombinedSender(level.Notice, grip.Sender()).
+					Run(ctx)
+				if err != nil {
+					notify.Errorf("%s running %s failed: %s", name, output, err.Error())
+					return err
+				}
+				notify.Noticef("%s running %s completed", name, output)
+				return nil
 			}
 			sort.Strings(others)
 			output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: others, DMenu: conf.Settings.DMenu})
@@ -190,6 +193,7 @@ func DMenu() *cmdr.Commander {
 			// don't notify here let the inner one do that
 			return jasper.Context(ctx).
 				CreateCommand(ctx).
+				AddEnv("SARDIS_LOG_QUIET_STDOUT", "true").
 				Append(fmt.Sprintf("%s %s", "sardis dmenu", output)).
 				SetCombinedSender(level.Notice, grip.Sender()).
 				Run(ctx)

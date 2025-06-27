@@ -169,22 +169,24 @@ type CredentialsAWS struct {
 }
 
 type CommandGroupConf struct {
-	Name       string        `bson:"name" json:"name" yaml:"name"`
-	Directory  string        `bson:"directory" json:"directory" yaml:"directory"`
-	Command    string        `bson:"default_command" json:"default_command" yaml:"default_command"`
-	Notify     *bool         `bson:"notify" json:"notify" yaml:"notify"`
-	Background *bool         `bson:"background" json:"background" yaml:"background"`
-	Commands   []CommandConf `bson:"commands" json:"commands" yaml:"commands"`
+	Name        string                 `bson:"name" json:"name" yaml:"name"`
+	Directory   string                 `bson:"directory" json:"directory" yaml:"directory"`
+	Environment dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
+	Command     string                 `bson:"default_command" json:"default_command" yaml:"default_command"`
+	Notify      *bool                  `bson:"notify" json:"notify" yaml:"notify"`
+	Background  *bool                  `bson:"background" json:"background" yaml:"background"`
+	Commands    []CommandConf          `bson:"commands" json:"commands" yaml:"commands"`
 }
 
 type CommandConf struct {
-	Name       string   `bson:"name" json:"name" yaml:"name"`
-	Directory  string   `bson:"directory" json:"directory" yaml:"directory"`
-	Alias      string   `bson:"alias" json:"alias" yaml:"alias"`
-	Command    string   `bson:"command" json:"command" yaml:"command"`
-	Commands   []string `bson:"commands" json:"commands" yaml:"commands"`
-	Notify     bool     `bson:"notify" json:"notify" yaml:"notify"`
-	Background bool     `bson:"bson" json:"bson" yaml:"bson"`
+	Name        string                 `bson:"name" json:"name" yaml:"name"`
+	Alias       string                 `bson:"alias" json:"alias" yaml:"alias"`
+	Directory   string                 `bson:"directory" json:"directory" yaml:"directory"`
+	Environment dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
+	Command     string                 `bson:"command" json:"command" yaml:"command"`
+	Commands    []string               `bson:"commands" json:"commands" yaml:"commands"`
+	Notify      bool                   `bson:"notify" json:"notify" yaml:"notify"`
+	Background  bool                   `bson:"bson" json:"bson" yaml:"bson"`
 }
 
 type BlogConf struct {
@@ -708,6 +710,18 @@ func (conf *CommandGroupConf) Validate() error {
 
 		if cmd.Directory == "" {
 			cmd.Directory = conf.Directory
+		}
+
+		if conf.Environment != nil || cmd.Environment != nil {
+			env := dt.Map[string, string]{}
+			if conf.Environment != nil {
+				env.ExtendWithStream(conf.Environment.Stream()).Ignore().Wait()
+			}
+			if cmd.Environment != nil {
+				env.ExtendWithStream(cmd.Environment.Stream()).Ignore().Wait()
+			}
+
+			cmd.Environment = env
 		}
 
 		if conf.Command != "" {

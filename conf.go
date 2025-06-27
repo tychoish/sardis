@@ -398,7 +398,7 @@ func (conf *Configuration) expandLinks(catcher *erc.Collector) []LinkConf {
 	return links
 }
 
-func (conf *Configuration) GetTaggedRepos(tags ...string) []RepoConf {
+func (conf *Configuration) GetTaggedRepos(tags ...string) dt.Slice[RepoConf] {
 	if len(tags) == 0 {
 		return nil
 	}

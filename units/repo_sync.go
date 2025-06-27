@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
@@ -64,6 +65,7 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 	if stat, err := os.Stat(j.Path); os.IsNotExist(err) || !stat.IsDir() {
 		return fmt.Errorf("path '%s' for %q does not exist", j.Path, j.buildID.Resolve())
 	}
+	started := time.Now()
 
 	procout := &bufsend{}
 	procout.SetPriority(level.Info)
@@ -113,7 +115,8 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 		Pair("errors", err != nil).
 		Pair("id", j.buildID.Resolve()).
 		Pair("path", j.Path).
-		Pair("host", j.Host)
+		Pair("host", j.Host).
+		Pair("dur", time.Since(started).Seconds())
 
 	if err != nil {
 		proclog.Noticeln(

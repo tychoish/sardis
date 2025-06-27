@@ -44,7 +44,7 @@ func NewRepoStatusJob(path string) fun.Worker {
 		logger.Debug(message.Fields{
 			"op":   "git status",
 			"path": path,
-			"secs": time.Since(startAt).Seconds(),
+			"dur":  time.Since(startAt).Seconds(),
 			"ok":   ec.Ok(),
 		})
 

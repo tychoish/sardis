@@ -7,7 +7,6 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/sardis"
@@ -69,8 +68,7 @@ func nightly() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			ec := &erc.Collector{}
-			jobs, run := units.SetupWorkers(ec)
+			jobs, run := units.SetupWorkers()
 
 			for idx := range conf.Links {
 				jobs.PushBack(units.NewSymlinkCreateJob(conf.Links[idx]))
@@ -83,7 +81,7 @@ func nightly() *cmdr.Commander {
 			for idx := range conf.System.Services {
 				jobs.PushBack(units.NewSystemServiceSetupJob(conf.System.Services[idx]))
 			}
-			ec.Add(run(ctx))
-			return ec.Resolve()
+
+			return run(ctx)
 		}).Add)
 }

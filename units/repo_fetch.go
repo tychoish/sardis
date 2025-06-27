@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
@@ -17,16 +16,14 @@ import (
 
 func NewRepoFetchJob(conf sardis.RepoConf) fun.Worker {
 	return func(ctx context.Context) (err error) {
-		ec := &erc.Collector{}
-		defer func() { ec.Add(err); err = ec.Resolve() }()
-
 		start := time.Now()
 		defer func() {
-			grip.Notice(message.Fields{
+			grip.Info(message.Fields{
 				"path": conf.Path,
 				"repo": conf.Remote,
-				"ok":   ec.Ok(),
-				"op":   "repo fetch",
+				"host": "LOCAL",
+				"ok":   err == nil,
+				"op":   "git pull",
 				"dur":  time.Since(start).String(),
 			})
 		}()
@@ -37,13 +34,11 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.Worker {
 				"op":   "repo doesn't exist; cloning",
 			})
 
-			ec.Add(NewRepoCloneJob(conf)(ctx))
-			return nil
+			return NewRepoCloneJob(conf).Run(ctx)
 		}
 
 		if conf.RemoteName == "" || conf.Branch == "" {
-			ec.Add(errors.New("repo-fetch requires defined remote name and branch for the repo"))
-			return nil
+			return errors.New("repo-fetch requires defined remote name and branch for the repo")
 		}
 
 		// sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
@@ -64,7 +59,6 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.Worker {
 		cmd.AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", conf.RemoteName, conf.Branch)
 		cmd.Append(conf.Post...)
 
-		ec.Add(cmd.Run(ctx))
-		return nil
+		return cmd.Run(ctx)
 	}
 }

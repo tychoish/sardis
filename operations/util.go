@@ -8,7 +8,6 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/dupe"
@@ -28,7 +27,7 @@ func Utilities() *cmdr.Commander {
 func diffTrees() *cmdr.Commander {
 	return cmdr.AddOperation(cmdr.MakeCommander().
 		SetName("tree-diff").
-		SetUsage("Compare two trees of files"),
+		SetUsage("Compare two trees of files, printing duplicates."),
 		// parse args
 		func(ctx context.Context, cc *cli.Context) (dupe.Options, error) {
 			op := dupe.OperationDisplay
@@ -89,14 +88,12 @@ func setupLinks() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			ec := &erc.Collector{}
-			jobs, run := units.SetupWorkers(ec)
+			jobs, run := units.SetupWorkers()
 
 			for _, link := range conf.Links {
 				jobs.PushBack(units.NewSymlinkCreateJob(link))
 			}
 
-			ec.Add(run(ctx))
-			return ec.Resolve()
+			return run(ctx)
 		}).Add)
 }

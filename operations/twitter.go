@@ -24,7 +24,6 @@ func Tweet() *cmdr.Commander {
 				return cc.String("message"), nil
 			}).
 			SetAction(func(ctx context.Context, msg string) error {
-
 				if len(msg) > 280 {
 					return fmt.Errorf("message is too long [%d]", len(msg))
 				}

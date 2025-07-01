@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
 	"github.com/cheynewallace/tabby"
@@ -39,6 +40,7 @@ func RunCommand() *cmdr.Commander {
 }
 
 func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops []string) (err error) {
+	// TODO avoid re-rendering this
 	cmds := conf.ExportAllCommands()
 
 	notify := sardis.DesktopNotify(ctx)
@@ -97,16 +99,22 @@ func listCommands() *cmdr.Commander {
 				homedir := util.GetHomedir()
 
 				table := tabby.New()
-				table.AddHeader("Name", "Group", "Aliases", "Command", "Directory")
+				table.AddHeader("Name", "Group", "Command", "Directory")
 				for _, group := range conf.Commands {
 					for _, cmd := range group.Commands {
 						if cmd.Directory == homedir {
 							cmd.Directory = ""
 						}
+						if group.Name == "run" && (len(group.Aliases) > 0 && group.Aliases[len(group.Aliases)-1] != "*") {
+							group.Aliases = append(group.Aliases, "*")
+						}
 
-						table.AddLine(cmd.Name, group.Name, append(group.Aliases, cmd.Aliases...), cmd.Commands, cmd.Directory)
+						grps := strings.Join(append([]string{group.Name}, group.Aliases...), ",")
+						nms := strings.Join(append([]string{cmd.Name}, cmd.Aliases...), ",")
+
+						table.AddLine(nms, grps, cmd.Commands, cmd.Directory)
 						for _, cg := range cmd.Commands {
-							table.AddLine("", "", "", cg, "")
+							table.AddLine("", "", cg, "")
 						}
 					}
 				}

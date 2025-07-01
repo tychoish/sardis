@@ -771,11 +771,15 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 		for _, groupName := range groupNames {
 			for cidx := range cg.Commands {
 				cgName := cg.Commands[cidx].Name
-				cmdNames := append(make([]string, 0, 1+len(cg.Commands[cidx].Aliases)),
+				cmdNames := append(make([]string, 0, 2+len(cg.Commands[cidx].Aliases)),
 					fmt.Sprintf("%s.%s", groupName, cgName))
 
 				for _, a := range cg.Commands[cidx].Aliases {
 					cmdNames = append(cmdNames, fmt.Sprintf("%s.%s", groupName, a))
+				}
+
+				if groupName == "run" {
+					cmdNames = append(cmdNames, cgName)
 				}
 
 				for _, name := range cmdNames {

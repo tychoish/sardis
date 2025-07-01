@@ -27,8 +27,6 @@ func listMenus() *cmdr.Commander {
 				table := tabby.New()
 				table.AddHeader("Name", "Selections")
 
-				groups := map[string][]string{}
-
 				for name, group := range conf.ExportCommandGroups() {
 					cmds := []string{}
 					for _, cmd := range group.Commands {

@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -98,17 +97,16 @@ func listCommands() *cmdr.Commander {
 				homedir := util.GetHomedir()
 
 				table := tabby.New()
-				table.AddHeader("Name", "Group", "Command", "Directory")
+				table.AddHeader("Name", "Group", "Aliases", "Command", "Directory")
 				for _, group := range conf.Commands {
 					for _, cmd := range group.Commands {
-
 						if cmd.Directory == homedir {
 							cmd.Directory = ""
 						}
 
-						table.AddLine(cmd.Name, group.Name, cmd.Commands, cmd.Directory)
+						table.AddLine(cmd.Name, group.Name, append(group.Aliases, cmd.Aliases...), cmd.Commands, cmd.Directory)
 						for _, cg := range cmd.Commands {
-							table.AddLine("", "", cg, "")
+							table.AddLine("", "", "", cg, "")
 						}
 					}
 				}
@@ -123,7 +121,6 @@ type dmenuListCommandTypes int
 const (
 	dmenuListCommandAll dmenuListCommandTypes = iota
 	dmenuListCommandGroup
-	dmenuListCommandRun
 )
 
 func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
@@ -132,38 +129,34 @@ func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
 		SetUsage("return a list of defined commands").
 		With(cmdr.SpecBuilder(ResolveConfiguration).
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				var cmds []sardis.CommandConf
+				var cmds map[string]sardis.CommandConf
 
 				switch kind {
 				case dmenuListCommandAll:
-					allCmd := conf.ExportAllCommands()
-					for _, cmd := range allCmd {
-						cmds = append(cmds, cmd)
-					}
-				case dmenuListCommandRun:
-					allCmd := conf.ExportAllCommands()
-					for _, cmd := range allCmd {
-						if cmd.Name != "" {
-							cmds = append(cmds, cmd)
-						}
-					}
+					cmds = conf.ExportAllCommands()
 				case dmenuListCommandGroup:
 					for _, group := range conf.Commands {
-						cmds = append(cmds, sardis.CommandConf{
+						cmds[group.Name] = sardis.CommandConf{
 							Name:    group.Name,
 							Command: fmt.Sprintln("sardis dmenu", group.Name),
-						})
+						}
+						for _, alias := range group.Aliases {
+							cmds[alias] = sardis.CommandConf{
+								Name:    group.Name,
+								Command: fmt.Sprintln("sardis dmenu", group.Name),
+							}
+						}
 					}
+
 				}
 
 				opts := make([]string, 0, len(cmds))
 				seen := &dt.Set[string]{}
 
-				for _, cmd := range cmds {
-					if seen.Check(cmd.Alias) || seen.Check(cmd.Name) {
+				for key := range cmds {
+					if seen.Check(key) || key == "" {
 						continue
 					}
-					key := ft.Default(cmd.Alias, cmd.Name)
 					seen.Add(key)
 					opts = append(opts, key)
 				}

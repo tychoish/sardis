@@ -170,6 +170,7 @@ type CredentialsAWS struct {
 
 type CommandGroupConf struct {
 	Name        string                 `bson:"name" json:"name" yaml:"name"`
+	Aliases     []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
 	Directory   string                 `bson:"directory" json:"directory" yaml:"directory"`
 	Environment dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
 	Command     string                 `bson:"default_command" json:"default_command" yaml:"default_command"`
@@ -180,7 +181,7 @@ type CommandGroupConf struct {
 
 type CommandConf struct {
 	Name        string                 `bson:"name" json:"name" yaml:"name"`
-	Alias       string                 `bson:"alias" json:"alias" yaml:"alias"`
+	Aliases     []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
 	Directory   string                 `bson:"directory" json:"directory" yaml:"directory"`
 	Environment dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
 	Command     string                 `bson:"command" json:"command" yaml:"command"`
@@ -197,11 +198,10 @@ type BlogConf struct {
 }
 
 type MenuConf struct {
-	Name       string                    `bson:"name" json:"name" yaml:"name"`
-	Command    string                    `bson:"command" json:"command" yaml:"command"`
-	Selections []string                  `bson:"selections" json:"selections" yaml:"selections"`
-	Notify     bool                      `bson:"notify" json:"notify" yaml:"notify"`
-	Aliases    []dt.Pair[string, string] `bson:"aliases" json:"aliases" yaml:"aliases"`
+	Name       string   `bson:"name" json:"name" yaml:"name"`
+	Command    string   `bson:"command" json:"command" yaml:"command"`
+	Selections []string `bson:"selections" json:"selections" yaml:"selections"`
+	Notify     bool     `bson:"notify" json:"notify" yaml:"notify"`
 }
 
 func LoadConfiguration(fn string) (*Configuration, error) {
@@ -227,7 +227,7 @@ func (conf *MenuConf) Validate() error {
 		ec.Add(ers.Wrapf(err, "%s [%s] does not exist", base, conf.Command))
 	}
 
-	ec.Whenf(len(conf.Selections) == 0 && len(conf.Aliases) == 0, "must specify options for %q", conf.Name)
+	ec.Whenf(len(conf.Selections) == 0, "must specify options for %q", conf.Name)
 
 	return ec.Resolve()
 }
@@ -732,7 +732,13 @@ func (conf *CommandGroupConf) Validate() error {
 			}
 			cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
-			cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Alias)
+
+			if len(cmd.Aliases) >= 1 {
+				cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Aliases[0])
+			}
+			for idx, alias := range cmd.Aliases {
+				cmd.Command = strings.ReplaceAll(cmd.Command, fmt.Sprintf("{{alias[%d]}}", idx), alias)
+			}
 		}
 
 		for idx := range cmd.Commands {
@@ -741,7 +747,12 @@ func (conf *CommandGroupConf) Validate() error {
 			}
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{alias}}", cmd.Alias)
+			if len(cmd.Aliases) >= 1 {
+				cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Aliases[0])
+			}
+			for idx, alias := range cmd.Aliases {
+				cmd.Command = strings.ReplaceAll(cmd.Command, fmt.Sprintf("{{alias[%d]}}", idx), alias)
+			}
 		}
 
 		cmd.Directory, err = homedir.Expand(cmd.Directory)
@@ -755,46 +766,41 @@ func (conf *CommandGroupConf) Validate() error {
 
 func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 	out := dt.NewMap(map[string]CommandConf{})
-	for _, group := range conf.Commands {
-		for idx := range group.Commands {
-			cmd := group.Commands[idx]
-			if cmd.Alias == "" {
-				cmd.Alias = fmt.Sprintf("%s.%s", group.Name, cmd.Name)
-			}
-			if out.Check(cmd.Name) {
-				delete(out, cmd.Name)
-			} else {
-				out[cmd.Name] = cmd
-			}
-			if group.Notify != nil {
-				cmd.Notify = *group.Notify
-			}
+	for _, cg := range conf.Commands {
+		groupNames := append([]string{cg.Name}, cg.Aliases...)
+		for _, groupName := range groupNames {
+			for cidx := range cg.Commands {
+				cgName := cg.Commands[cidx].Name
+				cmdNames := append(make([]string, 0, 1+len(cg.Commands[cidx].Aliases)),
+					fmt.Sprintf("%s.%s", groupName, cgName))
 
-			out[cmd.Alias] = cmd
+				for _, a := range cg.Commands[cidx].Aliases {
+					cmdNames = append(cmdNames, fmt.Sprintf("%s.%s", groupName, a))
+				}
+
+				for _, name := range cmdNames {
+					cmd := cg.Commands[cidx]
+
+					if cg.Notify != nil {
+						cmd.Notify = *cg.Notify
+					}
+
+					out[name] = cmd
+				}
+			}
 		}
 	}
 	for _, menus := range conf.Menus {
 		for _, operation := range menus.Selections {
 			var cmd CommandConf
+			cmd.Name = fmt.Sprintf("%s.%s", menus.Name, operation)
+
 			if menus.Command == "" {
-				cmd.Name = fmt.Sprintf("%s.%s", menus.Name, operation)
 				cmd.Command = operation
 			} else {
-				cmd.Name = fmt.Sprintf("%s.%s", menus.Name, operation)
 				cmd.Command = fmt.Sprintf("%s %s", menus.Command, operation)
 			}
-			cmd.Notify = menus.Notify
-			out[cmd.Name] = cmd
-		}
-		for _, alias := range menus.Aliases {
-			var cmd CommandConf
-			if menus.Command == "" {
-				cmd.Name = fmt.Sprintf("%s.%s", menus.Name, alias.Key)
-				cmd.Command = alias.Value
-			} else {
-				cmd.Name = fmt.Sprintf("%s.%s", menus.Name, alias.Key)
-				cmd.Command = fmt.Sprintf("%s %s", menus.Command, alias.Value)
-			}
+
 			cmd.Notify = menus.Notify
 			out[cmd.Name] = cmd
 		}
@@ -808,6 +814,9 @@ func (conf *Configuration) ExportCommandGroups() map[string]CommandGroupConf {
 	for idx := range conf.Commands {
 		group := conf.Commands[idx]
 		out[group.Name] = group
+		for idx := range group.Aliases {
+			out[group.Aliases[idx]] = group
+		}
 	}
 	return out
 }
@@ -817,7 +826,9 @@ func (conf *CommandGroupConf) ExportCommands() map[string]CommandConf {
 	for idx := range conf.Commands {
 		cmd := conf.Commands[idx]
 		out[cmd.Name] = cmd
-		out[cmd.Alias] = cmd
+		for idx := range cmd.Aliases {
+			out[cmd.Aliases[idx]] = cmd
+		}
 	}
 	return out
 }
@@ -834,4 +845,5 @@ func (conf *Configuration) SSHAgentSocket() string {
 		conf.Settings.SSHAgentSocketPath = ft.Must(sutil.GetSSHAgentPath())
 	}
 	return conf.Settings.SSHAgentSocketPath
+
 }

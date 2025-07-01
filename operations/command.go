@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -105,17 +106,21 @@ func listCommands() *cmdr.Commander {
 						if cmd.Directory == homedir {
 							cmd.Directory = ""
 						}
-						if group.Name == "run" && (len(group.Aliases) > 0 && group.Aliases[len(group.Aliases)-1] != "*") {
-							group.Aliases = append(group.Aliases, "*")
+
+						grps := append([]string{group.Name}, group.Aliases...)
+						if group.Name == "run" && !slices.Contains(grps, "*") {
+							grps = append(grps, "*")
 						}
 
-						grps := strings.Join(append([]string{group.Name}, group.Aliases...), ",")
-						nms := strings.Join(append([]string{cmd.Name}, cmd.Aliases...), ",")
+						nms := strings.Join(append([]string{cmd.Name}, cmd.Aliases...), ", ")
+						cmds := append([]string{cmd.Command}, cmd.Commands...)
 
-						table.AddLine(nms, grps, cmd.Commands, cmd.Directory)
-						for _, cg := range cmd.Commands {
-							table.AddLine("", "", cg, "")
-						}
+						table.AddLine(
+							nms,                      // names
+							strings.Join(grps, ","),  // group
+							strings.Join(cmds, "; "), //commands
+							cmd.Directory,            // dir
+						)
 					}
 				}
 				table.Print()

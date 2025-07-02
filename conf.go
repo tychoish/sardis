@@ -121,14 +121,14 @@ type LinkConf struct {
 }
 
 type Settings struct {
-	Notification        NotifyConf                  `bson:"notify" json:"notify" yaml:"notify"`
-	Telegram            telegram.Options            `bson:"telegram" json:"telegram" yaml:"telegram"`
-	Credentials         CredentialsConf             `bson:"credentials" json:"credentials" yaml:"credentials"`
-	SSHAgentSocketPath  string                      `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
-	AlacrittySocketPath string                      `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
-	Logging             LoggingConf                 `bson:"logging" json:"logging" yaml:"logging"`
-	ConfigPaths         []string                    `bson:"config_files" json:"config_files" yaml:"config_files"`
-	DMenu               *godmenu.DMenuConfiguration `bson:"dmenu" json:"dmenu" yaml:"dmenu"`
+	Notification        NotifyConf       `bson:"notify" json:"notify" yaml:"notify"`
+	Telegram            telegram.Options `bson:"telegram" json:"telegram" yaml:"telegram"`
+	Credentials         CredentialsConf  `bson:"credentials" json:"credentials" yaml:"credentials"`
+	SSHAgentSocketPath  string           `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
+	AlacrittySocketPath string           `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
+	Logging             LoggingConf      `bson:"logging" json:"logging" yaml:"logging"`
+	ConfigPaths         []string         `bson:"config_files" json:"config_files" yaml:"config_files"`
+	DMenu               *godmenu.Flags   `bson:"dmenu" json:"dmenu" yaml:"dmenu"`
 }
 
 type LoggingConf struct {
@@ -467,11 +467,11 @@ func (conf *Settings) Validate() error {
 	return catcher.Resolve()
 }
 
-func defaultDMenuConf() *godmenu.DMenuConfiguration {
-	return &godmenu.DMenuConfiguration{
-		Path:            godmenu.DefaultDmenuPath,
+func defaultDMenuConf() *godmenu.Flags {
+	return &godmenu.Flags{
+		Path:            godmenu.DefaultDMenuPath,
 		BackgroundColor: godmenu.DefaultBackgroundColor,
-		ForegroundColor: godmenu.DefaultForegroundColor,
+		TextColor:       godmenu.DefaultTextColor,
 		Font:            "Source Code Pro-13",
 		Lines:           16,
 		Prompt:          "=>>",

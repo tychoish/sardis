@@ -104,6 +104,8 @@ github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 h1:El6M4kTTCOh6aBiKaU
 github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510/go.mod h1:pupxD2MaaD3pAXIBCelhxNneeOaAeabZDe5s4K6zSpQ=
 github.com/google/uuid v1.3.1 h1:KjJaJ9iWZ3jOFZIf1Lqf4laDRCasjl0BCmnEGxkdLb4=
 github.com/google/uuid v1.3.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
+github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/gorilla/mux v1.8.0 h1:i40aqfkR1h2SlN9hojwV5ZA91wcXFOvkdNIeFDP5koI=
 github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
 github.com/imdario/mergo v0.3.9 h1:UauaLniWCFHWd+Jp9oCEkTBj8VO/9DKg3PV3VCNMDIg=
@@ -209,6 +211,8 @@ github.com/tychoish/gimlet v0.0.0-20250611125935-c7dc51701c88 h1:LVhHxpRV5dCMmYG
 github.com/tychoish/gimlet v0.0.0-20250611125935-c7dc51701c88/go.mod h1:Yo0Ntsfamm9qYacm8SCbIbIJq44cRrD6pr8GLhddc/4=
 github.com/tychoish/godmenu v0.1.2 h1:TGLV5NPL8JcJyaG0LXZKmARLkPed7XYzfyLPR3jibC4=
 github.com/tychoish/godmenu v0.1.2/go.mod h1:qSzN1kkHVRKFNsqr2kLe4pSOzBCtfJrryGVEWum1iac=
+github.com/tychoish/godmenu v0.1.3-0.20250702205301-21d0535588b2 h1:lR4Vs2Lqv4dXVklOZW8smKm+O13TXT3MVgRDlzd/UoY=
+github.com/tychoish/godmenu v0.1.3-0.20250702205301-21d0535588b2/go.mod h1:qSzN1kkHVRKFNsqr2kLe4pSOzBCtfJrryGVEWum1iac=
 github.com/tychoish/grip v0.4.0 h1:5WL5H4raAqj+1eG0p7JsXABvqElPuE3+0G95V0MmrPQ=
 github.com/tychoish/grip v0.4.0/go.mod h1:/0IsKegfHVZ4R2E+3iOB2yarhLh4XL3yyhO2Brv98LA=
 github.com/tychoish/grip/x/desktop v0.0.0-20250626175245-f5276066a1e9 h1:4vs42pUOpRLSS07hxal/2EvvyEy+qNSMPzkJTHLgDdM=
@@ -239,6 +243,8 @@ github.com/tychoish/jasper/x/track v0.0.0-20250611023115-421e64b64a4b h1:+raroCn
 github.com/tychoish/jasper/x/track v0.0.0-20250611023115-421e64b64a4b/go.mod h1:3udeMQM8PGZkpydeCPwqPUWJmvbi1g9EjpGCQUErpIw=
 github.com/tychoish/libfun v0.0.0-20250611153132-36e6fe89abc4 h1:KO8Rh9gGrQSOwSlW5yjWrDtuLiZ40bXuNAlMtcNZF6Y=
 github.com/tychoish/libfun v0.0.0-20250611153132-36e6fe89abc4/go.mod h1:2ymq54rE+vl41jr0GHPMdKkSxlBtg2uNE6UDSWfUKek=
+github.com/tychoish/libfun v0.0.0-20250702205451-14fe5698cc2e h1:SQ80lZtfr2rV9IvGX9tXCaQDQ3JGMCbKzmSOjhhBMlE=
+github.com/tychoish/libfun v0.0.0-20250702205451-14fe5698cc2e/go.mod h1:Kgc6869oEASMXJ2kCr4tUizOzm44opnTevjPHjDIJmg=
 github.com/ulikunitz/xz v0.5.6/go.mod h1:2bypXElzHzzJZwzH67Y6wb67pO62Rzfn7BSiF4ABRW8=
 github.com/ulikunitz/xz v0.5.11 h1:kpFauv27b6ynzBNT/Xy+1k+fK4WswhN/6PN5WhFAGw8=
 github.com/ulikunitz/xz v0.5.11/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=

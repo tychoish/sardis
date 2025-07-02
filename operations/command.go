@@ -176,9 +176,9 @@ func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
 
 				sort.Strings(opts)
 
-				cmd, err := godmenu.RunDMenu(ctx, godmenu.Options{
+				cmd, err := godmenu.Do(ctx, godmenu.Configuration{
 					Selections: opts,
-					DMenu:      conf.Settings.DMenu,
+					Flags:      conf.Settings.DMenu,
 				})
 				switch {
 				case err == nil:

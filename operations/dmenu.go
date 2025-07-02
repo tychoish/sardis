@@ -90,9 +90,9 @@ func DMenu() *cmdr.Commander {
 
 				sort.Strings(opts)
 
-				cmd, err := godmenu.RunDMenu(ctx, godmenu.Options{
+				cmd, err := godmenu.Do(ctx, godmenu.Configuration{
 					Selections: opts,
-					DMenu:      conf.Settings.DMenu,
+					Flags:      conf.Settings.DMenu,
 				})
 				switch {
 				case err == nil:
@@ -119,7 +119,7 @@ func DMenu() *cmdr.Commander {
 					mapping[item] = item
 				}
 
-				output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: opts, DMenu: conf.Settings.DMenu})
+				output, err := godmenu.Do(ctx, godmenu.Configuration{Selections: opts, Flags: conf.Settings.DMenu})
 				switch {
 				case err == nil:
 					break
@@ -166,7 +166,7 @@ func DMenu() *cmdr.Commander {
 			}
 			sort.Strings(others)
 
-			output, err := godmenu.RunDMenu(ctx, godmenu.Options{Selections: others, DMenu: conf.Settings.DMenu})
+			output, err := godmenu.Do(ctx, godmenu.Configuration{Selections: others, Flags: conf.Settings.DMenu})
 			switch {
 			case err == nil:
 				break

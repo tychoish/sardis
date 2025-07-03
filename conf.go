@@ -180,14 +180,15 @@ type CommandGroupConf struct {
 }
 
 type CommandConf struct {
-	Name        string                 `bson:"name" json:"name" yaml:"name"`
-	Aliases     []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
-	Directory   string                 `bson:"directory" json:"directory" yaml:"directory"`
-	Environment dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
-	Command     string                 `bson:"command" json:"command" yaml:"command"`
-	Commands    []string               `bson:"commands" json:"commands" yaml:"commands"`
-	Notify      bool                   `bson:"notify" json:"notify" yaml:"notify"`
-	Background  bool                   `bson:"bson" json:"bson" yaml:"bson"`
+	Name            string                 `bson:"name" json:"name" yaml:"name"`
+	Aliases         []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
+	Directory       string                 `bson:"directory" json:"directory" yaml:"directory"`
+	Environment     dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
+	Command         string                 `bson:"command" json:"command" yaml:"command"`
+	Commands        []string               `bson:"commands" json:"commands" yaml:"commands"`
+	OverrideDefault bool                   `bson:"override_default" json:"override_default" yaml:"override_default"`
+	Notify          *bool                  `bson:"notify" json:"notify" yaml:"notify"`
+	Background      *bool                  `bson:"bson" json:"bson" yaml:"bson"`
 }
 
 type BlogConf struct {
@@ -694,22 +695,15 @@ func (conf *CommandGroupConf) Validate() error {
 	home := util.GetHomedir()
 	catcher := &erc.Collector{}
 
-	if conf.Directory == "" {
-		conf.Directory = home
-	}
 	catcher.When(conf.Name == "", ers.Error("command group must have name"))
-	shouldNotify := conf.Notify != nil && *conf.Notify
-	shouldBackground := conf.Background != nil && *conf.Background
 
 	for idx := range conf.Commands {
 		cmd := conf.Commands[idx]
-		cmd.Notify = cmd.Notify || shouldNotify
-		cmd.Background = cmd.Background || shouldBackground
 
 		catcher.Whenf(cmd.Name == "", "commands [%d] must have a name", idx)
 
 		if cmd.Directory == "" {
-			cmd.Directory = conf.Directory
+			cmd.Directory = home
 		}
 
 		if conf.Environment != nil || cmd.Environment != nil {
@@ -726,11 +720,12 @@ func (conf *CommandGroupConf) Validate() error {
 
 		if conf.Command != "" {
 			if cmd.Command == "" {
+				catcher.Whenf(cmd.OverrideDefault, "command %q in group %q is unspecified with OverrideDefault", cmd.Name, conf.Name)
 				cmd.Command = conf.Command
-			} else if strings.Contains(conf.Command, "{{command}}") {
+			} else if !cmd.OverrideDefault && strings.Contains(conf.Command, "{{command}}") {
 				cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
 			}
-			cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
+
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
 
 			if len(cmd.Aliases) >= 1 {
@@ -742,10 +737,11 @@ func (conf *CommandGroupConf) Validate() error {
 		}
 
 		for idx := range cmd.Commands {
-			if strings.Contains(conf.Command, "{{command}}") {
+			if !cmd.OverrideDefault && strings.Contains(conf.Command, "{{command}}") {
+				catcher.Whenf(cmd.OverrideDefault, "command %q.%d in group %q is unspecified with OverrideDefault", cmd.Name, idx, conf.Name)
 				cmd.Commands[idx] = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Commands[idx])
 			}
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
+
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
 			if len(cmd.Aliases) >= 1 {
 				cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Aliases[0])
@@ -785,9 +781,8 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 				for _, name := range cmdNames {
 					cmd := cg.Commands[cidx]
 
-					if cg.Notify != nil {
-						cmd.Notify = *cg.Notify
-					}
+					cmd.Notify = ft.Default(cmd.Notify, cg.Notify)
+					cmd.Background = ft.Default(cmd.Background, cg.Background)
 
 					out[name] = cmd
 				}
@@ -805,7 +800,8 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 				cmd.Command = fmt.Sprintf("%s %s", menus.Command, operation)
 			}
 
-			cmd.Notify = menus.Notify
+			cmd.Notify = ft.Ptr(menus.Notify)
+
 			out[cmd.Name] = cmd
 		}
 	}

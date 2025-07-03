@@ -15,6 +15,7 @@ import (
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -60,7 +61,7 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops [
 			ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
 			SetOutputSender(level.Info, grip.Sender()).
 			SetErrorSender(level.Error, grip.Sender()).
-			Background(cmd.Background).
+			Background(ft.Ref(cmd.Background)).
 			Append(cmd.Command).
 			Append(cmd.Commands...).
 			Prerequisite(func() bool {
@@ -80,7 +81,7 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops [
 					grip.Critical(err)
 					return err
 				}
-				notify.Noticeln(name, "completed")
+				notify.Notice(message.Whenln(ft.Ref(cmd.Notify), name, "completed"))
 				return nil
 			}).Run(ctx)
 		if err != nil {

@@ -78,7 +78,7 @@ func DMenu() *cmdr.Commander {
 		}).SetAction(func(ctx context.Context, name string) error {
 			conf := sardis.AppConfiguration(ctx)
 			cmdGrp := conf.ExportCommandGroups()
-
+			dmenuConf := conf.Settings.DMenu
 			// if we're running "sardis dmenu <group>" and
 			// the group exists:
 			if group, ok := cmdGrp[name]; ok {
@@ -90,9 +90,9 @@ func DMenu() *cmdr.Commander {
 
 				sort.Strings(opts)
 
-				cmd, err := godmenu.Do(ctx, godmenu.Configuration{
+				cmd, err := godmenu.Do(ctx, godmenu.Options{
 					Selections: opts,
-					Flags:      conf.Settings.DMenu,
+					Flags:      &dmenuConf,
 				})
 				switch {
 				case err == nil:
@@ -119,7 +119,7 @@ func DMenu() *cmdr.Commander {
 					mapping[item] = item
 				}
 
-				output, err := godmenu.Do(ctx, godmenu.Configuration{Selections: opts, Flags: conf.Settings.DMenu})
+				output, err := godmenu.Do(ctx, godmenu.Options{Selections: opts, Flags: &dmenuConf})
 				switch {
 				case err == nil:
 					break
@@ -166,7 +166,7 @@ func DMenu() *cmdr.Commander {
 			}
 			sort.Strings(others)
 
-			output, err := godmenu.Do(ctx, godmenu.Configuration{Selections: others, Flags: conf.Settings.DMenu})
+			output, err := godmenu.Do(ctx, godmenu.Options{Selections: others, Flags: &dmenuConf})
 			switch {
 			case err == nil:
 				break

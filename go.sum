@@ -215,6 +215,8 @@ github.com/tychoish/godmenu v0.1.3-0.20250702205301-21d0535588b2 h1:lR4Vs2Lqv4dX
 github.com/tychoish/godmenu v0.1.3-0.20250702205301-21d0535588b2/go.mod h1:qSzN1kkHVRKFNsqr2kLe4pSOzBCtfJrryGVEWum1iac=
 github.com/tychoish/godmenu v0.1.3-0.20250702210058-8c9f0e1d9116 h1:vOMD+5zFXlaidSIC6/OzCNtKKXeSRKlZBkborOWP9nM=
 github.com/tychoish/godmenu v0.1.3-0.20250702210058-8c9f0e1d9116/go.mod h1:qSzN1kkHVRKFNsqr2kLe4pSOzBCtfJrryGVEWum1iac=
+github.com/tychoish/godmenu v0.2.0 h1:JJe9V9RvdNjKqAa4h5Syhw5lcehB5usabuxmXaihWJs=
+github.com/tychoish/godmenu v0.2.0/go.mod h1:bCUugCMHgbIN/vAGtFaqtjCzyNRrcTGc4or9jG4Erh4=
 github.com/tychoish/grip v0.4.0 h1:5WL5H4raAqj+1eG0p7JsXABvqElPuE3+0G95V0MmrPQ=
 github.com/tychoish/grip v0.4.0/go.mod h1:/0IsKegfHVZ4R2E+3iOB2yarhLh4XL3yyhO2Brv98LA=
 github.com/tychoish/grip/x/desktop v0.0.0-20250626175245-f5276066a1e9 h1:4vs42pUOpRLSS07hxal/2EvvyEy+qNSMPzkJTHLgDdM=
@@ -247,6 +249,10 @@ github.com/tychoish/libfun v0.0.0-20250611153132-36e6fe89abc4 h1:KO8Rh9gGrQSOwSl
 github.com/tychoish/libfun v0.0.0-20250611153132-36e6fe89abc4/go.mod h1:2ymq54rE+vl41jr0GHPMdKkSxlBtg2uNE6UDSWfUKek=
 github.com/tychoish/libfun v0.0.0-20250702205451-14fe5698cc2e h1:SQ80lZtfr2rV9IvGX9tXCaQDQ3JGMCbKzmSOjhhBMlE=
 github.com/tychoish/libfun v0.0.0-20250702205451-14fe5698cc2e/go.mod h1:Kgc6869oEASMXJ2kCr4tUizOzm44opnTevjPHjDIJmg=
+github.com/tychoish/libfun v0.0.0-20250703170244-5c51e71ba7f3 h1:N2P+ZCPSSj82E3cooCfhcjtujr4zbRo8nhjobo89Om0=
+github.com/tychoish/libfun v0.0.0-20250703170244-5c51e71ba7f3/go.mod h1:q9aa872pdmGWbyCRFoaG/BwQwrgPUsKx7I0HEGa15F0=
+github.com/tychoish/libfun v0.0.0-20250703172608-7534704a8bf4 h1:A+Lpx4jyHSjlruuQCFWzG47zEeSvB70voQtPqQ0Q3ik=
+github.com/tychoish/libfun v0.0.0-20250703172608-7534704a8bf4/go.mod h1:hLtak9PvsT/metXIO0zVzfkQHilZe4CM4fcpazLAzKU=
 github.com/ulikunitz/xz v0.5.6/go.mod h1:2bypXElzHzzJZwzH67Y6wb67pO62Rzfn7BSiF4ABRW8=
 github.com/ulikunitz/xz v0.5.11 h1:kpFauv27b6ynzBNT/Xy+1k+fK4WswhN/6PN5WhFAGw8=
 github.com/ulikunitz/xz v0.5.11/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=

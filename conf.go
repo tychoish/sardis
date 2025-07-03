@@ -128,7 +128,7 @@ type Settings struct {
 	AlacrittySocketPath string           `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
 	Logging             LoggingConf      `bson:"logging" json:"logging" yaml:"logging"`
 	ConfigPaths         []string         `bson:"config_files" json:"config_files" yaml:"config_files"`
-	DMenu               *godmenu.Flags   `bson:"dmenu" json:"dmenu" yaml:"dmenu"`
+	DMenu               godmenu.Flags    `bson:"dmenu" json:"dmenu" yaml:"dmenu"`
 }
 
 type LoggingConf struct {
@@ -467,8 +467,8 @@ func (conf *Settings) Validate() error {
 	return catcher.Resolve()
 }
 
-func defaultDMenuConf() *godmenu.Flags {
-	return &godmenu.Flags{
+func defaultDMenuConf() godmenu.Flags {
+	return godmenu.Flags{
 		Path:            godmenu.DefaultDMenuPath,
 		BackgroundColor: godmenu.DefaultBackgroundColor,
 		TextColor:       godmenu.DefaultTextColor,

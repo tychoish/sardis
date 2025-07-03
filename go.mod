@@ -14,7 +14,7 @@ require (
 	github.com/tychoish/birch v0.3.0
 	github.com/tychoish/cmdr v0.4.0
 	github.com/tychoish/fun v0.12.0
-	github.com/tychoish/godmenu v0.1.3-0.20250702210058-8c9f0e1d9116
+	github.com/tychoish/godmenu v0.2.0
 	github.com/tychoish/grip v0.4.0
 	github.com/tychoish/grip/x/desktop v0.0.0-20250626175245-f5276066a1e9
 	github.com/tychoish/grip/x/jira v0.0.0-20250626173215-d516ec138ab2
@@ -25,7 +25,7 @@ require (
 	github.com/tychoish/jasper v0.1.2
 	github.com/tychoish/jasper/x/cli v0.0.0-20250611130524-76f5189e13d7
 	github.com/tychoish/jasper/x/track v0.0.0-20250611023115-421e64b64a4b
-	github.com/tychoish/libfun v0.0.0-20250702205451-14fe5698cc2e
+	github.com/tychoish/libfun v0.0.0-20250703172608-7534704a8bf4
 	github.com/urfave/cli/v2 v2.25.3
 	go.mongodb.org/mongo-driver v1.11.6
 	golang.org/x/tools v0.33.0

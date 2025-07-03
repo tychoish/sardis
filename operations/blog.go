@@ -97,6 +97,7 @@ func blogPublish() *cmdr.Commander {
 					AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
 					Append(blog.DeployCommands...).
 					Directory(repo.Path).
+					AddEnv("SARDIS_LOG_QUIET_STDOUT", "true").
 					SetOutputSender(level.Info, grip.Sender()).
 					SetErrorSender(level.Error, grip.Sender()).
 					Run(ctx)

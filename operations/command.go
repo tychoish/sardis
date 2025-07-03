@@ -176,10 +176,11 @@ func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
 
 				sort.Strings(opts)
 
-				cmd, err := godmenu.Do(ctx, godmenu.Configuration{
-					Selections: opts,
-					Flags:      conf.Settings.DMenu,
-				})
+				cmd, err := godmenu.Run(ctx,
+					godmenu.ExtendSelections(opts),
+					godmenu.WithFlags(conf.Settings.DMenu),
+					godmenu.Sorted(),
+				)
 				switch {
 				case err == nil:
 					break

@@ -70,7 +70,7 @@ func repoUpdate() *cmdr.Commander {
 		SetName("update").
 		Aliases("sync")
 
-	const opName = "repo sync"
+	const opName = "repo-sync"
 
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		repos := args.conf.GetTaggedRepos(args.ops...)

@@ -91,9 +91,7 @@ func blogPublish() *cmdr.Commander {
 					return fmt.Errorf("problem syncing blog repo: %w", err)
 				}
 
-				jpm := jasper.Context(ctx)
-
-				err := jpm.CreateCommand(ctx).
+				err := jasper.Context(ctx).CreateCommand(ctx).
 					AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
 					Append(blog.DeployCommands...).
 					Directory(repo.Path).

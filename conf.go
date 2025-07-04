@@ -57,7 +57,6 @@ type RepoConf struct {
 	Post       []string `bson:"post" json:"post" yaml:"post"`
 	Mirrors    []string `bson:"mirrors" json:"mirrors" yaml:"mirrors"`
 	Tags       []string `bson:"tags" json:"tags" yaml:"tags"`
-	Deploy     []string `bson:"deploy" json:"deploy" yaml:"deploy"`
 }
 
 type ArchLinuxConf struct {
@@ -685,14 +684,14 @@ func (conf *Configuration) GetHost(name string) (*HostConf, error) {
 func (conf *CommandGroupConf) Validate() error {
 	var err error
 	home := util.GetHomedir()
-	catcher := &erc.Collector{}
+	ec := &erc.Collector{}
 
-	catcher.When(conf.Name == "", ers.Error("command group must have name"))
+	ec.When(conf.Name == "", ers.Error("command group must have name"))
 
 	for idx := range conf.Commands {
 		cmd := conf.Commands[idx]
 
-		catcher.Whenf(cmd.Name == "", "commands [%d] must have a name", idx)
+		ec.Whenf(cmd.Name == "", "command in group [%s](%d) must have a name", conf.Name, idx)
 
 		if cmd.Directory == "" {
 			cmd.Directory = home
@@ -710,14 +709,23 @@ func (conf *CommandGroupConf) Validate() error {
 			cmd.Environment = env
 		}
 
-		if conf.Command != "" {
-			if cmd.Command == "" {
-				catcher.Whenf(cmd.OverrideDefault, "command %q in group %q is unspecified with OverrideDefault", cmd.Name, conf.Name)
+		if cmd.Command == "" {
+			ec.Whenf(cmd.OverrideDefault, "cannot override default without an override, in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
+			if conf.Command != "" {
 				cmd.Command = conf.Command
-			} else if !cmd.OverrideDefault && strings.Contains(conf.Command, "{{command}}") {
-				cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
+			} else {
+				cmd.Command = cmd.Name
 			}
+			ec.Whenf(cmd.Command == "", "cannot resolve default command in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
+		}
 
+		ec.Whenf(strings.Contains(cmd.Command, "{{command}}"), "unresolveable token found in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
+
+		if !cmd.OverrideDefault && strings.Contains(conf.Command, "{{command}}") {
+			cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
+		}
+
+		if conf.Command != "" {
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", conf.Name)
 
@@ -730,28 +738,29 @@ func (conf *CommandGroupConf) Validate() error {
 		}
 
 		for idx := range cmd.Commands {
-			if !cmd.OverrideDefault && strings.Contains(conf.Command, "{{command}}") {
-				catcher.Whenf(cmd.OverrideDefault, "command %q.%d in group %q is unspecified with OverrideDefault", cmd.Name, idx, conf.Name)
-				cmd.Commands[idx] = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Commands[idx])
+			if strings.Contains(cmd.Commands[idx], "{{command}}") {
+				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
 			}
 
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", conf.Name)
+
 			if len(cmd.Aliases) >= 1 {
-				cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Aliases[0])
+				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{alias}}", cmd.Aliases[0])
 			}
+
 			for idx, alias := range cmd.Aliases {
-				cmd.Command = strings.ReplaceAll(cmd.Command, fmt.Sprintf("{{alias[%d]}}", idx), alias)
+				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], fmt.Sprintf("{{alias[%d]}}", idx), alias)
 			}
 		}
 
 		cmd.Directory, err = homedir.Expand(cmd.Directory)
-		catcher.Add(ers.Wrapf(err, "command %q at %d", cmd.Name, idx))
+		ec.Add(ers.Wrapf(err, "command %q at %d", cmd.Name, idx))
 
 		conf.Commands[idx] = cmd
 	}
 
-	return catcher.Resolve()
+	return ec.Resolve()
 }
 
 func (conf *Configuration) ExportAllCommands() map[string]CommandConf {

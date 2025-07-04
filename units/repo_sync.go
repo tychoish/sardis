@@ -59,7 +59,7 @@ func (j *repoSyncJob) isLocal() bool {
 	return j.Host == "" || j.Host == "LOCAL"
 }
 
-const ruler string = "-------------------------------"
+const ruler string = "----------------"
 
 func (j *repoSyncJob) Run(ctx context.Context) error {
 	if stat, err := os.Stat(j.Path); os.IsNotExist(err) || !stat.IsDir() {
@@ -107,8 +107,10 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 		AppendArgs("git", "push").
 		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, fmt.Sprintf(syncCmdTemplate, j.buildID.Resolve()))).
 		BashWhen(!j.isLocal(), "git fetch origin && git rebase origin/$(git rev-parse --abbrev-ref HEAD)").
+		AddEnv("SARDIS_LOG_QUIET_STDOUT", "true").
 		Append(j.Post...).
 		Run(ctx)
+
 	msg := message.BuildPair().
 		Pair("op", "repo-sync").
 		Pair("state", "completed").
@@ -121,15 +123,17 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 	if err != nil {
 		proclog.Noticeln(
 			ruler,
-			"repo", strings.ToUpper(j.RepoConf.Name), "---",
-			"host", strings.ToUpper(j.Host), "---",
-			"path", strings.ToUpper(j.RepoConf.Path),
+			"repo:", strings.ToUpper(j.RepoConf.Name), "----",
+			"host:", strings.ToUpper(j.Host), "----",
+			"path:", strings.ToUpper(j.RepoConf.Path),
+			ruler,
 		)
 
 		grip.Error(msg)
-		grip.Error(procout.buffer.String())
-		return err
 
+		grip.Error(procout.buffer.String())
+
+		return err
 	}
 
 	grip.Info(msg)

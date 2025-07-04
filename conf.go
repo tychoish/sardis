@@ -126,6 +126,7 @@ type Settings struct {
 	Credentials         CredentialsConf  `bson:"credentials" json:"credentials" yaml:"credentials"`
 	SSHAgentSocketPath  string           `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
 	AlacrittySocketPath string           `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
+	Hostname            string           `bson:"-" json:"-" yaml:"-"`
 	Logging             LoggingConf      `bson:"logging" json:"logging" yaml:"logging"`
 	ConfigPaths         []string         `bson:"config_files" json:"config_files" yaml:"config_files"`
 	DMenu               godmenu.Flags    `bson:"dmenu" json:"dmenu" yaml:"dmenu"`
@@ -203,6 +204,7 @@ type MenuConf struct {
 	Command    string   `bson:"command" json:"command" yaml:"command"`
 	Selections []string `bson:"selections" json:"selections" yaml:"selections"`
 	Notify     bool     `bson:"notify" json:"notify" yaml:"notify"`
+	Background bool     `bson:"background" json:"background" yaml:"background"`
 }
 
 func LoadConfiguration(fn string) (*Configuration, error) {
@@ -242,40 +244,29 @@ func (conf *Configuration) Validate() error {
 	conf.expandLinkedFiles(ec)
 
 	for idx := range conf.System.Services {
-		if err := conf.System.Services[idx].Validate(); err != nil {
-			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.System.Services[idx], err))
-		}
+		ec.Wrapf(conf.System.Services[idx].Validate(), "%d of %T is not valid", idx, len(conf.System.Services), conf.System.Services[idx])
 	}
 
 	for idx := range conf.Repo {
-		if err := conf.Repo[idx].Validate(); err != nil {
-			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Repo[idx], err))
-		}
+		ec.Wrapf(conf.Repo[idx].Validate(), "%d/%d of %T is not valid", idx, len(conf.Repo), conf.Repo[idx])
 	}
 
 	conf.Links = conf.expandLinks(ec)
 	for idx := range conf.Links {
-		if err := conf.Links[idx].Validate(); err != nil {
-			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Links[idx], err))
-		}
+		ec.Wrapf(conf.Links[idx].Validate(), "%d/%d of %T is not valid", idx, len(conf.Links), conf.Links[idx])
+		conf.Links[idx].Target = strings.ReplaceAll(conf.Links[idx].Target, "{{hostname}}", conf.Settings.Hostname)
 	}
 
 	for idx := range conf.Hosts {
-		if err := conf.Hosts[idx].Validate(); err != nil {
-			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Hosts[idx], err))
-		}
+		ec.Wrapf(conf.Hosts[idx].Validate(), "%d of %T is not valid", idx, conf.Hosts[idx])
 	}
 
 	for idx := range conf.Commands {
-		if err := conf.Commands[idx].Validate(); err != nil {
-			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Commands[idx], err))
-		}
+		ec.Wrapf(conf.Commands[idx].Validate(), "%d of %T is not valid", idx, conf.Commands[idx])
 	}
 	for idx := range conf.Menus {
 		ec.Whenf(conf.Menus[idx].Name == "", "must specify name for dmenu spec at item %d", idx)
-		if err := conf.Menus[idx].Validate(); err != nil {
-			ec.Add(fmt.Errorf("%d of %T is not valid: %w", idx, conf.Menus[idx], err))
-		}
+		ec.Wrapf(conf.Menus[idx].Validate(), "%d of %T is not valid", idx, conf.Menus[idx])
 	}
 
 	if conf.shouldIndexRepos() {
@@ -458,14 +449,17 @@ func (conf *Settings) Validate() error {
 			continue
 		}
 
-		if err := c.Validate(); err != nil {
-			catcher.Add(fmt.Errorf("%T is not valid: %w", c, err))
-		}
+		catcher.Wrapf(c.Validate(), "%T is not valid", c)
 	}
 
 	conf.DMenu = ft.DefaultFuture(conf.DMenu, defaultDMenuConf)
+	conf.Hostname = makeErrorHandler[string](catcher.Push)(os.Hostname())
 
 	return catcher.Resolve()
+}
+
+func makeErrorHandler[T any](eh func(error)) func(T, error) T {
+	return func(v T, err error) T { eh(err); return v }
 }
 
 func defaultDMenuConf() godmenu.Flags {
@@ -511,9 +505,7 @@ func (conf *NotifyConf) Validate() error {
 		"user": conf.User,
 		"pass": conf.Password,
 	} {
-		if v == "" {
-			catcher.Add(fmt.Errorf("missing value for '%s'", k))
-		}
+		catcher.Whenf(v == "", "missing value for '%s'", k)
 	}
 
 	return catcher.Resolve()
@@ -727,6 +719,7 @@ func (conf *CommandGroupConf) Validate() error {
 			}
 
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", conf.Name)
 
 			if len(cmd.Aliases) >= 1 {
 				cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Aliases[0])
@@ -743,6 +736,7 @@ func (conf *CommandGroupConf) Validate() error {
 			}
 
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
+			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", conf.Name)
 			if len(cmd.Aliases) >= 1 {
 				cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Aliases[0])
 			}
@@ -774,10 +768,6 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 					cmdNames = append(cmdNames, fmt.Sprintf("%s.%s", groupName, a))
 				}
 
-				if groupName == "run" {
-					cmdNames = append(cmdNames, cgName)
-				}
-
 				for _, name := range cmdNames {
 					cmd := cg.Commands[cidx]
 
@@ -801,6 +791,7 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 			}
 
 			cmd.Notify = ft.Ptr(menus.Notify)
+			cmd.Background = ft.Ptr(menus.Background)
 
 			out[cmd.Name] = cmd
 		}

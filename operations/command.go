@@ -44,6 +44,10 @@ func RunCommand() *cmdr.Commander {
 func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops []string) (err error) {
 	// TODO avoid re-rendering this
 	cmds := conf.ExportAllCommands()
+	runGroup := conf.ExportCommandGroups()["run"].Commands
+	for idx := range runGroup {
+		cmds[runGroup[idx].Name] = runGroup[idx]
+	}
 
 	notify := sardis.DesktopNotify(ctx)
 

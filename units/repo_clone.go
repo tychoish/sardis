@@ -41,7 +41,7 @@ func NewRepoCloneJob(rconf sardis.RepoConf) fun.Worker {
 		conf := sardis.AppConfiguration(ctx)
 		cmd := jasper.Context(ctx).CreateCommand(ctx)
 
-		sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
+		sender := send.MakeAnnotating(grip.Sender(), map[string]any{
 			"repo": rconf.Name,
 		})
 

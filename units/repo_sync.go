@@ -95,7 +95,7 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 		SetErrorSender(level.Error, procout).
 		Priority(level.Debug).
 		ID(j.buildID.Resolve()).
-		AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
+		AddEnv(sardis.EnvVarSSHAgentSocket, conf.SSHAgentSocket()).
 		Directory(j.Path).
 		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, fmt.Sprintf(syncCmdTemplate, j.buildID.Resolve()))).
 		Append(j.Pre...).
@@ -107,7 +107,7 @@ func (j *repoSyncJob) Run(ctx context.Context) error {
 		AppendArgs("git", "push").
 		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, fmt.Sprintf(syncCmdTemplate, j.buildID.Resolve()))).
 		BashWhen(!j.isLocal(), "git fetch origin && git rebase origin/$(git rev-parse --abbrev-ref HEAD)").
-		AddEnv("SARDIS_LOG_QUIET_STDOUT", "true").
+		AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
 		Append(j.Post...).
 		Run(ctx)
 

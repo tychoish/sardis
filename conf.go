@@ -171,14 +171,15 @@ type CredentialsAWS struct {
 }
 
 type CommandGroupConf struct {
-	Name        string                 `bson:"name" json:"name" yaml:"name"`
-	Aliases     []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
-	Directory   string                 `bson:"directory" json:"directory" yaml:"directory"`
-	Environment dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
-	Command     string                 `bson:"default_command" json:"default_command" yaml:"default_command"`
-	Notify      *bool                  `bson:"notify" json:"notify" yaml:"notify"`
-	Background  *bool                  `bson:"background" json:"background" yaml:"background"`
-	Commands    []CommandConf          `bson:"commands" json:"commands" yaml:"commands"`
+	Name          string                 `bson:"name" json:"name" yaml:"name"`
+	Aliases       []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
+	Directory     string                 `bson:"directory" json:"directory" yaml:"directory"`
+	Environment   dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
+	Command       string                 `bson:"default_command" json:"default_command" yaml:"default_command"`
+	Notify        *bool                  `bson:"notify" json:"notify" yaml:"notify"`
+	Background    *bool                  `bson:"background" json:"background" yaml:"background"`
+	Commands      []CommandConf          `bson:"commands" json:"commands" yaml:"commands"`
+	CmdNamePrefix string                 `bson:"command_name_prefix" json:"command_name_prefix" yaml:"command_name_prefix"`
 }
 
 type CommandConf struct {
@@ -191,6 +192,7 @@ type CommandConf struct {
 	OverrideDefault bool                   `bson:"override_default" json:"override_default" yaml:"override_default"`
 	Notify          *bool                  `bson:"notify" json:"notify" yaml:"notify"`
 	Background      *bool                  `bson:"bson" json:"bson" yaml:"bson"`
+	GroupName       string
 }
 
 type BlogConf struct {
@@ -329,6 +331,28 @@ func (conf *Configuration) expandLinkedFiles(catcher *erc.Collector) {
 }
 
 func (conf *Configuration) resolveCommands() {
+	// expand aliases
+	if len(conf.Commands) == 0 {
+		return
+	}
+	withAliases := make([]CommandGroupConf, 0, len(conf.Commands)+len(conf.Commands)/2+1)
+	for idx := range conf.Commands {
+		cg := conf.Commands[idx]
+		withAliases = append(withAliases, cg)
+
+		if len(conf.Commands[idx].Aliases) == 0 {
+			continue
+		}
+
+		for _, alias := range cg.Aliases {
+			acg := cg
+			acg.Aliases = nil
+			acg.Name = alias
+			withAliases = append(withAliases, acg)
+		}
+	}
+	conf.Commands = withAliases
+
 	index := make(map[string]int, len(conf.Commands))
 	haveMerged := false
 	for idx := range conf.Commands {
@@ -355,6 +379,7 @@ func (conf *Configuration) resolveCommands() {
 	// reorder it because it came off of a default map in random order
 	sparse.SortQuick(cmp.LessThanConverter(func(p dt.Pair[string, int]) int { return p.Value }))
 
+	// make an output structure
 	resolved := dt.NewSlice(make([]CommandGroupConf, 0, len(index)))
 
 	// read the resolution inside out...
@@ -813,10 +838,17 @@ func (conf *CommandGroupConf) Validate() error {
 
 		cmd.Directory, err = homedir.Expand(cmd.Directory)
 		ec.Add(ers.Wrapf(err, "command %q at %d", cmd.Name, idx))
+		if conf.CmdNamePrefix != "" {
+			cmd.Name = fmt.Sprintf("%s.%s", conf.CmdNamePrefix, cmd.Name)
+		}
 
 		for _, alias := range cmd.Aliases {
 			acmd := cmd
-			acmd.Name = alias
+			if conf.CmdNamePrefix != "" {
+				acmd.Name = fmt.Sprintf("%s.%s", conf.CmdNamePrefix, alias)
+			} else {
+				acmd.Name = alias
+			}
 			acmd.Aliases = nil
 			aliased = append(aliased, acmd)
 		}
@@ -846,9 +878,9 @@ func (conf *Configuration) ExportAllCommands() []CommandConf {
 		groupNames := append([]string{cg.Name}, cg.Aliases...)
 		for _, groupName := range groupNames {
 			for cidx := range cg.Commands {
-				cgName := cg.Commands[cidx].Name
+				cmdName := cg.Commands[cidx].Name
 
-				for _, name := range []string{cg.Name, fmt.Sprintf("%s.%s", groupName, cgName)} {
+				for _, name := range []string{cg.Name, fmt.Sprintf("%s.%s", groupName, cmdName)} {
 					cmd := cg.Commands[cidx]
 					cmd.Name = name
 					out = append(out, cmd)

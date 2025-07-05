@@ -92,10 +92,10 @@ func blogPublish() *cmdr.Commander {
 				}
 
 				err := jasper.Context(ctx).CreateCommand(ctx).
-					AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
+					AddEnv(sardis.EnvVarSSHAgentSocket, conf.SSHAgentSocket()).
 					Append(blog.DeployCommands...).
 					Directory(repo.Path).
-					AddEnv("SARDIS_LOG_QUIET_STDOUT", "true").
+					AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
 					SetOutputSender(level.Info, grip.Sender()).
 					SetErrorSender(level.Error, grip.Sender()).
 					Run(ctx)

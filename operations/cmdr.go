@@ -51,6 +51,7 @@ func Commander() *cmdr.Commander {
 		Middleware(sardis.WithDesktopNotify).
 		Middleware(func(ctx context.Context) context.Context {
 			jpm := jasper.NewManager(jasper.ManagerOptionSetSynchronized())
+
 			srv.AddCleanup(ctx, jpm.Close)
 			return jasper.WithManager(ctx, jpm)
 		}).

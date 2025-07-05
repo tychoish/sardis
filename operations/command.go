@@ -13,6 +13,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
@@ -23,6 +24,7 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
+	sutil "github.com/tychoish/sardis/util"
 )
 
 const commandFlagName = "command"
@@ -37,39 +39,56 @@ func RunCommand() *cmdr.Commander {
 		)
 	return addOpCommand(cmd, "command",
 		func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-			return runConfiguredCommand(ctx, args.conf, args.ops)
+			cmds, err := getcmds(args.conf, args.conf.ExportAllCommands(), args.ops)
+			if err != nil {
+				return err
+			}
+			return runConfiguredCommand(ctx, args.conf, cmds)
 		})
 }
 
-func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops []string) (err error) {
-	// TODO avoid re-rendering this
-	cmds := conf.ExportAllCommands()
-	runGroup := conf.ExportCommandGroups()["run"].Commands
-	for idx := range runGroup {
-		cmds = append(cmds, runGroup[idx])
+func getcmds(conf *sardis.Configuration, cmds []sardis.CommandConf, args []string) ([]sardis.CommandConf, error) {
+	// TODO make this a method on conf.
+	out := make([]sardis.CommandConf, 0, len(args))
+
+	ops := dt.NewSetFromSlice(args)
+	seen := make([]string, 0, len(args))
+
+	for idx := range cmds {
+		name := cmds[idx].Name
+		// if the name of the ops matches one we're looking
+		// for or if the name of the command starts with the
+		// group name "run." check the inner name.
+		if ops.Check(name) || (strings.HasPrefix(name, "run.") && ops.Check(name[4:])) {
+			out = append(out, cmds[idx])
+			seen = append(seen, name)
+		}
 	}
 
-	notify := sardis.DesktopNotify(ctx)
+	// if we didn't find all that we were looking for?
+	if ops.Len() != len(out) {
+		return nil, fmt.Errorf("found %d ops, of %d, ops %q; found %q ",
+			len(out), ops.Len(),
+			// TODO we should be able to get slices from sets without panic
+			strings.Join(fun.NewGenerator(ops.Stream().Slice).Force().Resolve(), ", "),
+			strings.Join(seen, ", "),
+		)
+	}
 
-	for idx, name := range ops {
-		cmd, ok := func() (out sardis.CommandConf, ok bool) {
-			for _, cmd := range cmds {
-				if cmd.Name == name {
-					return cmd, true
-				}
-			}
-			return out, false
-		}()
-		if !ok {
-			return fmt.Errorf("command name %q is not defined", name)
-		}
-		err = jasper.Context(ctx).CreateCommand(ctx).
+	return out, nil
+}
+
+func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, cmds []sardis.CommandConf) (err error) {
+	jpm := jasper.Context(ctx)
+	for idx, cmd := range cmds {
+		name := cmd.Name
+		err = jpm.CreateCommand(ctx).
 			Directory(cmd.Directory).
 			Environment(cmd.Environment).
-			AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
-			AddEnv("SARDIS_LOG_QUIET_STDOUT", "true").
-			AddEnv("ALACRITTY_SOCKET", conf.AlacrittySocket()).
-			ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(ops))).
+			AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
+			AddEnv(sardis.EnvVarAlacrittySocket, conf.AlacrittySocket()).
+			AddEnv(sardis.EnvVarSSHAgentSocket, conf.SSHAgentSocket()).
+			ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(cmds))).
 			SetOutputSender(level.Info, grip.Sender()).
 			SetErrorSender(level.Error, grip.Sender()).
 			Background(ft.Ref(cmd.Background)).
@@ -82,11 +101,12 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops [
 					"cmd":  cmd.Command,
 					"cmds": cmd.Commands,
 					"num":  idx + 1,
-					"len":  len(ops),
+					"len":  len(cmds),
 				})
 				return true
 			}).
 			PostHook(func(err error) error {
+				notify := sardis.DesktopNotify(ctx)
 				if err != nil {
 					notify.Error(message.WrapError(err, name))
 					grip.Critical(err)
@@ -112,7 +132,7 @@ func listCommands() *cmdr.Commander {
 				homedir := util.GetHomedir()
 
 				table := tabby.New()
-				table.AddHeader("Name", "Group", "Command", "Directory")
+				table.AddHeader("Group", "Name", "Command", "Directory")
 
 				for _, group := range conf.Commands {
 					for _, cmd := range group.Commands {
@@ -127,13 +147,29 @@ func listCommands() *cmdr.Commander {
 
 						nms := strings.Join(append([]string{cmd.Name}, cmd.Aliases...), ", ")
 						cmds := append([]string{cmd.Command}, cmd.Commands...)
+						for idx := range cmds {
+							if maxLen := 52; len(cmds[idx]) > maxLen {
+								cmds[idx] = fmt.Sprintf("<%s...>", cmds[idx][:maxLen])
+							}
+						}
+						for idx, chunk := range cmds {
+							if idx == 0 {
+								table.AddLine(
+									strings.Join(grps, ","),                 // group
+									nms,                                     // names
+									chunk,                                   // command
+									sutil.TryCollapseHomedir(cmd.Directory), // dir
+								)
+							} else {
+								table.AddLine(
+									"",    // group
+									"",    // names
+									chunk, // command
+									"",    // dir
+								)
 
-						table.AddLine(
-							nms,                      // names
-							strings.Join(grps, ","),  // group
-							strings.Join(cmds, "; "), //commands
-							cmd.Directory,            // dir
-						)
+							}
+						}
 					}
 				}
 				table.Print()
@@ -189,6 +225,7 @@ func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
 					}
 					seen.Add(cmd.Name)
 					opts = append(opts, cmd.Name)
+
 				}
 
 				sort.Strings(opts)
@@ -207,7 +244,12 @@ func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
 					return err
 				}
 
-				return runConfiguredCommand(ctx, conf, []string{cmd})
+				ops, err := getcmds(conf, cmds, []string{cmd})
+				if err != nil {
+					return err
+				}
+
+				return runConfiguredCommand(ctx, conf, ops)
 			}).Add)
 }
 

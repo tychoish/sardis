@@ -47,7 +47,7 @@ func NewRepoCloneJob(rconf sardis.RepoConf) fun.Worker {
 
 		ec.Add(cmd.ID(strings.Join([]string{rconf.Name, "clone"}, ".")).
 			Priority(level.Debug).
-			AddEnv(sardis.SSHAgentSocketEnvVar, conf.SSHAgentSocket()).
+			AddEnv(sardis.EnvVarSSHAgentSocket, conf.SSHAgentSocket()).
 			Directory(filepath.Dir(rconf.Path)).
 			SetOutputSender(level.Info, sender).
 			SetErrorSender(level.Warning, sender).

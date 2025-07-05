@@ -25,8 +25,8 @@ func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configu
 
 	conf.Settings.Logging.Priority = level.FromString(cc.String("level"))
 
-	conf.Settings.Logging.DisableSyslog = cc.Bool("quietSyslog") || os.Getenv("SARDIS_LOG_QUIET_SYSLOG") != ""
-	conf.Settings.Logging.DisableStandardOutput = cc.Bool("quietStdOut") || os.Getenv("SARDIS_LOG_QUIET_STDOUT") != ""
+	conf.Settings.Logging.DisableSyslog = cc.Bool("quietSyslog") || os.Getenv(sardis.EnvVarSardisLogQuietSyslog) != ""
+	conf.Settings.Logging.DisableStandardOutput = cc.Bool("quietStdOut") || os.Getenv(sardis.EnvVarSardisLogQuietStdOut) != ""
 	conf.Settings.Logging.EnableJSONFormating = cc.Bool("jsonLog") || os.Getenv("SARDIS_LOG_FORMAT_JSON") != ""
 	conf.Settings.Logging.EnableJSONColorFormatting = cc.Bool("colorJsonLog") || os.Getenv("SARDIS_LOG_COLOR_JSON") != ""
 

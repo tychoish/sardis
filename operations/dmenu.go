@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -40,14 +41,38 @@ func listMenus() *cmdr.Commander {
 						cmds = append(cmds, cmd.Name)
 						cmds = append(cmds, cmd.Aliases...)
 					}
-
-					table.AddLine(name, strings.Join(cmds, "; "))
+					if len(cmds) == 0 {
+						grip.Debugf("skipping empty command group %q", name)
+						continue
+					}
+					idx := -1
+					for chunk := range slices.Chunk(cmds, 4) {
+						idx++
+						if idx == 0 {
+							table.AddLine(name, strings.Join(chunk, "; "))
+						} else {
+							table.AddLine("", strings.Join(chunk, "; "))
+						}
+					}
+					table.AddLine("", "")
 				}
 
 				for _, m := range conf.Menus {
-					if len(m.Selections) > 0 {
-						table.AddLine(m.Name, strings.Join(m.Selections, "; "))
+					if len(m.Selections) == 0 {
+						grip.Debugf("skipping empty menu %q", m.Name)
+						continue
 					}
+
+					idx := -1
+					for chunk := range slices.Chunk(m.Selections, 4) {
+						idx++
+						if idx == 0 {
+							table.AddLine(m.Name, strings.Join(chunk, "; "))
+						} else {
+							table.AddLine("", strings.Join(chunk, "; "))
+						}
+					}
+					table.AddLine("", "")
 				}
 
 				table.Print()
@@ -82,10 +107,9 @@ func DMenu() *cmdr.Commander {
 			// if we're running "sardis dmenu <group>" and
 			// the group exists:
 			if group, ok := cmdGrp[name]; ok {
-				cmds := group.ExportCommands()
-				opts := make([]string, 0, len(cmds))
-				for name := range cmds {
-					opts = append(opts, name)
+				opts := make([]string, 0, len(group.Commands))
+				for _, cmd := range group.Commands {
+					opts = append(opts, cmd.Name)
 				}
 
 				sort.Strings(opts)
@@ -102,8 +126,12 @@ func DMenu() *cmdr.Commander {
 				default:
 					return ers.Wrapf(err, "group %q", name)
 				}
+				ops, err := getcmds(conf, group.Commands, []string{cmd})
+				if err != nil {
+					return err
+				}
 
-				return runConfiguredCommand(ctx, conf, []string{cmd})
+				return runConfiguredCommand(ctx, conf, ops)
 			}
 
 			notify := sardis.DesktopNotify(ctx)
@@ -137,7 +165,7 @@ func DMenu() *cmdr.Commander {
 				}
 
 				err = jasper.Context(ctx).CreateCommand(ctx).
-					AddEnv("SARDIS_LOG_QUIET_STDOUT", "true").
+					AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
 					Append(cmd).
 					SetCombinedSender(level.Notice, grip.Sender()).
 					Run(ctx)
@@ -183,7 +211,7 @@ func DMenu() *cmdr.Commander {
 			// don't notify here let the inner one do that
 			return jasper.Context(ctx).
 				CreateCommand(ctx).
-				AddEnv("SARDIS_LOG_QUIET_STDOUT", "true").
+				AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
 				AppendArgs("sardis", "dmenu", output).
 				SetCombinedSender(level.Notice, grip.Sender()).
 				Run(ctx)

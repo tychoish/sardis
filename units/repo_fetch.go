@@ -48,7 +48,7 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.Worker {
 		cmd := jasper.Context(ctx).
 			CreateCommand(ctx).
 			Directory(conf.Path).
-			AddEnv(sardis.SSHAgentSocketEnvVar, sardis.AppConfiguration(ctx).SSHAgentSocket())
+			AddEnv(sardis.EnvVarSSHAgentSocket, sardis.AppConfiguration(ctx).SSHAgentSocket())
 			// SetOutputSender(level.Info, sender).
 			// SetErrorSender(level.Warning, sender)
 

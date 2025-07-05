@@ -13,7 +13,9 @@ import (
 	git "github.com/go-git/go-git/v5"
 	"github.com/mitchellh/go-homedir"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
@@ -263,8 +265,10 @@ func (conf *Configuration) Validate() error {
 	for idx := range conf.Commands {
 		ec.Wrapf(conf.Commands[idx].Validate(), "%d of %T is not valid", idx, conf.Commands[idx])
 	}
+	conf.resolveCommands()
+
 	for idx := range conf.Menus {
-		ec.Whenf(conf.Menus[idx].Name == "", "must specify name for dmenu spec at item %d", idx)
+		ec.Whenf(conf.Menus[idx].Name == "", "must specify name for menu spec at item %d", idx)
 		ec.Wrapf(conf.Menus[idx].Validate(), "%d of %T is not valid", idx, conf.Menus[idx])
 	}
 
@@ -322,6 +326,54 @@ func (conf *Configuration) expandLinkedFiles(catcher *erc.Collector) {
 	}
 
 	conf.Merge(confs...)
+}
+
+func (conf *Configuration) resolveCommands() {
+	index := make(map[string]int, len(conf.Commands))
+	haveMerged := false
+	for idx := range conf.Commands {
+		lhn := conf.Commands[idx].Name
+
+		if _, ok := index[lhn]; !ok {
+			index[lhn] = idx
+			continue
+		}
+
+		cg := &conf.Commands[index[lhn]]
+		cg.Merge(conf.Commands[idx])
+		conf.Commands[index[lhn]] = *cg
+		haveMerged = true
+	}
+
+	if !haveMerged {
+		return
+	}
+
+	// get map of names -> indexes as an ordered sequence
+	sparse := dt.NewMap(index).Pairs()
+
+	// reorder it because it came off of a default map in random order
+	sparse.SortQuick(cmp.LessThanConverter(func(p dt.Pair[string, int]) int { return p.Value }))
+
+	resolved := dt.NewSlice(make([]CommandGroupConf, 0, len(index)))
+
+	// read the resolution inside out...
+	//
+	// ⬇️ ingest the contents of the converted and reordered stream
+	// into the resolved slice
+	resolved.Populate(
+		// use the .Index accessor to pull the groups out of the
+		// stream of sparse indexes of now merged groups ⬇️
+		fun.MakeConverter(dt.NewSlice(conf.Commands).Index).Stream(
+			// ⬇️ convert it into the (sparse) indexes of merged groups ⬆
+			fun.MakeConverter(func(p dt.Pair[string, int]) int { return p.Value }).Stream(
+				// ⬇️ take the (now ordered) pairs that we merged and ⬆
+				sparse.Stream(),
+			),
+		),
+	).Must().Wait()
+
+	conf.Commands = resolved
 }
 
 func (conf *Configuration) Merge(mcfs ...*Configuration) {
@@ -688,6 +740,8 @@ func (conf *CommandGroupConf) Validate() error {
 
 	ec.When(conf.Name == "", ers.Error("command group must have name"))
 
+	var aliased []CommandConf
+
 	for idx := range conf.Commands {
 		cmd := conf.Commands[idx]
 
@@ -754,36 +808,50 @@ func (conf *CommandGroupConf) Validate() error {
 			}
 		}
 
+		cmd.Notify = ft.Default(cmd.Notify, conf.Notify)
+		cmd.Background = ft.Default(cmd.Background, conf.Background)
+
 		cmd.Directory, err = homedir.Expand(cmd.Directory)
 		ec.Add(ers.Wrapf(err, "command %q at %d", cmd.Name, idx))
 
+		for _, alias := range cmd.Aliases {
+			acmd := cmd
+			acmd.Name = alias
+			acmd.Aliases = nil
+			aliased = append(aliased, acmd)
+		}
+		cmd.Aliases = nil
 		conf.Commands[idx] = cmd
 	}
+	conf.Commands = append(conf.Commands, aliased...)
 
 	return ec.Resolve()
 }
 
-func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
-	out := dt.NewMap(map[string]CommandConf{})
+func (conf *CommandGroupConf) Merge(rhv CommandGroupConf) bool {
+	if conf.Name != rhv.Name {
+		return false
+	}
+	conf.Commands = append(conf.Commands, rhv.Commands...)
+	conf.Command = ""
+	conf.Aliases = nil
+	conf.Environment = nil
+	return true
+}
+
+func (conf *Configuration) ExportAllCommands() []CommandConf {
+	out := dt.NewSlice([]CommandConf{})
+
 	for _, cg := range conf.Commands {
 		groupNames := append([]string{cg.Name}, cg.Aliases...)
 		for _, groupName := range groupNames {
 			for cidx := range cg.Commands {
 				cgName := cg.Commands[cidx].Name
-				cmdNames := append(make([]string, 0, 2+len(cg.Commands[cidx].Aliases)),
-					fmt.Sprintf("%s.%s", groupName, cgName))
 
-				for _, a := range cg.Commands[cidx].Aliases {
-					cmdNames = append(cmdNames, fmt.Sprintf("%s.%s", groupName, a))
-				}
-
-				for _, name := range cmdNames {
+				for _, name := range []string{cg.Name, fmt.Sprintf("%s.%s", groupName, cgName)} {
 					cmd := cg.Commands[cidx]
-
-					cmd.Notify = ft.Default(cmd.Notify, cg.Notify)
-					cmd.Background = ft.Default(cmd.Background, cg.Background)
-
-					out[name] = cmd
+					cmd.Name = name
+					out = append(out, cmd)
 				}
 			}
 		}
@@ -802,7 +870,7 @@ func (conf *Configuration) ExportAllCommands() map[string]CommandConf {
 			cmd.Notify = ft.Ptr(menus.Notify)
 			cmd.Background = ft.Ptr(menus.Background)
 
-			out[cmd.Name] = cmd
+			out = append(out, cmd)
 		}
 	}
 

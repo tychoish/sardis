@@ -46,13 +46,20 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, ops [
 	cmds := conf.ExportAllCommands()
 	runGroup := conf.ExportCommandGroups()["run"].Commands
 	for idx := range runGroup {
-		cmds[runGroup[idx].Name] = runGroup[idx]
+		cmds = append(cmds, runGroup[idx])
 	}
 
 	notify := sardis.DesktopNotify(ctx)
 
 	for idx, name := range ops {
-		cmd, ok := cmds[name]
+		cmd, ok := func() (out sardis.CommandConf, ok bool) {
+			for _, cmd := range cmds {
+				if cmd.Name == name {
+					return cmd, true
+				}
+			}
+			return out, false
+		}()
 		if !ok {
 			return fmt.Errorf("command name %q is not defined", name)
 		}
@@ -106,6 +113,7 @@ func listCommands() *cmdr.Commander {
 
 				table := tabby.New()
 				table.AddHeader("Name", "Group", "Command", "Directory")
+
 				for _, group := range conf.Commands {
 					for _, cmd := range group.Commands {
 						if cmd.Directory == homedir {
@@ -147,36 +155,40 @@ func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
 		SetUsage("return a list of defined commands").
 		With(cmdr.SpecBuilder(ResolveConfiguration).
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				var cmds map[string]sardis.CommandConf
+				var cmds []sardis.CommandConf
 
 				switch kind {
 				case dmenuListCommandAll:
 					cmds = conf.ExportAllCommands()
 				case dmenuListCommandGroup:
 					for _, group := range conf.Commands {
-						cmds[group.Name] = sardis.CommandConf{
+						cmds = append(cmds, sardis.CommandConf{
 							Name:    group.Name,
 							Command: fmt.Sprintln("sardis dmenu", group.Name),
-						}
+						})
+
 						for _, alias := range group.Aliases {
-							cmds[alias] = sardis.CommandConf{
-								Name:    group.Name,
+							cmds = append(cmds, sardis.CommandConf{
+								Name:    alias,
 								Command: fmt.Sprintln("sardis dmenu", group.Name),
-							}
+							})
 						}
 					}
 
 				}
 
 				opts := make([]string, 0, len(cmds))
-				seen := &dt.Set[string]{}
+				seen := dt.Set[string]{}
 
-				for key := range cmds {
-					if seen.Check(key) || key == "" {
+				// TODO could rebuild the map here,
+				// and pass to the runner
+
+				for _, cmd := range cmds {
+					if seen.Check(cmd.Name) {
 						continue
 					}
-					seen.Add(key)
-					opts = append(opts, key)
+					seen.Add(cmd.Name)
+					opts = append(opts, cmd.Name)
 				}
 
 				sort.Strings(opts)

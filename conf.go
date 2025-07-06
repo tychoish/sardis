@@ -192,7 +192,7 @@ type CommandConf struct {
 	OverrideDefault bool                   `bson:"override_default" json:"override_default" yaml:"override_default"`
 	Notify          *bool                  `bson:"notify" json:"notify" yaml:"notify"`
 	Background      *bool                  `bson:"bson" json:"bson" yaml:"bson"`
-	GroupName       string
+	GroupName       string                 `bson:"-" json:"-" yaml:"-"`
 }
 
 type BlogConf struct {
@@ -769,6 +769,7 @@ func (conf *CommandGroupConf) Validate() error {
 
 	for idx := range conf.Commands {
 		cmd := conf.Commands[idx]
+		cmd.GroupName = conf.Name
 
 		ec.Whenf(cmd.Name == "", "command in group [%s](%d) must have a name", conf.Name, idx)
 
@@ -837,7 +838,7 @@ func (conf *CommandGroupConf) Validate() error {
 		cmd.Background = ft.Default(cmd.Background, conf.Background)
 
 		cmd.Directory, err = homedir.Expand(cmd.Directory)
-		ec.Add(ers.Wrapf(err, "command %q at %d", cmd.Name, idx))
+		ec.Add(ers.Wrapf(err, "command group(%s)  %q at %d", cmd.GroupName, cmd.Name, idx))
 		if conf.CmdNamePrefix != "" {
 			cmd.Name = fmt.Sprintf("%s.%s", conf.CmdNamePrefix, cmd.Name)
 		}
@@ -880,11 +881,9 @@ func (conf *Configuration) ExportAllCommands() []CommandConf {
 			for cidx := range cg.Commands {
 				cmdName := cg.Commands[cidx].Name
 
-				for _, name := range []string{cg.Name, fmt.Sprintf("%s.%s", groupName, cmdName)} {
-					cmd := cg.Commands[cidx]
-					cmd.Name = name
-					out = append(out, cmd)
-				}
+				cmd := cg.Commands[cidx]
+				cmd.Name = fmt.Sprintf("%s.%s", groupName, cmdName)
+				out = append(out, cmd)
 			}
 		}
 	}

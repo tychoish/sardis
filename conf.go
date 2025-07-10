@@ -14,6 +14,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/erc"
@@ -43,6 +44,11 @@ type Configuration struct {
 	repoTags         map[string][]*RepoConf
 	indexedRepoCount int
 	linkedFilesRead  bool
+	caches           struct {
+		commandGroups adt.Once[map[string]CommandGroupConf]
+		allCommdands  adt.Once[[]CommandConf]
+		validation    adt.Once[error]
+	}
 }
 
 type RepoConf struct {
@@ -180,6 +186,8 @@ type CommandGroupConf struct {
 	Background    *bool                  `bson:"background" json:"background" yaml:"background"`
 	Commands      []CommandConf          `bson:"commands" json:"commands" yaml:"commands"`
 	CmdNamePrefix string                 `bson:"command_name_prefix" json:"command_name_prefix" yaml:"command_name_prefix"`
+
+	exportCache *adt.Once[map[string]CommandConf]
 }
 
 type CommandConf struct {
@@ -238,7 +246,8 @@ func (conf *MenuConf) Validate() error {
 	return ec.Resolve()
 }
 
-func (conf *Configuration) Validate() error {
+func (conf *Configuration) Validate() error { return conf.caches.validation.Call(conf.doValidate) }
+func (conf *Configuration) doValidate() error {
 	ec := &erc.Collector{}
 
 	ec.Add(conf.Settings.Validate())
@@ -402,27 +411,29 @@ func (conf *Configuration) resolveCommands() {
 }
 
 func (conf *Configuration) Merge(mcfs ...*Configuration) {
+	out := &Configuration{}
+	mcfs = append([]*Configuration{conf}, mcfs...)
 	for idx := range mcfs {
 		mcf := mcfs[idx]
 		if mcf == nil {
 			continue
 		}
 
-		conf.Blog = append(conf.Blog, mcf.Blog...)
-		conf.Commands = append(conf.Commands, mcf.Commands...)
-		conf.Hosts = append(conf.Hosts, mcf.Hosts...)
-		conf.Links = append(conf.Links, mcf.Links...)
-		conf.Menus = append(conf.Menus, mcf.Menus...)
-		conf.Repo = append(conf.Repo, mcf.Repo...)
-		conf.System.Arch.AurPackages = append(conf.System.Arch.AurPackages, mcf.System.Arch.AurPackages...)
-		conf.System.Arch.Packages = append(conf.System.Arch.Packages, mcf.System.Arch.Packages...)
-		conf.System.GoPackages = append(conf.System.GoPackages, mcf.System.GoPackages...)
-		conf.System.Services = append(conf.System.Services, mcf.System.Services...)
-		conf.TerminalCommands = append(conf.TerminalCommands, mcf.TerminalCommands...)
+		out.Blog = append(out.Blog, mcf.Blog...)
+		out.Commands = append(out.Commands, mcf.Commands...)
+		out.Hosts = append(out.Hosts, mcf.Hosts...)
+		out.Links = append(out.Links, mcf.Links...)
+		out.Menus = append(out.Menus, mcf.Menus...)
+		out.Repo = append(out.Repo, mcf.Repo...)
+		out.System.Arch.AurPackages = append(out.System.Arch.AurPackages, mcf.System.Arch.AurPackages...)
+		out.System.Arch.Packages = append(out.System.Arch.Packages, mcf.System.Arch.Packages...)
+		out.System.GoPackages = append(out.System.GoPackages, mcf.System.GoPackages...)
+		out.System.Services = append(out.System.Services, mcf.System.Services...)
+		out.TerminalCommands = append(out.TerminalCommands, mcf.TerminalCommands...)
 	}
 
-	if conf.shouldIndexRepos() {
-		conf.mapReposByTags()
+	if out.shouldIndexRepos() {
+		out.mapReposByTags()
 	}
 }
 
@@ -634,7 +645,7 @@ func (conf *ArchLinuxConf) Validate() error {
 
 func (conf *RepoConf) Validate() error {
 	if conf.Branch == "" {
-		conf.Branch = "master"
+		conf.Branch = "main"
 	}
 
 	if conf.RemoteName == "" {
@@ -873,6 +884,9 @@ func (conf *CommandGroupConf) Merge(rhv CommandGroupConf) bool {
 }
 
 func (conf *Configuration) ExportAllCommands() []CommandConf {
+	return conf.caches.allCommdands.Call(conf.doExportAllCommands)
+}
+func (conf *Configuration) doExportAllCommands() []CommandConf {
 	out := dt.NewSlice([]CommandConf{})
 
 	for _, cg := range conf.Commands {
@@ -908,25 +922,16 @@ func (conf *Configuration) ExportAllCommands() []CommandConf {
 	return out
 }
 
-func (conf *Configuration) ExportCommandGroups() map[string]CommandGroupConf {
+func (conf *Configuration) ExportCommandGroups() dt.Map[string, CommandGroupConf] {
+	return conf.caches.commandGroups.Call(conf.doExportCommandGroups)
+}
+func (conf *Configuration) doExportCommandGroups() map[string]CommandGroupConf {
 	out := make(map[string]CommandGroupConf, len(conf.Commands))
 	for idx := range conf.Commands {
 		group := conf.Commands[idx]
 		out[group.Name] = group
 		for idx := range group.Aliases {
 			out[group.Aliases[idx]] = group
-		}
-	}
-	return out
-}
-
-func (conf *CommandGroupConf) ExportCommands() map[string]CommandConf {
-	out := make(map[string]CommandConf, len(conf.Commands))
-	for idx := range conf.Commands {
-		cmd := conf.Commands[idx]
-		out[cmd.Name] = cmd
-		for idx := range cmd.Aliases {
-			out[cmd.Aliases[idx]] = cmd
 		}
 	}
 	return out

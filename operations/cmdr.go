@@ -16,6 +16,17 @@ import (
 	"github.com/tychoish/sardis"
 )
 
+/* Project Planning and TODO
+- [ ] TODO <cmdr> cut releases of commander
+- [ ] TODO <libfun> a log-based Map persistence (sets only, BSON encoding wrapping GOB)
+- [ ] TODO <sardis> move more (all?) of the operations logic into units, and have a generators produce workers scheme.
+- [ ] TODO <fun/libfun> worker pool but be able to pause to let things coalese
+- [ ] TODO <cmdr> move to v3 of the cli lib
+- [ ] TODO <cmdr> do something with argflags.
+
+
+*/
+
 func Commander() *cmdr.Commander {
 	return cmdr.MakeRootCommander().
 		Flags(cmdr.FlagBuilder(false).SetName("jsonLog").SetUsage("format logs as json").Flag(),

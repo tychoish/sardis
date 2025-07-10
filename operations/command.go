@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 
 	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
@@ -15,9 +14,7 @@ import (
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -34,7 +31,7 @@ func RunCommand() *cmdr.Commander {
 		SetUsage("runs a predefined command").
 		Subcommanders(
 			listCommands(),
-			dmenuListCmds(dmenuListCommandAll),
+			dmenuCommand(dmenuCommandAll).SetName("dmenu").SetUsage("use dmennu to select from all configured commands"),
 			qrCode(),
 		)
 	return addOpCommand(cmd, "command",
@@ -178,81 +175,6 @@ func listCommands() *cmdr.Commander {
 			}).Add)
 }
 
-type dmenuListCommandTypes int
-
-const (
-	dmenuListCommandAll dmenuListCommandTypes = iota
-	dmenuListCommandGroup
-)
-
-func dmenuListCmds(kind dmenuListCommandTypes) *cmdr.Commander {
-	return cmdr.MakeCommander().
-		SetName("dmenu").
-		SetUsage("return a list of defined commands").
-		With(cmdr.SpecBuilder(ResolveConfiguration).
-			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				var cmds []sardis.CommandConf
-
-				switch kind {
-				case dmenuListCommandAll:
-					cmds = conf.ExportAllCommands()
-				case dmenuListCommandGroup:
-					for _, group := range conf.Commands {
-						cmds = append(cmds, sardis.CommandConf{
-							Name:    group.Name,
-							Command: fmt.Sprintln("sardis dmenu", group.Name),
-						})
-
-						for _, alias := range group.Aliases {
-							cmds = append(cmds, sardis.CommandConf{
-								Name:    alias,
-								Command: fmt.Sprintln("sardis dmenu", group.Name),
-							})
-						}
-					}
-
-				}
-
-				opts := make([]string, 0, len(cmds))
-				seen := dt.Set[string]{}
-
-				// TODO could rebuild the map here,
-				// and pass to the runner
-
-				for _, cmd := range cmds {
-					if seen.Check(cmd.Name) {
-						continue
-					}
-					seen.Add(cmd.Name)
-					opts = append(opts, cmd.Name)
-
-				}
-
-				sort.Strings(opts)
-
-				cmd, err := godmenu.Run(ctx,
-					godmenu.ExtendSelections(opts),
-					godmenu.WithFlags(conf.Settings.DMenu),
-					godmenu.Sorted(),
-				)
-				switch {
-				case err == nil:
-					break
-				case ers.Is(err, godmenu.ErrSelectionMissing):
-					return nil
-				default:
-					return err
-				}
-
-				ops, err := getcmds(conf, cmds, []string{cmd})
-				if err != nil {
-					return err
-				}
-
-				return runConfiguredCommand(ctx, conf, ops)
-			}).Add)
-}
-
 type bufCloser struct{ bytes.Buffer }
 
 func (b bufCloser) Close() error { return nil }
@@ -267,6 +189,7 @@ func qrCode() *cmdr.Commander {
 			err := jasper.Context(ctx).CreateCommand(ctx).
 				AppendArgs("xsel", "--clipboard", "--output").SetOutputWriter(buf).
 				Run(ctx)
+
 			if err != nil {
 				return fmt.Errorf("problem getting clipboard: %w", err)
 			}

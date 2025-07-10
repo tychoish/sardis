@@ -27,6 +27,19 @@ func Blog() *cmdr.Commander {
 		)
 }
 
+func blogConvert() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("convert").
+		SetUsage("convert a hugo site to markdown from restructured text").
+		Flags(cmdr.FlagBuilder("~/src/blog").SetName("path").Flag()).
+		With(cmdr.SpecBuilder(func(ctx context.Context, c *cli.Context) (string, error) {
+			// TODO this should become middleware and use StringSPec
+			//     StringSpecBuilder("path", nil)
+			// need "Filter" in cmdr
+			return util.TryExpandHomedir(c.Path("path")), nil
+		}).SetAction(munger.ConvertSite).Add)
+}
+
 func blogPublish() *cmdr.Commander {
 	const blogNameFlag = "blog"
 	return cmdr.MakeCommander().
@@ -36,17 +49,7 @@ func blogPublish() *cmdr.Commander {
 			SetName(blogNameFlag).
 			SetUsage("name of the configured blog").
 			Flag()).
-		With(cmdr.SpecBuilder(
-			func(ctx context.Context, cc *cli.Context) (string, error) {
-				if name := cc.String(blogNameFlag); name != "" {
-					return name, nil
-				}
-
-				if cc.NArg() != 1 {
-					return "", fmt.Errorf("must specify %s", blogNameFlag)
-				}
-				return cc.Args().First(), nil
-			}).
+		With(StringSpecBuilder(blogNameFlag, nil).
 			SetAction(func(ctx context.Context, name string) error {
 				conf := sardis.AppConfiguration(ctx)
 
@@ -109,14 +112,4 @@ func blogPublish() *cmdr.Commander {
 
 				return nil
 			}).Add)
-}
-
-func blogConvert() *cmdr.Commander {
-	return cmdr.MakeCommander().
-		SetName("convert").
-		SetUsage("convert a hugo site to markdown from restructured text").
-		Flags(cmdr.FlagBuilder("~/src/blog").SetName("path").Flag()).
-		With(cmdr.SpecBuilder(func(ctx context.Context, c *cli.Context) (string, error) {
-			return util.TryExpandHomedir(c.Path("path")), nil
-		}).SetAction(munger.ConvertSite).Add)
 }

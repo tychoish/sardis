@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"github.com/cheynewallace/tabby"
-	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
@@ -101,17 +101,7 @@ func DMenu() *cmdr.Commander {
 			Flag()).
 		With(cmdr.SpecBuilder(ResolveConfiguration).SetMiddleware(sardis.WithConfiguration).Add).
 		Middleware(sardis.WithDesktopNotify).
-		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (string, error) {
-			if name := cc.String(commandFlagName); name != "" {
-				return name, nil
-			}
-
-			if name := cc.Args().First() != "" {
-				return name, nil
-			}
-			
-			return "all", nil
-		}).SetAction(runDmenuOperation).Add)
+		With(StringSpecBuilder(commandFlagName, ft.Ptr("all")).SetAction(runDmenuOperation).Add)
 }
 
 func dmenuCommand(kind dmenuCommandType) *cmdr.Commander {

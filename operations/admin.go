@@ -2,16 +2,36 @@ package operations
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
 )
+
+func StringSpecBuilder(flagName string, defaultValue *string) *cmdr.OperationSpec[string] {
+	return cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (string, error) {
+		if out := cc.String(flagName); out != "" {
+			return out, nil
+		}
+
+		if out := cc.Args().First(); out != "" {
+			return out, nil
+		}
+
+		if defaultValue == nil {
+			return "", fmt.Errorf("%q is a required flag, and was missing", flagName)
+		}
+
+		return ft.Ref(defaultValue), nil
+	})
+}
 
 func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configuration, error) {
 	if sardis.HasAppConfiguration(ctx) {

@@ -8,6 +8,8 @@ package sardis
 // and is specified with -ldflags at build time
 var BuildRevision = ""
 
+const ApplicationName = "sardis"
+
 const (
 	EnvVarSSHAgentSocket       = "SSH_AUTH_SOCK"
 	EnvVarAlacrittySocket      = "ALACRITTY_SOCKET"

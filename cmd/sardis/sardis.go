@@ -5,6 +5,7 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/jasper/x/cli"
+	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/operations"
 )
 
@@ -14,7 +15,7 @@ func main() {
 
 	cmd := operations.Commander()
 	cmd.SetAppOptions(cmdr.AppOptions{
-		Name:    "sardis",
+		Name:    sardis.ApplicationName,
 		Usage:   "tychoish automation",
 		Version: "v0.0.1-pre",
 	}).UrfaveCommands(cli.Jasper())

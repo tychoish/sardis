@@ -3,11 +3,15 @@ package operations
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -23,8 +27,46 @@ import (
 - [ ] TODO <fun/libfun> worker pool but be able to pause to let things coalese
 - [ ] TODO <cmdr> move to v3 of the cli lib
 - [ ] TODO <cmdr> do something with argflags.
-
+- [ ] TODO <cmdr> cmdr.Action adapter for fun.Worker/fun.Operation
 */
+
+func StringSpecBuilder(flagName string, defaultValue *string) *cmdr.OperationSpec[string] {
+	return cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (string, error) {
+		if out := cc.String(flagName); out != "" {
+			return out, nil
+		}
+
+		if out := cc.Args().First(); out != "" {
+			return out, nil
+		}
+
+		if defaultValue == nil {
+			return "", fmt.Errorf("%q is a required flag, and was missing", flagName)
+		}
+
+		return ft.Ref(defaultValue), nil
+	})
+}
+
+func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configuration, error) {
+	if sardis.HasAppConfiguration(ctx) {
+		return sardis.AppConfiguration(ctx), nil
+	}
+
+	conf, err := sardis.LoadConfiguration(cc.String("conf"))
+	if err != nil {
+		return nil, err
+	}
+
+	conf.Settings.Logging.Priority = level.FromString(cc.String("level"))
+
+	conf.Settings.Logging.DisableSyslog = cc.Bool("quietSyslog") || os.Getenv(sardis.EnvVarSardisLogQuietSyslog) != ""
+	conf.Settings.Logging.DisableStandardOutput = cc.Bool("quietStdOut") || os.Getenv(sardis.EnvVarSardisLogQuietStdOut) != ""
+	conf.Settings.Logging.EnableJSONFormating = cc.Bool("jsonLog") || os.Getenv("SARDIS_LOG_FORMAT_JSON") != ""
+	conf.Settings.Logging.EnableJSONColorFormatting = cc.Bool("colorJsonLog") || os.Getenv("SARDIS_LOG_COLOR_JSON") != ""
+
+	return conf, nil
+}
 
 func Commander() *cmdr.Commander {
 	return cmdr.MakeRootCommander().
@@ -64,6 +106,15 @@ func Commander() *cmdr.Commander {
 
 			srv.AddCleanup(ctx, jpm.Close)
 			return jasper.WithManager(ctx, jpm)
+		}).
+		Middleware(func(ctx context.Context) context.Context {
+			return srv.SetWorkerPool(ctx,
+				sardis.ApplicationName,
+				pubsub.NewUnlimitedQueue[fun.Worker](),
+				fun.WorkerGroupConfWorkerPerCPU(),
+				fun.WorkerGroupConfContinueOnError(),
+				fun.WorkerGroupConfContinueOnPanic(),
+			)
 		}).
 		SetAction(func(ctx context.Context, cc *cli.Context) error {
 			return cli.ShowAppHelp(cc)

@@ -21,6 +21,7 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/units"
 	sutil "github.com/tychoish/sardis/util"
 )
 
@@ -76,16 +77,19 @@ func getcmds(conf *sardis.Configuration, cmds []sardis.CommandConf, args []strin
 }
 
 func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, cmds []sardis.CommandConf) (err error) {
+	pool, run := units.SetupWorkers()
+
 	jpm := jasper.Context(ctx)
-	for idx, cmd := range cmds {
-		name := cmd.Name
-		err = jpm.CreateCommand(ctx).
+	for idx := range cmds {
+		cmd, idx := cmds[idx], idx
+
+		pool.PushBack(jpm.CreateCommand(ctx).
 			Directory(cmd.Directory).
 			Environment(cmd.Environment).
 			AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
 			AddEnv(sardis.EnvVarAlacrittySocket, conf.AlacrittySocket()).
 			AddEnv(sardis.EnvVarSSHAgentSocket, conf.SSHAgentSocket()).
-			ID(fmt.Sprintf("%s.%d/%d", name, idx+1, len(cmds))).
+			ID(fmt.Sprintf("%s.%d/%d", cmd.Name, idx+1, len(cmds))).
 			SetOutputSender(level.Info, grip.Sender()).
 			SetErrorSender(level.Error, grip.Sender()).
 			Background(ft.Ref(cmd.Background)).
@@ -93,7 +97,8 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, cmds 
 			Append(cmd.Commands...).
 			Prerequisite(func() bool {
 				grip.Info(message.Fields{
-					"op":   name,
+					"op":   cmd.Name,
+					"host": util.GetHostname(),
 					"dir":  cmd.Directory,
 					"cmd":  cmd.Command,
 					"cmds": cmd.Commands,
@@ -105,18 +110,16 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, cmds 
 			PostHook(func(err error) error {
 				notify := sardis.DesktopNotify(ctx)
 				if err != nil {
-					notify.Error(message.WrapError(err, name))
+					notify.Error(message.WrapError(err, cmd.Name))
 					grip.Critical(err)
 					return err
 				}
-				notify.Notice(message.Whenln(ft.Ref(cmd.Notify), name, "completed"))
+				notify.Notice(message.Whenln(ft.Ref(cmd.Notify), cmd.Name, "completed"))
 				return nil
-			}).Run(ctx)
-		if err != nil {
-			break
-		}
+			}).Worker())
 	}
-	return
+
+	return run(ctx)
 }
 
 func listCommands() *cmdr.Commander {

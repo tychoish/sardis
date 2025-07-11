@@ -9,9 +9,8 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/dupe"
-	"github.com/tychoish/sardis/units"
+	"github.com/tychoish/sardis/munger"
 )
 
 func Utilities() *cmdr.Commander {
@@ -19,9 +18,17 @@ func Utilities() *cmdr.Commander {
 		SetName("utility").
 		SetUsage("short utility commands").
 		Subcommanders(
-			setupLinks(),
 			diffTrees(),
+			blogConvert(),
 		)
+}
+
+func blogConvert() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("convert").
+		SetUsage("convert a hugo site to markdown from restructured text").
+		Flags(cmdr.FlagBuilder("~/src/blog").SetName("path").Flag()).
+		With(StringSpecBuilder("path", nil).SetAction(munger.ConvertSite).Add)
 }
 
 func diffTrees() *cmdr.Commander {
@@ -30,19 +37,23 @@ func diffTrees() *cmdr.Commander {
 		SetUsage("Compare two trees of files, printing duplicates."),
 		// parse args
 		func(ctx context.Context, cc *cli.Context) (dupe.Options, error) {
-			op := dupe.OperationDisplay
-			if cc.Bool("deleteMatching") {
-				op = dupe.OperationDelete
+			opts := dupe.Options{
+				Target: cc.String("target"),
+				Mirror: cc.String("mirror"),
 			}
 
-			opts := dupe.Options{
-				Target:    cc.String("target"),
-				Mirror:    cc.String("mirror"),
-				Operation: op,
+			if cc.Bool("deleteMatching") {
+				opts.Operation = dupe.OperationDelete
+			} else {
+				opts.Operation = dupe.OperationDisplay
 			}
+
 			args := cc.Args().Slice()
 			switch {
 			case opts.Target != "" && opts.Mirror != "":
+				return opts, nil
+			case opts.Target != "" && opts.Mirror == "" && len(args) >= 1:
+				opts.Mirror = args[0]
 				return opts, nil
 			case opts.Target == "" && opts.Mirror == "" && len(args) >= 2:
 				opts.Target = args[0]
@@ -50,9 +61,6 @@ func diffTrees() *cmdr.Commander {
 				return opts, nil
 			case opts.Target == "" && opts.Mirror != "" && len(args) >= 1:
 				opts.Target = args[0]
-				return opts, nil
-			case opts.Target != "" && opts.Mirror == "" && len(args) >= 1:
-				opts.Mirror = args[0]
 				return opts, nil
 			default:
 				return opts, fmt.Errorf("resolving dupe options: [target=%q, mirror=%q, num_args=%d]",
@@ -79,21 +87,4 @@ func diffTrees() *cmdr.Commander {
 		cmdr.FlagBuilder("").SetName("mirror").SetUsage("path of imutable upstream copy").SetValidate(func(path string) error { return nil }).Flag(),
 		cmdr.FlagBuilder(false).SetName("deleteMatching").SetUsage("when specified delete files from the target that are the same in the mirror").Flag(),
 	)
-}
-
-func setupLinks() *cmdr.Commander {
-	return cmdr.MakeCommander().
-		SetName("setup-links").
-		SetUsage("setup all configured links").
-		With(cmdr.SpecBuilder(
-			ResolveConfiguration,
-		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			jobs, run := units.SetupWorkers()
-
-			for _, link := range conf.Links {
-				jobs.PushBack(units.NewSymlinkCreateJob(link))
-			}
-
-			return run(ctx)
-		}).Add)
 }

@@ -127,7 +127,7 @@ func runDmenuOperation(ctx context.Context, name string) error {
 		return dmenuForCommands(ctx, conf, group.Commands)
 	}
 
-	cmds, err := getcmds(conf, conf.ExportAllCommands(), []string{name})
+	cmds, err := getcmds(conf.ExportAllCommands(), []string{name})
 	if err != nil {
 		return err
 	}
@@ -136,15 +136,8 @@ func runDmenuOperation(ctx context.Context, name string) error {
 }
 
 func dmenuGroupSelector(ctx context.Context, conf *sardis.Configuration) error {
-	grps := conf.ExportCommandGroups()
-
-	opts, err := grps.Keys().Slice(ctx)
-	if err != nil {
-		return err
-	}
-
 	cmd, err := godmenu.Run(ctx,
-		godmenu.ExtendSelections(opts),
+		godmenu.ExtendSelections(conf.ExportGroupNames()),
 		godmenu.WithFlags(conf.Settings.DMenu),
 		godmenu.Sorted(),
 	)
@@ -152,18 +145,21 @@ func dmenuGroupSelector(ctx context.Context, conf *sardis.Configuration) error {
 	if ers.Is(err, godmenu.ErrSelectionMissing) {
 		return nil
 	}
+
 	if err != nil {
 		return err
 	}
 
-	return dmenuForCommands(ctx, conf, grps[cmd].Commands)
+	return dmenuForCommands(ctx, conf, conf.ExportCommandGroups().Get(cmd).Commands)
 }
 
 func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, cmds []sardis.CommandConf) error {
 	if len(cmds) == 0 {
 		return errors.New("no selection")
 	}
+
 	seen := dt.Set[string]{}
+
 	seen.AppendStream(fun.MakeConverter(func(cmd *sardis.CommandConf) string { return cmd.Name }).Stream(dt.SlicePtrs(cmds).Stream()))
 
 	cmd, err := godmenu.Run(ctx,
@@ -180,7 +176,7 @@ func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, cmds []sa
 		return err
 	}
 
-	ops, err := getcmds(conf, cmds, strings.Fields(strings.TrimSpace(cmd)))
+	ops, err := getcmds(cmds, strings.Fields(strings.TrimSpace(cmd)))
 	if err != nil {
 		return err
 	}

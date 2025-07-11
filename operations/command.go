@@ -37,7 +37,7 @@ func RunCommand() *cmdr.Commander {
 		)
 	return addOpCommand(cmd, "command",
 		func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-			cmds, err := getcmds(args.conf, args.conf.ExportAllCommands(), args.ops)
+			cmds, err := getcmds(args.conf.ExportAllCommands(), args.ops)
 			if err != nil {
 				return err
 			}
@@ -45,31 +45,31 @@ func RunCommand() *cmdr.Commander {
 		})
 }
 
-func getcmds(conf *sardis.Configuration, cmds []sardis.CommandConf, args []string) ([]sardis.CommandConf, error) {
-	// TODO make this a method on conf.
+func getcmds(cmds []sardis.CommandConf, args []string) ([]sardis.CommandConf, error) {
 	out := make([]sardis.CommandConf, 0, len(args))
 
 	ops := dt.NewSetFromSlice(args)
-	seen := make([]string, 0, len(args))
+	collected := dt.Set[string]{}
+	collected.Order()
 
 	for idx := range cmds {
-		name := cmds[idx].Name
-		// if the name of the ops matches one we're looking
-		// for or if the name of the command starts with the
-		// group name "run." check the inner name.
-		if ops.Check(name) || (strings.HasPrefix(name, "run.") && ops.Check(name[4:])) {
+		if len(args) == collected.Len() {
+			break
+		}
+
+		if name := cmds[idx].NamePrime(); ops.Check(name) && ft.Not(collected.Check(name)) {
 			out = append(out, cmds[idx])
-			seen = append(seen, name)
+			collected.Add(name)
 		}
 	}
 
 	// if we didn't find all that we were looking for?
 	if ops.Len() != len(out) {
-		return nil, fmt.Errorf("found %d ops, of %d, ops %q; found %q ",
+		return nil, fmt.Errorf("found %d ops, of %d, ops [%s]; found [%s] ",
 			len(out), ops.Len(),
 			// TODO we should be able to get slices from sets without panic
 			strings.Join(fun.NewGenerator(ops.Stream().Slice).Force().Resolve(), ", "),
-			strings.Join(seen, ", "),
+			strings.Join(fun.NewGenerator(collected.Stream().Slice).Force().Resolve(), ", "),
 		)
 	}
 

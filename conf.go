@@ -45,9 +45,10 @@ type Configuration struct {
 	indexedRepoCount int
 	linkedFilesRead  bool
 	caches           struct {
-		commandGroups adt.Once[map[string]CommandGroupConf]
-		allCommdands  adt.Once[[]CommandConf]
-		validation    adt.Once[error]
+		commandGroups    adt.Once[map[string]CommandGroupConf]
+		allCommdands     adt.Once[[]CommandConf]
+		comandGroupNames adt.Once[[]string]
+		validation       adt.Once[error]
 	}
 }
 
@@ -201,6 +202,7 @@ type CommandConf struct {
 	Notify          *bool                  `bson:"notify" json:"notify" yaml:"notify"`
 	Background      *bool                  `bson:"bson" json:"bson" yaml:"bson"`
 	GroupName       string                 `bson:"-" json:"-" yaml:"-"`
+	unaliasedName   string
 }
 
 type BlogConf struct {
@@ -254,6 +256,7 @@ func (conf *Configuration) doValidate() error {
 	ec.Add(conf.System.Arch.Validate())
 
 	conf.expandLinkedFiles(ec)
+	conf.expandLocalNativeOps()
 
 	for idx := range conf.System.Services {
 		ec.Wrapf(conf.System.Services[idx].Validate(), "%d of %T is not valid", idx, len(conf.System.Services), conf.System.Services[idx])
@@ -288,6 +291,100 @@ func (conf *Configuration) doValidate() error {
 	}
 
 	return ec.Resolve()
+}
+
+func (conf *Configuration) expandLocalNativeOps() {
+	for _, repo := range conf.Repo {
+		if repo.Disabled || (!repo.LocalSync && !repo.Fetch) {
+			continue
+		}
+		conf.Commands = append(conf.Commands, CommandGroupConf{
+			Name:          ("local.repo"),
+			Notify:        ft.Ptr(repo.Notify),
+			CmdNamePrefix: repo.Name,
+			Commands: []CommandConf{
+				{
+					Name:      "update",
+					Aliases:   []string{"sync"},
+					Directory: repo.Path,
+					Command:   "sardis repo update {{prefix}}",
+				},
+				{
+					Name:      "fetch",
+					Directory: repo.Path,
+					Command:   "sardis repo fetch {{prefix}}",
+				},
+				{
+					Name:       "status",
+					Directory:  repo.Path,
+					Background: ft.Ptr(true),
+					Command:    "alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command 'sardis repo status {{prefix}}'",
+				},
+			},
+		})
+	}
+	for _, service := range conf.System.Services {
+		var command string
+		if service.User {
+			command = "systemctl --user"
+		} else {
+			command = "sudo systemctl"
+		}
+
+		var defaultState string
+		if service.Enabled && !service.Disabled {
+			defaultState = "enable"
+		} else {
+			defaultState = "disable"
+		}
+
+		// TODO these have a worker function already
+		// implemented in units for setup.
+		conf.Commands = append(conf.Commands, CommandGroupConf{
+			Name:          "local.systemd.service",
+			Notify:        ft.Ptr(true),
+			CmdNamePrefix: service.Name,
+			Command:       service.Unit,
+			Commands: []CommandConf{
+				{
+					Name:    "enable",
+					Command: fmt.Sprintf("%s enable %s", command, service.Unit),
+				},
+				{
+					Name:    "disable",
+					Command: fmt.Sprintf("%s disable %s", command, service.Unit),
+				},
+				{
+					Name:    "start",
+					Command: fmt.Sprintf("%s start %s", command, service.Unit),
+				},
+				{
+					Name:    "stop",
+					Command: fmt.Sprintf("%s stop %s", command, service.Unit),
+				},
+				{
+					Name:    "restart",
+					Command: fmt.Sprintf("%s restart %s", command, service.Unit),
+				},
+				{
+					Name:    "setup",
+					Command: fmt.Sprintf("%s %s %s", command, defaultState, service.Unit),
+				},
+				{
+					Name:            "status",
+					Background:      ft.Ptr(true),
+					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command '%s status %s'", command, service.Unit),
+					OverrideDefault: true,
+				},
+				{
+					Name:            "logs",
+					Background:      ft.Ptr(true),
+					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command 'journalctl --follow --pager-end --catalog --unit %s'", service.Unit),
+					OverrideDefault: true,
+				},
+			},
+		})
+	}
 }
 
 func (conf *Configuration) expandLinkedFiles(catcher *erc.Collector) {
@@ -810,15 +907,16 @@ func (conf *CommandGroupConf) Validate() error {
 			ec.Whenf(cmd.Command == "", "cannot resolve default command in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
 		}
 
-		ec.Whenf(strings.Contains(cmd.Command, "{{command}}"), "unresolveable token found in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
-
-		if !cmd.OverrideDefault && strings.Contains(conf.Command, "{{command}}") {
-			cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
-		}
+		ec.Whenf(strings.Contains(cmd.Command, " {{command}}"), "unresolveable token found in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
 
 		if conf.Command != "" {
+			if !cmd.OverrideDefault {
+				cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
+			}
+
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", conf.Name)
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", conf.CmdNamePrefix)
 
 			if len(cmd.Aliases) >= 1 {
 				cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Aliases[0])
@@ -829,12 +927,10 @@ func (conf *CommandGroupConf) Validate() error {
 		}
 
 		for idx := range cmd.Commands {
-			if strings.Contains(cmd.Commands[idx], "{{command}}") {
-				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
-			}
-
+			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", conf.Name)
+			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{prefix}}", conf.Name)
 
 			if len(cmd.Aliases) >= 1 {
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{alias}}", cmd.Aliases[0])
@@ -849,10 +945,10 @@ func (conf *CommandGroupConf) Validate() error {
 		cmd.Background = ft.Default(cmd.Background, conf.Background)
 
 		cmd.Directory, err = homedir.Expand(cmd.Directory)
-		ec.Add(ers.Wrapf(err, "command group(%s)  %q at %d", cmd.GroupName, cmd.Name, idx))
 		if conf.CmdNamePrefix != "" {
 			cmd.Name = fmt.Sprintf("%s.%s", conf.CmdNamePrefix, cmd.Name)
 		}
+		ec.Add(ers.Wrapf(err, "command group(%s)  %q at %d", cmd.GroupName, cmd.Name, idx))
 
 		for _, alias := range cmd.Aliases {
 			acmd := cmd
@@ -862,6 +958,7 @@ func (conf *CommandGroupConf) Validate() error {
 				acmd.Name = alias
 			}
 			acmd.Aliases = nil
+			acmd.unaliasedName = cmd.Name
 			aliased = append(aliased, acmd)
 		}
 		cmd.Aliases = nil
@@ -871,6 +968,8 @@ func (conf *CommandGroupConf) Validate() error {
 
 	return ec.Resolve()
 }
+
+func (conf *CommandConf) NamePrime() string { return ft.Default(conf.unaliasedName, conf.Name) }
 
 func (conf *CommandGroupConf) Merge(rhv CommandGroupConf) bool {
 	if conf.Name != rhv.Name {
@@ -925,6 +1024,13 @@ func (conf *Configuration) doExportAllCommands() []CommandConf {
 func (conf *Configuration) ExportCommandGroups() dt.Map[string, CommandGroupConf] {
 	return conf.caches.commandGroups.Call(conf.doExportCommandGroups)
 }
+func (conf *Configuration) ExportGroupNames() dt.Slice[string] {
+	return conf.caches.comandGroupNames.Call(conf.doExportGroupNames)
+}
+func (conf *Configuration) doExportGroupNames() []string {
+	return fun.NewGenerator(conf.ExportCommandGroups().Keys().Slice).Force().Resolve()
+}
+
 func (conf *Configuration) doExportCommandGroups() map[string]CommandGroupConf {
 	out := make(map[string]CommandGroupConf, len(conf.Commands))
 	for idx := range conf.Commands {

@@ -19,13 +19,17 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.Worker {
 		start := time.Now()
 		defer func() {
 			grip.Info(message.Fields{
-				"path": conf.Path,
-				"repo": conf.Remote,
-				"host": "LOCAL",
-				"ok":   err == nil,
-				"op":   "git pull",
-				"dur":  time.Since(start).String(),
+				"op":    "repo-fetch",
+				"path":  conf.Path,
+				"err":   err != nil,
+				"repo":  conf.Remote,
+				"dur":   time.Since(start).String(),
+				"host":  sardis.AppConfiguration(ctx).Settings.Runtime.Hostname,
+				"dir":   conf.Path,
+				"npre":  len(conf.Pre),
+				"npost": len(conf.Post),
 			})
+
 		}()
 
 		if !util.FileExists(conf.Path) {
@@ -41,16 +45,12 @@ func NewRepoFetchJob(conf sardis.RepoConf) fun.Worker {
 			return errors.New("repo-fetch requires defined remote name and branch for the repo")
 		}
 
-		// sender := send.MakeAnnotating(grip.Sender(), map[string]interface{}{
-		// 	"repo": conf.Name,
-		// })
-
 		cmd := jasper.Context(ctx).
 			CreateCommand(ctx).
 			Directory(conf.Path).
 			AddEnv(sardis.EnvVarSSHAgentSocket, sardis.AppConfiguration(ctx).SSHAgentSocket())
-			// SetOutputSender(level.Info, sender).
-			// SetErrorSender(level.Warning, sender)
+			// SetOutputSender(level.Trace, sender).
+			// SetErrorSender(level.Debug, sender)
 
 		if conf.LocalSync && slices.Contains(conf.Tags, "mail") {
 			cmd.Append(conf.Pre...)

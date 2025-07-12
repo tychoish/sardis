@@ -306,7 +306,7 @@ func (conf *Configuration) expandLocalNativeOps() {
 			continue
 		}
 		conf.Commands = append(conf.Commands, CommandGroupConf{
-			Name:          ("local.repo"),
+			Name:          ("repo"),
 			Notify:        ft.Ptr(repo.Notify),
 			CmdNamePrefix: repo.Name,
 			Commands: []CommandConf{
@@ -348,7 +348,7 @@ func (conf *Configuration) expandLocalNativeOps() {
 		// TODO these have a worker function already
 		// implemented in units for setup.
 		conf.Commands = append(conf.Commands, CommandGroupConf{
-			Name:          "local.systemd.service",
+			Name:          "systemd.service",
 			Directory:     conf.Settings.Runtime.Hostname,
 			Notify:        ft.Ptr(true),
 			CmdNamePrefix: service.Name,

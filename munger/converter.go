@@ -112,8 +112,8 @@ func ConvertSite(ctx context.Context, path string) error {
 		err := jasper.Context(ctx).
 			CreateCommand(ctx).
 			Append("pandoc --from=rst --to=commonmark_x").
-			SetOutputWriter(jutil.NewLocalBuffer(stdoutBuf)).
-			SetErrorWriter(jutil.NewLocalBuffer(stderrBuf)).
+			SetOutputWriter(jutil.NewLocalBuffer(&stdoutBuf)).
+			SetErrorWriter(jutil.NewLocalBuffer(&stderrBuf)).
 			SetInput(bytes.NewBuffer([]byte(p.Body))).
 			Run(ctx)
 		if err != nil {

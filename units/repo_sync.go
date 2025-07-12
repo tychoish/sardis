@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -20,16 +19,10 @@ import (
 	"github.com/tychoish/sardis"
 )
 
-type repoSyncJob struct {
-	sardis.RepoConf
-	Host string
-
-	buildID adt.Once[string]
-}
-
 const (
 	remoteUpdateCmdTemplate = "git add -A && git fetch origin && git rebase origin/$(git rev-parse --abbrev-ref HEAD)"
 	syncCmdTemplate         = remoteUpdateCmdTemplate + " && git commit -a -m 'auto-update: (%s)'; git push"
+	ruler                   = "---------"
 )
 
 func NewLocalRepoSyncJob(repo sardis.RepoConf) fun.Worker {
@@ -37,107 +30,95 @@ func NewLocalRepoSyncJob(repo sardis.RepoConf) fun.Worker {
 }
 
 func NewRepoSyncJob(host string, repo sardis.RepoConf) fun.Worker {
-	j := &repoSyncJob{
-		RepoConf: repo,
-		Host:     host,
+	hn := util.GetHostname()
+	if host == "LOCAL" {
+		host = hn
 	}
 
-	j.buildID.Set(func() string {
-		hostname := util.GetHostname()
+	isLocal := host == hn
+	var buildID string
+	if isLocal {
+		buildID = fmt.Sprintf("sync.LOCAL(%s).REPO(%s)", hn, repo.Name)
+	} else {
+		buildID = fmt.Sprintf("sync.REMOTE(%s).REPO(%s).OPERATOR(%s)", host, repo.Name, hn)
+	}
 
-		if j.isLocal() {
-			return fmt.Sprintf("sync.LOCAL(%s).REPO(%s)", hostname, j.Name)
+	return func(ctx context.Context) error {
+		if stat, err := os.Stat(repo.Path); os.IsNotExist(err) {
+			return fmt.Errorf("path '%s' for %q does not exist", repo.Path, buildID)
+		} else if !stat.IsDir() {
+			return fmt.Errorf("path '%s' for %q exists but is a %s", repo.Path, buildID, stat.Mode().String())
 		}
+		started := time.Now()
 
-		return fmt.Sprintf("sync.REMOTE(%s).SOURCE(%s).REPO(%s)", j.Host, hostname, j.Name)
-	})
-
-	return j.Run
-}
-
-func (j *repoSyncJob) isLocal() bool {
-	return j.Host == "" || j.Host == "LOCAL"
-}
-
-const ruler string = "----------------"
-
-func (j *repoSyncJob) Run(ctx context.Context) error {
-	if stat, err := os.Stat(j.Path); os.IsNotExist(err) || !stat.IsDir() {
-		return fmt.Errorf("path '%s' for %q does not exist", j.Path, j.buildID.Resolve())
-	}
-	started := time.Now()
-
-	procout := &bufsend{}
-	procout.SetPriority(level.Info)
-	procout.SetName(j.buildID.Resolve())
-	procout.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
-	proclog := grip.NewLogger(procout)
-	proclog.Noticeln(
-		ruler,
-		"repo", strings.ToUpper(j.RepoConf.Name), "---",
-		"host", strings.ToUpper(j.Host), "---",
-		"path", strings.ToUpper(j.RepoConf.Path),
-	)
-
-	grip.Info(message.BuildPair().
-		Pair("op", "repo-sync").
-		Pair("state", "started").
-		Pair("id", j.buildID.Resolve()).
-		Pair("path", j.Path).
-		Pair("host", j.Host),
-	)
-
-	conf := sardis.AppConfiguration(ctx)
-
-	err := jasper.Context(ctx).
-		CreateCommand(ctx).
-		SetOutputSender(level.Info, procout).
-		SetErrorSender(level.Error, procout).
-		Priority(level.Debug).
-		ID(j.buildID.Resolve()).
-		AddEnv(sardis.EnvVarSSHAgentSocket, conf.SSHAgentSocket()).
-		Directory(j.Path).
-		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, fmt.Sprintf(syncCmdTemplate, j.buildID.Resolve()))).
-		Append(j.Pre...).
-		AppendArgs("git", "add", "-A").
-		Bash("git fetch origin && git rebase origin/$(git rev-parse --abbrev-ref HEAD)").
-		Bash("git ls-files -d | xargs -r git rm --ignore-unmatch --quiet -- ").
-		AppendArgs("git", "add", "-A").
-		Bash(fmt.Sprintf("git commit -a -m 'update: (%s)' || true", j.buildID.Resolve())).
-		AppendArgs("git", "push").
-		AppendArgsWhen(!j.isLocal(), "ssh", j.Host, fmt.Sprintf("cd %s && %s", j.Path, fmt.Sprintf(syncCmdTemplate, j.buildID.Resolve()))).
-		BashWhen(!j.isLocal(), "git fetch origin && git rebase origin/$(git rev-parse --abbrev-ref HEAD)").
-		AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
-		Append(j.Post...).
-		Run(ctx)
-
-	msg := message.BuildPair().
-		Pair("op", "repo-sync").
-		Pair("state", "completed").
-		Pair("errors", err != nil).
-		Pair("id", j.buildID.Resolve()).
-		Pair("path", j.Path).
-		Pair("host", j.Host).
-		Pair("dur", time.Since(started).Seconds())
-
-	if err != nil {
+		procout := &bufsend{}
+		procout.SetPriority(level.Info)
+		procout.SetName(buildID)
+		procout.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
+		proclog := grip.NewLogger(procout)
 		proclog.Noticeln(
 			ruler,
-			"repo:", strings.ToUpper(j.RepoConf.Name), "----",
-			"host:", strings.ToUpper(j.Host), "----",
-			"path:", strings.ToUpper(j.RepoConf.Path),
+			"repo:", strings.ToUpper(repo.Name), "---",
+			"host:", strings.ToUpper(host), "---",
+			"path:", strings.ToUpper(repo.Path),
 			ruler,
 		)
 
-		grip.Error(msg)
+		grip.Info(message.BuildPair().
+			Pair("op", "repo-sync").
+			Pair("state", "started").
+			Pair("id", buildID).
+			Pair("path", repo.Path).
+			Pair("host", host),
+		)
 
-		grip.Error(procout.buffer.String())
+		err := jasper.Context(ctx).
+			CreateCommand(ctx).
+			SetOutputSender(level.Info, procout).
+			SetErrorSender(level.Info, procout).
+			Priority(level.Debug).
+			ID(buildID).
+			Directory(repo.Path).
+			AppendArgsWhen(ft.Not(isLocal), "ssh", host, fmt.Sprintf("cd %s && %s", repo.Path, fmt.Sprintf(syncCmdTemplate, buildID))).
+			Append(repo.Pre...).
+			AppendArgs("git", "add", "-A").
+			Bash("git fetch origin && git rebase origin/$(git rev-parse --abbrev-ref HEAD)").
+			Bash("git ls-files -d | xargs -r git rm --ignore-unmatch --quiet -- ").
+			AppendArgs("git", "add", "-A").
+			Bash(fmt.Sprintf("git commit -a -m 'update: (%s)' || true", buildID)).
+			AppendArgs("git", "push").
+			AppendArgsWhen(ft.Not(isLocal), "ssh", host, fmt.Sprintf("cd %s && %s", repo.Path, fmt.Sprintf(syncCmdTemplate, buildID))).
+			BashWhen(ft.Not(isLocal), "git fetch origin && git rebase origin/$(git rev-parse --abbrev-ref HEAD)").
+			Append(repo.Post...).
+			Run(ctx)
 
-		return err
+		msg := message.BuildPair().
+			Pair("op", "repo-sync").
+			Pair("state", "completed").
+			Pair("host", host).
+			Pair("errors", err != nil).
+			Pair("id", buildID).
+			Pair("path", repo.Path).
+			Pair("dur", time.Since(started))
+
+		if err != nil {
+			proclog.Noticeln(
+				ruler,
+				"repo:", strings.ToUpper(repo.Name), "----",
+				"host:", strings.ToUpper(host), "----",
+				"path:", strings.ToUpper(repo.Path),
+				ruler,
+			)
+
+			grip.Error(msg)
+			grip.Error(procout.buffer.String())
+
+			return err
+		}
+
+		grip.Info(msg)
+		return nil
 	}
-
-	grip.Info(msg)
-	return nil
 }
 
 type bufsend struct {

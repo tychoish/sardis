@@ -15,7 +15,6 @@ import (
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
-	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
 )
@@ -61,7 +60,6 @@ func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configu
 	}
 
 	conf.Settings.Logging.Priority = level.FromString(cc.String("level"))
-
 	conf.Settings.Logging.DisableSyslog = cc.Bool("quietSyslog") || os.Getenv(sardis.EnvVarSardisLogQuietSyslog) != ""
 	conf.Settings.Logging.DisableStandardOutput = cc.Bool("quietStdOut") || os.Getenv(sardis.EnvVarSardisLogQuietStdOut) != ""
 	conf.Settings.Logging.EnableJSONFormating = cc.Bool("jsonLog") || os.Getenv("SARDIS_LOG_FORMAT_JSON") != ""
@@ -101,14 +99,9 @@ func Commander() *cmdr.Commander {
 			SetMiddleware(sardis.ContextSetup(
 				sardis.WithConfiguration,
 				sardis.WithAppLogger,
+				sardis.WithJasper,
 			)).Add).
 		Middleware(sardis.WithDesktopNotify).
-		Middleware(func(ctx context.Context) context.Context {
-			jpm := jasper.NewManager(jasper.ManagerOptionSetSynchronized())
-
-			srv.AddCleanup(ctx, jpm.Close)
-			return jasper.WithManager(ctx, jpm)
-		}).
 		Middleware(func(ctx context.Context) context.Context {
 			return srv.SetWorkerPool(ctx,
 				sardis.ApplicationName,

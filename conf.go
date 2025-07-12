@@ -759,7 +759,15 @@ func (conf *Configuration) GetRepo(name string) *RepoConf {
 	for idx := range conf.Repo {
 		if conf.Repo[idx].Name == name {
 			return &conf.Repo[idx]
+		}
+	}
+	return nil
+}
 
+func (conf *Configuration) GetBlog(name string) *BlogConf {
+	for idx := range conf.Blog {
+		if conf.Blog[idx].RepoName == name {
+			return &conf.Blog[idx]
 		}
 	}
 	return nil

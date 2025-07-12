@@ -2,12 +2,14 @@ package operations
 
 import (
 	"context"
+	"os"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
 )
@@ -28,7 +30,13 @@ func hacking() *cmdr.Commander {
 	return cmdr.MakeCommander().SetName("hack").
 		With(cmdr.SpecBuilder(ResolveConfiguration).
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				grip.Info("hackerz!")
+				grip.Info(message.Fields{
+					"version":                    sardis.BuildRevision,
+					"alacritty":                  conf.AlacrittySocket(),
+					"ssh_agent":                  conf.SSHAgentSocket(),
+					sardis.EnvVarAlacrittySocket: os.Getenv(sardis.EnvVarAlacrittySocket),
+					sardis.EnvVarSSHAgentSocket:  os.Getenv(sardis.EnvVarSSHAgentSocket),
+				})
 				return nil
 			}).Add)
 }

@@ -2,6 +2,7 @@ package units
 
 import (
 	"context"
+	"os"
 	"strings"
 
 	"github.com/tychoish/fun"
@@ -38,14 +39,16 @@ func SyncRepo(repo sardis.RepoConf) fun.Worker {
 		}
 
 		if repo.LocalSync {
-			if changes, err := repo.HasChanges(); changes || err != nil {
-				return NewLocalRepoSyncJob(repo).Run(ctx)
+			if _, err := os.Stat(repo.Path); os.IsNotExist(err) {
+				return NewRepoFetchJob(repo).Run(ctx)
 			}
 
-			return NewRepoFetchJob(repo).Run(ctx)
+			if changes, err := repo.HasChanges(); changes || err != nil {
+				return NewRepoSyncJob(hostname, repo).Run(ctx)
+			}
 		}
 
-		if repo.Fetch || hasMirrors {
+		if repo.Fetch || hasMirrors || repo.LocalSync {
 			return NewRepoFetchJob(repo).Run(ctx)
 		}
 

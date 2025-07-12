@@ -89,8 +89,6 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, cmds 
 			Directory(cmd.Directory).
 			Environment(cmd.Environment).
 			AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
-			AddEnv(sardis.EnvVarAlacrittySocket, conf.AlacrittySocket()).
-			AddEnv(sardis.EnvVarSSHAgentSocket, conf.SSHAgentSocket()).
 			ID(fmt.Sprintf("%s.%d/%d", cmd.Name, idx+1, len(cmds))).
 			SetOutputSender(level.Info, grip.Sender()).
 			SetErrorSender(level.Error, grip.Sender()).

@@ -34,35 +34,19 @@ func blogPublish() *cmdr.Commander {
 		With(StringSpecBuilder(blogNameFlag, nil).
 			SetAction(func(ctx context.Context, name string) error {
 				conf := sardis.AppConfiguration(ctx)
-
-				ctx = sardis.WithRemoteNotify(ctx, conf)
-				notify := sardis.RemoteNotify(ctx)
-
 				if conf == nil || len(conf.Blog) == 0 {
 					return errors.New("no blog configured")
 				}
 
-				var repo *sardis.RepoConf
-				var blog *sardis.BlogConf
-				for idx := range conf.Blog {
-					b := conf.Blog[idx]
-					if b.RepoName != name {
-						continue
-					}
-					for ridx := range conf.Repo {
-						r := conf.Repo[ridx]
-						if b.RepoName != r.Name {
-							continue
-						}
-						repo = &r
-						blog = &b
-					}
+				blog := conf.GetBlog(name)
+				if blog == nil {
+					return fmt.Errorf("blog %q is not defined", name)
 				}
 
-				if repo == nil || blog == nil {
-					return fmt.Errorf("invalid configuration for '%s'", name)
+				repo := conf.GetRepo(name)
+				if repo == nil {
+					return fmt.Errorf("repo %q for corresponding blog is not defined", name)
 				}
-
 				if !blog.Enabled {
 					grip.Info(message.Fields{
 						"op":   "blog publish",
@@ -72,25 +56,28 @@ func blogPublish() *cmdr.Commander {
 					return nil
 				}
 
-				if err := units.NewLocalRepoSyncJob(*repo)(ctx); err != nil {
+				if err := units.NewRepoSyncJob(conf.Settings.Runtime.Hostname, *repo)(ctx); err != nil {
 					return fmt.Errorf("problem syncing blog repo: %w", err)
 				}
 
 				err := jasper.Context(ctx).CreateCommand(ctx).
-					AddEnv(sardis.EnvVarSSHAgentSocket, conf.SSHAgentSocket()).
 					Append(blog.DeployCommands...).
 					Directory(repo.Path).
 					AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
 					SetOutputSender(level.Info, grip.Sender()).
 					SetErrorSender(level.Error, grip.Sender()).
 					Run(ctx)
+
 				if err != nil {
-					notify.Error(message.WrapError(err, message.Fields{
-						"op":   "blog publish",
+					sardis.RemoteNotify(ctx).Error(message.WrapError(err, message.Fields{
+						"op":   "blog-publish",
 						"repo": repo.Name,
+						"path": repo.Path,
 					}))
 					return fmt.Errorf("problem running deploy command: %w", err)
 				}
+
+				grip.Infof("blog publication complete for %q", name)
 
 				return nil
 			}).Add)

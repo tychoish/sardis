@@ -22,10 +22,10 @@ require (
 	github.com/tychoish/grip/x/telegram v0.0.0-20250626173215-d516ec138ab2
 	github.com/tychoish/grip/x/twitter v0.0.0-20250626175245-f5276066a1e9
 	github.com/tychoish/grip/x/xmpp v0.0.0-20250626175245-f5276066a1e9
-	github.com/tychoish/jasper v0.1.2
-	github.com/tychoish/jasper/x/cli v0.0.0-20250611130524-76f5189e13d7
-	github.com/tychoish/jasper/x/track v0.0.0-20250611023115-421e64b64a4b
-	github.com/tychoish/libfun v0.0.0-20250703172608-7534704a8bf4
+	github.com/tychoish/jasper v0.1.3-0.20250712191228-9a0a31d519ad
+	github.com/tychoish/jasper/x/cli v0.0.0-20250712191228-9a0a31d519ad
+	github.com/tychoish/jasper/x/track v0.0.0-20250712195804-18ceb2ba20a3
+	github.com/tychoish/libfun v0.0.0-20250712200500-93c467b8e7b9
 	github.com/urfave/cli/v2 v2.25.3
 	go.mongodb.org/mongo-driver v1.11.6
 	golang.org/x/tools v0.33.0
@@ -96,8 +96,8 @@ require (
 	github.com/tychoish/gimlet v0.0.0-20250611125935-c7dc51701c88 // indirect
 	github.com/tychoish/grip/x/metrics v0.0.0-20250608160243-37fab929fbd2 // indirect
 	github.com/tychoish/grip/x/splunk v0.0.0-20250608160243-37fab929fbd2 // indirect
-	github.com/tychoish/jasper/x/remote v0.0.0-20230825152828-7bf0c66efca5 // indirect
-	github.com/tychoish/jasper/x/splunk v0.0.0-20250611023115-421e64b64a4b // indirect
+	github.com/tychoish/jasper/x/remote v0.0.0-20250712195804-18ceb2ba20a3 // indirect
+	github.com/tychoish/jasper/x/splunk v0.0.0-20250712195804-18ceb2ba20a3 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect

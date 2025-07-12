@@ -108,20 +108,17 @@ func WithDesktopNotify(ctx context.Context) context.Context {
 
 func RemoteNotify(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "remote-notify") }
 func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Context) {
-	out = ctx
-
-	root := grip.Sender()
-
 	var loggers []send.Sender
+	root := grip.Sender()
+	defer func() {
+		out = grip.WithContextLogger(ctx, "remote-notify",
+			grip.NewLogger(send.NewMulti(
+				root.Name(),
+				append(loggers, root),
+			)))
+	}()
 
 	host := util.GetHostname()
-
-	defer func() {
-		loggers = append(loggers, root)
-		sender := send.MakeMulti(loggers...)
-
-		out = grip.WithContextLogger(ctx, "remote-notify", grip.NewLogger(sender))
-	}()
 
 	if conf.Settings.Notification.Target != "" && !conf.Settings.Notification.Disabled {
 		sender, err := xmpp.NewSender(conf.Settings.Notification.Target,

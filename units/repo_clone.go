@@ -2,69 +2,82 @@ package units
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"time"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper"
+	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
 )
 
 func NewRepoCloneJob(rconf sardis.RepoConf) fun.Worker {
-	return func(ctx context.Context) (err error) {
-		ec := &erc.Collector{}
-		defer func() { err = ec.Resolve() }()
+	const opName = "repo-clone"
+
+	return func(ctx context.Context) error {
+		hostname := util.GetHostname()
+		startAt := time.Now()
 
 		if _, err := os.Stat(rconf.Path); !os.IsNotExist(err) {
+			grip.Info(message.Fields{
+				"op":   opName,
+				"msg":  "repo exists, skipping clone, running update jobs as needed",
+				"path": rconf.Path,
+				"repo": rconf.Remote,
+				"host": hostname,
+			})
+
 			if rconf.LocalSync {
 				rconfCopy := rconf
 				rconfCopy.Pre = nil
 				rconfCopy.Post = nil
-				ec.Add(NewLocalRepoSyncJob(rconfCopy)(ctx))
-			} else if rconf.Fetch {
-				ec.Add(NewRepoFetchJob(rconf).Run(ctx))
+				return NewRepoSyncJob(hostname, rconfCopy).Run(ctx)
 			}
 
-			grip.Notice(message.Fields{
-				"path": rconf.Path,
-				"repo": rconf.Remote,
-				"op":   "exists, skipping clone",
-			})
+			if rconf.Fetch {
+				return NewRepoFetchJob(rconf).Run(ctx)
+			}
+
+			return nil
 		}
 
-		conf := sardis.AppConfiguration(ctx)
-
-		cmd := jasper.Context(ctx).CreateCommand(ctx)
 		sender := send.MakeAnnotating(grip.Sender(), map[string]any{
+			"op":   opName,
 			"repo": rconf.Name,
-			"host": conf.Settings.Runtime.Hostname,
+			"host": hostname,
 		})
 
-		ec.Add(cmd.ID(strings.Join([]string{rconf.Name, "clone"}, ".")).
+		err := jasper.Context(ctx).CreateCommand(ctx).
+			ID(fmt.Sprintf("%s.%s.clone", hostname, rconf.Name)).
 			Priority(level.Debug).
-			AddEnv(sardis.EnvVarSSHAgentSocket, conf.SSHAgentSocket()).
 			Directory(filepath.Dir(rconf.Path)).
 			SetOutputSender(level.Info, sender).
 			SetErrorSender(level.Warning, sender).
 			AppendArgs("git", "clone", rconf.Remote, rconf.Path).
-			AddWhen(len(rconf.Post) > 0, rconf.Post).
-			Run(ctx))
+			Append(rconf.Post...).
+			Run(ctx)
 
-		grip.Notice(message.BuildPair().
-			Pair("op", "repo-clone").
+		msg := message.BuildPair().
+			Pair("op", opName).
+			Pair("host", hostname).
+			Pair("dur", time.Since(startAt)).
+			Pair("err", err != nil).
 			Pair("repo", rconf.Name).
 			Pair("path", rconf.Path).
-			Pair("remote", rconf.Remote).
-			Pair("host", conf.Settings.Runtime.Hostname).
-			Pair("err", !ec.Ok()),
-		)
+			Pair("remote", rconf.Remote)
 
-		return
+		if err != nil {
+			grip.Error(message.WrapError(err, msg))
+			return err
+		}
+
+		grip.Notice(msg)
+		return nil
 	}
 }

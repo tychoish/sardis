@@ -12,6 +12,7 @@ type HostConf struct {
 	Hostname string `bson:"host" json:"host" yaml:"host"`
 	Port     int    `bson:"port" json:"port" yaml:"port"`
 	Protocol string `bson:"protocol" json:"protocol" yaml:"protocol"`
+	Sardis   bool   `bson:"has_sardis" json:"has_sardis" yaml:"has_sardis"`
 }
 
 func (h *HostConf) Jasper(ctx context.Context) (jasper.Manager, error) {

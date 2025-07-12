@@ -17,7 +17,17 @@ func Admin() *cmdr.Commander {
 			configCheck(),
 			nightly(),
 			setupLinks(),
+			hacking(),
 		)
+}
+
+func hacking() *cmdr.Commander {
+	return cmdr.MakeCommander().SetName("hack").
+		With(cmdr.SpecBuilder(ResolveConfiguration).
+			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
+				grip.Info("hackerz!")
+				return nil
+			}).Add)
 }
 
 func setupLinks() *cmdr.Commander {

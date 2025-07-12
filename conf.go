@@ -134,10 +134,14 @@ type Settings struct {
 	Credentials         CredentialsConf  `bson:"credentials" json:"credentials" yaml:"credentials"`
 	SSHAgentSocketPath  string           `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
 	AlacrittySocketPath string           `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
-	Hostname            string           `bson:"-" json:"-" yaml:"-"`
 	Logging             LoggingConf      `bson:"logging" json:"logging" yaml:"logging"`
 	ConfigPaths         []string         `bson:"config_files" json:"config_files" yaml:"config_files"`
 	DMenu               godmenu.Flags    `bson:"dmenu" json:"dmenu" yaml:"dmenu"`
+
+	Runtime struct {
+		Hostname        string `bson:"-" json:"-" yaml:"-"`
+		IncludeLocalSHH bool   `bson:"include_local_ssh" json:"include_local_ssh" yaml:"include_local_ssh"`
+	}
 }
 
 type LoggingConf struct {
@@ -182,17 +186,19 @@ type CommandGroupConf struct {
 	Aliases       []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
 	Directory     string                 `bson:"directory" json:"directory" yaml:"directory"`
 	Environment   dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
+	CmdNamePrefix string                 `bson:"command_name_prefix" json:"command_name_prefix" yaml:"command_name_prefix"`
 	Command       string                 `bson:"default_command" json:"default_command" yaml:"default_command"`
 	Notify        *bool                  `bson:"notify" json:"notify" yaml:"notify"`
 	Background    *bool                  `bson:"background" json:"background" yaml:"background"`
+	Host          *string                `bson:"host" json:"host" yaml:"host"`
 	Commands      []CommandConf          `bson:"commands" json:"commands" yaml:"commands"`
-	CmdNamePrefix string                 `bson:"command_name_prefix" json:"command_name_prefix" yaml:"command_name_prefix"`
 
 	exportCache *adt.Once[map[string]CommandConf]
 }
 
 type CommandConf struct {
 	Name            string                 `bson:"name" json:"name" yaml:"name"`
+	GroupName       string                 `bson:"-" json:"-" yaml:"-"`
 	Aliases         []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
 	Directory       string                 `bson:"directory" json:"directory" yaml:"directory"`
 	Environment     dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
@@ -201,8 +207,9 @@ type CommandConf struct {
 	OverrideDefault bool                   `bson:"override_default" json:"override_default" yaml:"override_default"`
 	Notify          *bool                  `bson:"notify" json:"notify" yaml:"notify"`
 	Background      *bool                  `bson:"bson" json:"bson" yaml:"bson"`
-	GroupName       string                 `bson:"-" json:"-" yaml:"-"`
-	unaliasedName   string
+	Host            *string                `bson:"host" json:"host" yaml:"host"`
+
+	unaliasedName string
 }
 
 type BlogConf struct {
@@ -269,7 +276,7 @@ func (conf *Configuration) doValidate() error {
 	conf.Links = conf.expandLinks(ec)
 	for idx := range conf.Links {
 		ec.Wrapf(conf.Links[idx].Validate(), "%d/%d of %T is not valid", idx, len(conf.Links), conf.Links[idx])
-		conf.Links[idx].Target = strings.ReplaceAll(conf.Links[idx].Target, "{{hostname}}", conf.Settings.Hostname)
+		conf.Links[idx].Target = strings.ReplaceAll(conf.Links[idx].Target, "{{hostname}}", conf.Settings.Runtime.Hostname)
 	}
 
 	for idx := range conf.Hosts {
@@ -315,14 +322,14 @@ func (conf *Configuration) expandLocalNativeOps() {
 					Command:   "sardis repo fetch {{prefix}}",
 				},
 				{
-					Name:       "status",
-					Directory:  repo.Path,
-					Background: ft.Ptr(true),
-					Command:    "alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command 'sardis repo status {{prefix}}'",
+					Name:      "status",
+					Directory: repo.Path,
+					Command:   "alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command 'sardis repo status {{prefix}}'",
 				},
 			},
 		})
 	}
+
 	for _, service := range conf.System.Services {
 		var command string
 		if service.User {
@@ -342,6 +349,7 @@ func (conf *Configuration) expandLocalNativeOps() {
 		// implemented in units for setup.
 		conf.Commands = append(conf.Commands, CommandGroupConf{
 			Name:          "local.systemd.service",
+			Directory:     conf.Settings.Runtime.Hostname,
 			Notify:        ft.Ptr(true),
 			CmdNamePrefix: service.Name,
 			Command:       service.Unit,
@@ -372,14 +380,12 @@ func (conf *Configuration) expandLocalNativeOps() {
 				},
 				{
 					Name:            "status",
-					Background:      ft.Ptr(true),
-					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command '%s status %s'", command, service.Unit),
+					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command %s status %s", command, service.Unit),
 					OverrideDefault: true,
 				},
 				{
 					Name:            "logs",
-					Background:      ft.Ptr(true),
-					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command 'journalctl --follow --pager-end --catalog --unit %s'", service.Unit),
+					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command journalctl --follow --pager-end --catalog --unit %s", service.Unit),
 					OverrideDefault: true,
 				},
 			},
@@ -637,7 +643,7 @@ func (conf *Settings) Validate() error {
 	}
 
 	conf.DMenu = ft.DefaultFuture(conf.DMenu, defaultDMenuConf)
-	conf.Hostname = makeErrorHandler[string](catcher.Push)(os.Hostname())
+	conf.Runtime.Hostname = makeErrorHandler[string](catcher.Push)(os.Hostname())
 
 	return catcher.Resolve()
 }
@@ -941,13 +947,14 @@ func (conf *CommandGroupConf) Validate() error {
 			}
 		}
 
-		cmd.Notify = ft.Default(cmd.Notify, conf.Notify)
-		cmd.Background = ft.Default(cmd.Background, conf.Background)
-
-		cmd.Directory, err = homedir.Expand(cmd.Directory)
 		if conf.CmdNamePrefix != "" {
 			cmd.Name = fmt.Sprintf("%s.%s", conf.CmdNamePrefix, cmd.Name)
 		}
+
+		cmd.Notify = ft.Default(cmd.Notify, conf.Notify)
+		cmd.Background = ft.Default(cmd.Background, conf.Background)
+		cmd.Host = ft.Default(cmd.Host, conf.Host)
+		cmd.Directory, err = homedir.Expand(cmd.Directory)
 		ec.Add(ers.Wrapf(err, "command group(%s)  %q at %d", cmd.GroupName, cmd.Name, idx))
 
 		for _, alias := range cmd.Aliases {
@@ -989,13 +996,24 @@ func (conf *Configuration) doExportAllCommands() []CommandConf {
 	out := dt.NewSlice([]CommandConf{})
 
 	for _, cg := range conf.Commands {
+		if hn, ok := ft.RefOk(cg.Host); ok && hn == conf.Settings.Runtime.Hostname {
+			// we have matching commands
+			if !conf.Settings.Runtime.IncludeLocalSHH {
+				continue
+			}
+		}
+
 		groupNames := append([]string{cg.Name}, cg.Aliases...)
 		for _, groupName := range groupNames {
 			for cidx := range cg.Commands {
-				cmdName := cg.Commands[cidx].Name
+				if hn, ok := ft.RefOk(cg.Commands[cidx].Host); ok && hn == conf.Settings.Runtime.Hostname {
+					if !conf.Settings.Runtime.IncludeLocalSHH {
+						continue
+					}
+				}
 
 				cmd := cg.Commands[cidx]
-				cmd.Name = fmt.Sprintf("%s.%s", groupName, cmdName)
+				cmd.Name = fmt.Sprintf("%s.%s", groupName, cg.Commands[cidx].Name)
 				out = append(out, cmd)
 			}
 		}
@@ -1055,5 +1073,4 @@ func (conf *Configuration) SSHAgentSocket() string {
 		conf.Settings.SSHAgentSocketPath = ft.Must(sutil.GetSSHAgentPath())
 	}
 	return conf.Settings.SSHAgentSocketPath
-
 }

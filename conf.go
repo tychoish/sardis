@@ -305,26 +305,29 @@ func (conf *Configuration) expandLocalNativeOps() {
 		if repo.Disabled || (!repo.LocalSync && !repo.Fetch) {
 			continue
 		}
+
 		conf.Commands = append(conf.Commands, CommandGroupConf{
-			Name:          ("repo"),
+			Name:          "repo",
 			Notify:        ft.Ptr(repo.Notify),
+			Command:       "sardis repo {{command}} {{prefix}}",
 			CmdNamePrefix: repo.Name,
 			Commands: []CommandConf{
 				{
 					Name:      "update",
 					Aliases:   []string{"sync"},
 					Directory: repo.Path,
-					Command:   "sardis repo update {{prefix}}",
+					Command:   "update",
 				},
 				{
 					Name:      "fetch",
 					Directory: repo.Path,
-					Command:   "sardis repo fetch {{prefix}}",
+					Command:   "fetch",
 				},
 				{
-					Name:      "status",
-					Directory: repo.Path,
-					Command:   "alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command 'sardis repo status {{prefix}}'",
+					Name:            "status",
+					Directory:       repo.Path,
+					OverrideDefault: true,
+					Command:         "alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command 'sardis repo status {{prefix}}'",
 				},
 			},
 		})
@@ -352,35 +355,17 @@ func (conf *Configuration) expandLocalNativeOps() {
 			Directory:     conf.Settings.Runtime.Hostname,
 			Notify:        ft.Ptr(true),
 			CmdNamePrefix: service.Name,
-			Command:       service.Unit,
+			Command:       fmt.Sprintf("%s {{name}} %s", command, service.Unit),
 			Commands: []CommandConf{
-				{
-					Name:    "enable",
-					Command: fmt.Sprintf("%s enable %s", command, service.Unit),
-				},
-				{
-					Name:    "disable",
-					Command: fmt.Sprintf("%s disable %s", command, service.Unit),
-				},
-				{
-					Name:    "start",
-					Command: fmt.Sprintf("%s start %s", command, service.Unit),
-				},
-				{
-					Name:    "stop",
-					Command: fmt.Sprintf("%s stop %s", command, service.Unit),
-				},
-				{
-					Name:    "restart",
-					Command: fmt.Sprintf("%s restart %s", command, service.Unit),
-				},
-				{
-					Name:    "setup",
-					Command: fmt.Sprintf("%s %s %s", command, defaultState, service.Unit),
-				},
+				{Name: "enable"},
+				{Name: "disable"},
+				{Name: "start"},
+				{Name: "stop"},
+				{Name: "restart"},
+				{Name: "setup", Command: defaultState},
 				{
 					Name:            "status",
-					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command %s status %s", command, service.Unit),
+					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command %s {{name}} %s", command, service.Unit),
 					OverrideDefault: true,
 				},
 				{
@@ -915,21 +900,19 @@ func (conf *CommandGroupConf) Validate() error {
 
 		ec.Whenf(strings.Contains(cmd.Command, " {{command}}"), "unresolveable token found in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
 
-		if conf.Command != "" {
-			if !cmd.OverrideDefault {
-				cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
-			}
+		if conf.Command != "" && !cmd.OverrideDefault {
+			cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
+		}
 
-			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
-			cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", conf.Name)
-			cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", conf.CmdNamePrefix)
+		cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
+		cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", conf.Name)
+		cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", conf.CmdNamePrefix)
 
-			if len(cmd.Aliases) >= 1 {
-				cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Aliases[0])
-			}
-			for idx, alias := range cmd.Aliases {
-				cmd.Command = strings.ReplaceAll(cmd.Command, fmt.Sprintf("{{alias[%d]}}", idx), alias)
-			}
+		if len(cmd.Aliases) >= 1 {
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Aliases[0])
+		}
+		for idx, alias := range cmd.Aliases {
+			cmd.Command = strings.ReplaceAll(cmd.Command, fmt.Sprintf("{{alias[%d]}}", idx), alias)
 		}
 
 		for idx := range cmd.Commands {

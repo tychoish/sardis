@@ -28,7 +28,7 @@ func NewRepoCloneJob(rconf sardis.RepoConf) fun.Worker {
 				rconfCopy.Post = nil
 				ec.Add(NewLocalRepoSyncJob(rconfCopy)(ctx))
 			} else if rconf.Fetch {
-				ec.Add(NewRepoFetchJob(rconf)(ctx))
+				ec.Add(NewRepoFetchJob(rconf).Run(ctx))
 			}
 
 			grip.Notice(message.Fields{
@@ -39,10 +39,11 @@ func NewRepoCloneJob(rconf sardis.RepoConf) fun.Worker {
 		}
 
 		conf := sardis.AppConfiguration(ctx)
-		cmd := jasper.Context(ctx).CreateCommand(ctx)
 
+		cmd := jasper.Context(ctx).CreateCommand(ctx)
 		sender := send.MakeAnnotating(grip.Sender(), map[string]any{
 			"repo": rconf.Name,
+			"host": conf.Settings.Runtime.Hostname,
 		})
 
 		ec.Add(cmd.ID(strings.Join([]string{rconf.Name, "clone"}, ".")).
@@ -55,12 +56,14 @@ func NewRepoCloneJob(rconf sardis.RepoConf) fun.Worker {
 			AddWhen(len(rconf.Post) > 0, rconf.Post).
 			Run(ctx))
 
-		grip.Notice(message.Fields{
-			"path": rconf.Path,
-			"repo": rconf.Remote,
-			"ok":   ec.Ok(),
-			"op":   "repo clone",
-		})
+		grip.Notice(message.BuildPair().
+			Pair("op", "repo-clone").
+			Pair("repo", rconf.Name).
+			Pair("path", rconf.Path).
+			Pair("remote", rconf.Remote).
+			Pair("host", conf.Settings.Runtime.Hostname).
+			Pair("err", !ec.Ok()),
+		)
 
 		return
 	}

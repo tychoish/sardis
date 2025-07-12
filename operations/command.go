@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -21,7 +22,6 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
-	"github.com/tychoish/sardis/units"
 	sutil "github.com/tychoish/sardis/util"
 )
 
@@ -77,13 +77,15 @@ func getcmds(cmds []sardis.CommandConf, args []string) ([]sardis.CommandConf, er
 }
 
 func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, cmds []sardis.CommandConf) (err error) {
-	pool, run := units.SetupWorkers()
+	wg := &fun.WaitGroup{}
+	ec := &erc.Collector{}
 
 	jpm := jasper.Context(ctx)
+
 	for idx := range cmds {
 		cmd, idx := cmds[idx], idx
 
-		pool.PushBack(jpm.CreateCommand(ctx).
+		wg.Launch(ctx, jpm.CreateCommand(ctx).
 			Directory(cmd.Directory).
 			Environment(cmd.Environment).
 			AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
@@ -116,10 +118,11 @@ func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, cmds 
 				}
 				notify.Notice(message.Whenln(ft.Ref(cmd.Notify), cmd.Name, "completed"))
 				return nil
-			}).Worker())
+			}).Worker().Operation(ec.Push))
 	}
 
-	return run(ctx)
+	return wg.Worker().Join(func(context.Context) error { return ec.Resolve() }).Run(ctx)
+
 }
 
 func listCommands() *cmdr.Commander {

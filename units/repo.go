@@ -5,48 +5,50 @@ import (
 	"strings"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
 )
 
 func SyncRepo(repo sardis.RepoConf) fun.Worker {
-	hostname := util.GetHostname()
-	hasMirrors := false
+	return func(ctx context.Context) error {
+		wg := &fun.WaitGroup{}
+		ec := &erc.Collector{}
 
-	workerList, runWorkers := SetupWorkers()
+		hostname := util.GetHostname()
 
-	for _, mirror := range repo.Mirrors {
-		if strings.Contains(mirror, hostname) {
-			grip.Infof("skipping mirror %s->%s because it's probably local (%s)",
-				repo.Path, mirror, hostname)
-			continue
+		hasMirrors := false
+
+		for _, mirror := range repo.Mirrors {
+			if strings.Contains(mirror, hostname) {
+				grip.Infof("skipping mirror %s->%s because it's probably local (%s)",
+					repo.Path, mirror, hostname)
+				continue
+			}
+
+			hasMirrors = true
+			wg.Launch(ctx, NewRepoSyncJob(mirror, repo).Operation(ec.Push))
 		}
 
-		hasMirrors = true
-		workerList.PushBack(NewRepoSyncJob(mirror, repo))
-	}
+		wg.Worker().Operation(ec.Push).Run(ctx)
 
-	return func(ctx context.Context) error {
-		if err := runWorkers(ctx); err != nil {
-			return err
+		if !ec.Ok() {
+			return ec.Resolve()
 		}
 
 		if repo.LocalSync {
-			changes, err := repo.HasChanges()
-
-			if changes || err != nil {
-				return NewLocalRepoSyncJob(repo)(ctx)
+			if changes, err := repo.HasChanges(); changes || err != nil {
+				return NewLocalRepoSyncJob(repo).Run(ctx)
 			}
 
-			return NewRepoFetchJob(repo)(ctx)
+			return NewRepoFetchJob(repo).Run(ctx)
 		}
 
 		if repo.Fetch || hasMirrors {
-			return NewRepoFetchJob(repo)(ctx)
+			return NewRepoFetchJob(repo).Run(ctx)
 		}
 
 		return nil
 	}
-
 }

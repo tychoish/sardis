@@ -83,7 +83,9 @@ func repoUpdate() *cmdr.Commander {
 		shouldNotify := false
 
 		started := time.Now()
-		jobs, run := units.SetupWorkers()
+
+		wg := &fun.WaitGroup{}
+		ec := &erc.Collector{}
 
 		repoNames := make([]string, 0, len(repos))
 		for idx := range repos {
@@ -94,38 +96,40 @@ func repoUpdate() *cmdr.Commander {
 			if repo.Notify {
 				shouldNotify = true
 			}
-			jobs.PushBack(units.SyncRepo(repo))
+			wg.Launch(ctx, units.SyncRepo(repo).Operation(ec.Push))
 			repoNames = append(repoNames, repo.Name)
 		}
 
-		grip.Info(message.Fields{
-			"op":      opName,
-			"message": "waiting for jobs to complete",
-			"tags":    args.ops,
-			"repos":   repoNames,
-		})
+		grip.Info(message.BuildPair().
+			Pair("op", opName).
+			Pair("state", "starting").
+			Pair("args", args.ops).
+			Pair("repos", repoNames).
+			Pair("host", args.conf.Settings.Runtime.Hostname),
+		)
 
-		err := run(ctx)
+		wg.Worker().Operation(ec.Push).Run(ctx)
 
 		// QUESTION: should we send notification here
-		grip.Notice(message.Fields{
-			"op":    opName,
-			"state": "complete",
-			"err":   err != nil,
+		grip.Notice(message.BuildPair().
+			Pair("op", opName).
+			Pair("err", !ec.Ok()).
+			Pair("state", "complete").
+			Pair("host", args.conf.Settings.Runtime.Hostname).
+			Pair("args", args.ops).
+			Pair("n", len(repoNames)).
+			Pair("repos", repoNames).
+			Pair("dur", time.Since(started)),
+		)
+
+		notify.NoticeWhen(shouldNotify && ec.Ok(), message.Fields{
 			"tag":   args.ops,
 			"repos": repoNames,
-			"dur":   time.Since(started).Seconds(),
-			"n":     len(repoNames),
-		})
-
-		notify.NoticeWhen(shouldNotify && err == nil, message.Fields{
-			"tag":   args.ops,
-			"repos": repoNames,
 			"op":    opName,
 			"dur":   time.Since(started).Seconds(),
 		})
 
-		return err
+		return ec.Resolve()
 	})
 }
 
@@ -137,13 +141,15 @@ func repoCleanup() *cmdr.Commander {
 
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		repos := args.conf.GetTaggedRepos(args.ops...)
-		jobs, run := units.SetupWorkers()
+		wg := &fun.WaitGroup{}
+		ec := &erc.Collector{}
 
 		for _, repo := range repos {
-			jobs.PushBack(units.NewRepoCleanupJob(repo.Path))
+			wg.Launch(ctx, units.NewRepoCleanupJob(repo.Path).Operation(ec.Push))
 		}
+		wg.Worker().Operation(ec.Push).Run(ctx)
 
-		return run(ctx)
+		return ec.Resolve()
 	})
 }
 
@@ -154,7 +160,8 @@ func repoClone() *cmdr.Commander {
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		repos := args.conf.GetTaggedRepos(args.ops...)
 
-		jobs, run := units.SetupWorkers()
+		wg := &fun.WaitGroup{}
+		ec := &erc.Collector{}
 
 		for idx := range repos {
 			if _, err := os.Stat(repos[idx].Path); !os.IsNotExist(err) {
@@ -166,10 +173,12 @@ func repoClone() *cmdr.Commander {
 				continue
 			}
 
-			jobs.PushBack(units.NewRepoCloneJob(repos[idx]))
+			wg.Launch(ctx, units.NewRepoCloneJob(repos[idx]).Operation(ec.Push))
 		}
 
-		return run(ctx)
+		wg.Worker().Operation(ec.Push).Run(ctx)
+
+		return ec.Resolve()
 	})
 }
 
@@ -246,12 +255,12 @@ func repoFetch() *cmdr.Commander {
 		SetUsage("fetch one or more repos")
 
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-		jobs, run := units.SetupWorkers()
-
+		wg := &fun.WaitGroup{}
+		ec := &erc.Collector{}
 		return fun.MakeConverter(units.NewRepoFetchJob).Stream(
 			args.conf.GetTaggedRepos(args.ops...).Stream().Filter(
 				func(repo sardis.RepoConf) bool { return repo.Fetch },
 			),
-		).ReadAll(jobs.PushBack).Join(run).Run(ctx)
+		).ReadAll(func(op fun.Worker) { wg.Launch(ctx, op.Operation(ec.Push)) }).Join(wg.Worker()).Run(ctx)
 	})
 }

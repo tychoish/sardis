@@ -4,6 +4,9 @@ import (
 	"context"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/units"
@@ -37,13 +40,16 @@ func setupLinks() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			jobs, run := units.SetupWorkers()
+			ec := &erc.Collector{}
+			wg := &fun.WaitGroup{}
 
 			for _, link := range conf.Links {
-				jobs.PushBack(units.NewSymlinkCreateJob(link))
+				wg.Launch(ctx, units.NewSymlinkCreateJob(link).Operation(ec.Push))
 			}
 
-			return run(ctx)
+			wg.Worker().Operation(ec.Push).Run(ctx)
+
+			return ec.Resolve()
 		}).Add)
 }
 
@@ -69,20 +75,25 @@ func nightly() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			jobs, run := units.SetupWorkers()
+			queue := pubsub.NewUnlimitedQueue[fun.Worker]()
+			dist := queue.Distributor()
+			ec := &erc.Collector{}
+
+			wait := fun.MAKE.WorkerPool(dist.Stream()).Launch(ctx)
 
 			for idx := range conf.Links {
-				jobs.PushBack(units.NewSymlinkCreateJob(conf.Links[idx]))
+				ec.Push(dist.Send(ctx, units.NewSymlinkCreateJob(conf.Links[idx])))
 			}
 
 			for idx := range conf.Repo {
-				jobs.PushBack(units.NewRepoCleanupJob(conf.Repo[idx].Path))
+				ec.Push(dist.Send(ctx, units.NewRepoCleanupJob(conf.Repo[idx].Path)))
 			}
 
 			for idx := range conf.System.Services {
-				jobs.PushBack(units.NewSystemServiceSetupJob(conf.System.Services[idx]))
+				ec.Push(dist.Send(ctx, units.NewSystemServiceSetupJob(conf.System.Services[idx])))
 			}
+			queue.Close()
 
-			return run(ctx)
+			return wait(ctx)
 		}).Add)
 }

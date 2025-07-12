@@ -7,6 +7,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
@@ -44,12 +45,16 @@ func fetchAur() *cmdr.Commander {
 
 			return packages, nil
 		}).SetAction(func(ctx context.Context, packages []string) error {
-			queue, run := units.SetupWorkers()
+			wg := &fun.WaitGroup{}
+			ec := &erc.Collector{}
 
 			for _, name := range packages {
-				queue.PushBack(units.NewArchFetchAurJob(name, true))
+				wg.Launch(ctx, units.NewArchFetchAurJob(name, true).Operation(ec.Push))
 			}
-			return run(ctx)
+
+			wg.Wait(ctx)
+
+			return ec.Resolve()
 		}).Add)
 }
 
@@ -69,13 +74,15 @@ func buildPkg() *cmdr.Commander {
 
 			return packages, nil
 		}).SetAction(func(ctx context.Context, packages []string) error {
-			queue, run := units.SetupWorkers()
-
+			wg := &fun.WaitGroup{}
+			ec := &erc.Collector{}
 			for _, name := range packages {
-				queue.PushBack(units.NewArchAbsBuildJob(name))
+				wg.Launch(ctx, units.NewArchAbsBuildJob(name).Operation(ec.Push))
 			}
 
-			return run(ctx)
+			wg.Wait(ctx)
+
+			return ec.Resolve()
 		}).Add)
 }
 

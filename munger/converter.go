@@ -53,6 +53,7 @@ type BlogMetadata struct {
 }
 
 func CollectFiles(rootPath string) *fun.Stream[BlogPost] {
+	rootPath = jutil.TryExpandHomedir(rootPath)
 	grip.Infof("collecting blog files: %s", rootPath)
 	return libfun.WalkDirIterator(rootPath, func(path string, dir fs.DirEntry) (_ *BlogPost, err error) {
 		if !strings.HasSuffix(path, ".rst") {

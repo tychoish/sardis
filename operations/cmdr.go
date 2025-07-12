@@ -28,6 +28,8 @@ import (
 - [ ] TODO <cmdr> move to v3 of the cli lib
 - [ ] TODO <cmdr> do something with argflags.
 - [ ] TODO <cmdr> cmdr.Action adapter for fun.Worker/fun.Operation
+- [ ] TODO <fun> finish fn.Converter[T, O] and fn.Filter[T]
+- [ ] TOOD [fun] WaitGroup should have and Add method that is an fn.Handler for workers/ops
 */
 
 func StringSpecBuilder(flagName string, defaultValue *string) *cmdr.OperationSpec[string] {

@@ -2,56 +2,55 @@ package units
 
 import (
 	"context"
+	"fmt"
 	"os"
-	"strings"
+	"time"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/jasper/util"
-	"github.com/tychoish/sardis"
+	"github.com/tychoish/grip/level"
+	"github.com/tychoish/grip/message"
+	"github.com/tychoish/jasper"
+	"github.com/tychoish/sardis/repo"
 )
 
-func SyncRepo(repo sardis.RepoConf) fun.Worker {
+func NewRepoCloneJob(conf repo.Configuration) fun.Worker             { return conf.CloneJob() }
+func NewRepoFetchJob(conf repo.Configuration) fun.Worker             { return conf.FetchJob() }
+func SyncRepo(conf repo.Configuration) fun.Worker                    { return conf.FullSync() }
+func NewLocalRepoSyncJob(conf repo.Configuration) fun.Worker         { return conf.Sync("LOCAL") }
+func NewRepoSyncJob(host string, conf repo.Configuration) fun.Worker { return conf.Sync(host) }
+
+func NewRepoCleanupJob(path string) fun.Worker {
 	return func(ctx context.Context) error {
-		wg := &fun.WaitGroup{}
-		ec := &erc.Collector{}
-
-		hostname := util.GetHostname()
-
-		hasMirrors := false
-
-		for _, mirror := range repo.Mirrors {
-			if strings.Contains(mirror, hostname) {
-				grip.Infof("skipping mirror %s->%s because it's probably local (%s)",
-					repo.Path, mirror, hostname)
-				continue
-			}
-
-			hasMirrors = true
-			wg.Launch(ctx, NewRepoSyncJob(mirror, repo).Operation(ec.Push))
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return fmt.Errorf("cannot cleanup %s, no repository exists", path)
 		}
 
-		wg.Worker().Operation(ec.Push).Run(ctx)
+		start := time.Now()
 
-		if !ec.Ok() {
-			return ec.Resolve()
-		}
+		var err error
 
-		if repo.LocalSync {
-			if _, err := os.Stat(repo.Path); os.IsNotExist(err) {
-				return NewRepoFetchJob(repo).Run(ctx)
-			}
+		defer func() {
+			grip.Notice(message.Fields{
+				"op":    "repo-cleanup",
+				"repo":  path,
+				"dur":   time.Since(start),
+				"error": err != nil,
+			})
+		}()
 
-			if changes, err := repo.HasChanges(); changes || err != nil {
-				return NewRepoSyncJob(hostname, repo).Run(ctx)
-			}
-		}
+		cmd := jasper.Context(ctx)
 
-		if repo.Fetch || hasMirrors || repo.LocalSync {
-			return NewRepoFetchJob(repo).Run(ctx)
-		}
+		sender := grip.Context(ctx).Sender()
 
-		return nil
+		err = cmd.CreateCommand(ctx).Priority(level.Info).
+			Directory(path).
+			SetOutputSender(level.Debug, sender).
+			SetErrorSender(level.Warning, sender).
+			AppendArgs("git", "gc").
+			AppendArgs("git", "prune").
+			Run(ctx)
+
+		return err
 	}
 }

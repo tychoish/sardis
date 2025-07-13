@@ -22,7 +22,7 @@ require (
 	github.com/tychoish/grip/x/telegram v0.0.0-20250626173215-d516ec138ab2
 	github.com/tychoish/grip/x/twitter v0.0.0-20250626175245-f5276066a1e9
 	github.com/tychoish/grip/x/xmpp v0.0.0-20250626175245-f5276066a1e9
-	github.com/tychoish/jasper v0.1.3-0.20250712191228-9a0a31d519ad
+	github.com/tychoish/jasper v0.1.3-0.20250713002007-d673ada4fd85
 	github.com/tychoish/jasper/x/cli v0.0.0-20250712191228-9a0a31d519ad
 	github.com/tychoish/jasper/x/track v0.0.0-20250712195804-18ceb2ba20a3
 	github.com/tychoish/libfun v0.0.0-20250712200500-93c467b8e7b9

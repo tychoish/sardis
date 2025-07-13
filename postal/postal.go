@@ -8,20 +8,21 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/fn"
 )
 
 type Job interface{ Resolve() fun.Worker }
 
 type Registry struct {
 	Codecs    CodecStore
-	Factories dt.Map[Schema, fun.Future[Job]]
+	Factories dt.Map[Schema, fn.Future[Job]]
 }
 
-func RegisterFactory[T Job](r *Registry, s Schema, fn fun.Future[T]) {
+func RegisterFactory[T Job](r *Registry, s Schema, fn fn.Future[T]) {
 	r.Register(s, func() Job { return fn() })
 }
 
-func (r *Registry) Register(schema Schema, fn fun.Future[Job]) { r.Factories.Add(schema, fn) }
+func (r *Registry) Register(schema Schema, fn fn.Future[Job]) { r.Factories.Add(schema, fn) }
 
 func (r *Registry) MakeEnvelope(s Schema, msg Job) (*Envelope, error) {
 	if err := s.Validate(); err != nil {

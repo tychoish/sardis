@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/pubsub"
 )
@@ -201,10 +202,10 @@ func (r *Router[T]) AddPeer(opt T) error { return r.peerPipe.Add(opt) }
 
 func (r *Router[T]) Send(ep Envelope) error { return r.outgoing.PushBack(ep) }
 
-func (r *Router[T]) Stream(ctx context.Context) *fun.Iterator[Envelope] {
+func (r *Router[T]) Stream(ctx context.Context) *fun.Stream[Envelope] {
 	sub := r.incoming.Subscribe(ctx)
 	defer r.incoming.Unsubscribe(ctx, sub)
-	return fun.ChannelIterator(sub)
+	return fun.ChannelStream(sub)
 }
 
 func (r *Router[T]) Exec(ctx context.Context, ep Envelope) (Envelope, error) {
@@ -313,7 +314,7 @@ func (r *Router[T]) createNewPeer(ctx context.Context, opts T, conn Connection) 
 			r.wg.Done()
 		}()
 
-		iter := r.outgoing.Iterator()
+		iter := r.outgoing.StreamFront()
 		defer func() { r.ErrorObserver.Get()(iter.Close()) }()
 
 		for iter.Next(ctx) {
@@ -370,7 +371,7 @@ func (r *Router[T]) createNewPeer(ctx context.Context, opts T, conn Connection) 
 						err = ErrProtocolConflict
 					}
 				}
-				if err := ers.Join(err, rsp.Error); err != nil {
+				if err := erc.Join(err, rsp.Error); err != nil {
 					info := p.failureInfo
 					if info == nil {
 						info = &disconnectedPeer[T]{
@@ -444,7 +445,7 @@ func (r *Router[T]) startDialer(ctx context.Context) {
 	r.wg.Add(1)
 	go func() {
 		defer r.wg.Done()
-		iter := r.peerPipe.Iterator()
+		iter := r.peerPipe.Stream()
 		for iter.Next(ctx) {
 			r.dialNewPeer(ctx, iter.Value())
 		}

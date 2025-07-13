@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 )
 
 type Schema struct {
@@ -26,8 +27,8 @@ const (
 
 func (s Schema) Validate() error {
 	ec := &erc.Collector{}
-	erc.When(ec, s.Version < 0, "schema version must not be negative")
-	erc.When(ec, s.Type < "", "message type must be specified")
+	ec.When(s.Version < 0, ers.New("schema version must not be negative"))
+	ec.When(s.Type < "", ers.New("message type must be specified"))
 
 	return ec.Resolve()
 }

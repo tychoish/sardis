@@ -18,6 +18,7 @@ import (
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/x/track"
+	"github.com/tychoish/libfun"
 )
 
 func TestGraph(t *testing.T) {
@@ -72,7 +73,7 @@ func TestGraph(t *testing.T) {
 		totalNodes := 0
 		for idx, group := range graph.Order {
 			totalNodes += len(group)
-			seen.Populate(fun.SliceIterator(group))
+			seen.AppendStream(fun.SliceStream(group))
 			grip.Info(message.MakeKV(
 				message.KV("idx", idx),
 				message.KV("size", len(group)),
@@ -90,7 +91,7 @@ func TestGraph(t *testing.T) {
 		assert.NotError(t, err)
 
 		seen := &dt.Set[string]{}
-		pkgs := dt.Mapify(graph.Packages.IndexByPackageName())
+		pkgs := dt.NewMap(graph.Packages.IndexByPackageName())
 
 		for gidx, group := range graph.Order {
 			for eidx, edge := range group {
@@ -127,7 +128,7 @@ func TestGraph(t *testing.T) {
 		graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
 		assert.NotError(t, err)
 		assert.True(t, len(graph.Order) >= 1)
-		pkgs := dt.Mapify(graph.Packages.IndexByPackageName())
+		pkgs := dt.NewMap(graph.Packages.IndexByPackageName())
 		for _, edge := range graph.Order[0] {
 			testt.Log(t, edge)
 			check.True(t, pkgs.Check(edge))
@@ -193,7 +194,7 @@ func TestGraph(t *testing.T) {
 			graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
 			assert.NotError(t, err)
 
-			iter := Ripgrep(ctx, jpm, RipgrepArgs{
+			iter := libfun.Ripgrep(ctx, jpm, libfun.RipgrepArgs{
 				Types:       []string{"go"},
 				Regexp:      "go:generate",
 				Path:        "~/neon/cloud",
@@ -202,7 +203,7 @@ func TestGraph(t *testing.T) {
 			})
 
 			limits := &dt.Set[string]{}
-			limits.Populate(graph.Packages.ConvertPathsToPackages(iter))
+			limits.AppendStream(graph.Packages.ConvertPathsToPackages(iter))
 			report(t, graph.Narrow(limits))
 		})
 	})

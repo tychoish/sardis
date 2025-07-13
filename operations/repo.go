@@ -20,6 +20,7 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/repo"
 	"github.com/tychoish/sardis/units"
 )
 
@@ -240,9 +241,9 @@ func repoStatus() *cmdr.Commander {
 	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 		catcher := &erc.Collector{}
 
-		catcher.Add(fun.SliceStream(args.conf.GetTaggedRepos(args.ops...)).ReadAll(func(conf sardis.RepoConf) {
+		catcher.Add(fun.SliceStream(args.conf.GetTaggedRepos(args.ops...)).ReadAll(func(conf repo.Configuration) {
 			grip.Info(conf.Name)
-			catcher.Add(units.NewRepoStatusJob(conf.Path).Run(ctx))
+			catcher.Add(conf.StatusJob().Run(ctx))
 		}).Run(ctx))
 
 		return catcher.Resolve()
@@ -259,7 +260,7 @@ func repoFetch() *cmdr.Commander {
 		ec := &erc.Collector{}
 		return fun.MakeConverter(units.NewRepoFetchJob).Stream(
 			args.conf.GetTaggedRepos(args.ops...).Stream().Filter(
-				func(repo sardis.RepoConf) bool { return repo.Fetch },
+				func(repo repo.Configuration) bool { return repo.Fetch },
 			),
 		).ReadAll(func(op fun.Worker) { wg.Launch(ctx, op.Operation(ec.Push)) }).Join(wg.Worker()).Run(ctx)
 	})

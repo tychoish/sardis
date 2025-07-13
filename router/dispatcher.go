@@ -6,9 +6,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/srv"
 )
@@ -152,7 +150,7 @@ func (r *Dispatcher) RegisterHandler(key Protocol, hfn Handler) bool {
 }
 
 func (r *Dispatcher) OverrideHandler(key Protocol, hfn Handler) {
-	ft.WhenCall(!key.IsZero(), func() { r.handlers.Store(key, hfn) })
+	ft.CallWhen(!key.IsZero(), func() { r.handlers.Store(key, hfn) })
 }
 
 // Stream returns a channel that processes
@@ -267,10 +265,10 @@ func (r *Dispatcher) Exec(ctx context.Context, m Message) (*Response, error) {
 func (r *Dispatcher) doIntercept(ctx context.Context, key Protocol, rr *Response) (err error) {
 	ec := &erc.Collector{}
 	defer func() { err = ec.Resolve() }()
-	defer erc.Recover(ec)
+	defer ec.Recover()
 
 	if icept, ok := r.interceptor.Load(key); ok {
-		iter := icept.Iterator()
+		iter := icept.StreamFront()
 		for iter.Next(ctx) {
 			if err = iter.Value()(ctx, rr); err != nil {
 				ec.Add(err)
@@ -286,10 +284,10 @@ func (r *Dispatcher) doIntercept(ctx context.Context, key Protocol, rr *Response
 func (r *Dispatcher) doMiddleware(ctx context.Context, key Protocol, req *Message) (err error) {
 	ec := &erc.Collector{}
 	defer func() { err = ec.Resolve() }()
-	defer erc.Recover(ec)
+	defer ec.Recover()
 
 	if mw, ok := r.middleware.Load(key); ok {
-		iter := mw.Iterator()
+		iter := mw.StreamFront()
 		for iter.Next(ctx) {
 			if err := iter.Value()(ctx, req); err != nil {
 				ec.Add(err)
@@ -304,10 +302,10 @@ func (r *Dispatcher) doMiddleware(ctx context.Context, key Protocol, req *Messag
 func (r *Dispatcher) doHandler(ctx context.Context, key Protocol, req Message) (resp Response) {
 	ec := &erc.Collector{}
 	defer func() { resp.Error = ec.Resolve() }()
-	defer erc.Recover(ec)
+	defer ec.Recover()
 
 	h, ok := r.handlers.Load(key)
-	erc.When(ec, !ok, ErrNoHandler)
+	ec.When(!ok, ErrNoHandler)
 
 	if ok {
 		var err error
@@ -351,7 +349,7 @@ func (r *Dispatcher) registerProcessResponseService() error {
 			case <-ctx.Done():
 				return nil
 			case <-r.isRunning:
-				return itertool.ParallelForEach(ctx, r.outgoing.Iterator(),
+				return r.outgoing.Stream().Parallel(
 					func(ctx context.Context, rr Response) error {
 						if err := r.doIntercept(ctx, Protocol{}, &rr); err != nil {
 							rr.Error = err
@@ -360,7 +358,7 @@ func (r *Dispatcher) registerProcessResponseService() error {
 						}
 
 						if err := r.doIntercept(ctx, rr.Protocol, &rr); err != nil {
-							rr.Error = ers.Join(err, rr.Error)
+							rr.Error = erc.Join(err, rr.Error)
 						}
 
 						r.broker.Publish(ctx, rr)
@@ -368,7 +366,7 @@ func (r *Dispatcher) registerProcessResponseService() error {
 
 					},
 					fun.WorkerGroupConfNumWorkers(r.conf.Workers),
-				)
+				).Run(ctx)
 			}
 		},
 	})
@@ -378,7 +376,7 @@ func (r *Dispatcher) registerMiddlwareService() error {
 	return r.orchestrator.Add(&srv.Service{
 		Shutdown: r.pipe.Close,
 		Run: func(ctx context.Context) error {
-			return itertool.ParallelForEach(ctx, r.pipe.Distributor().Iterator(),
+			return r.pipe.Distributor().Stream().Parallel(
 				func(ctx context.Context, req Message) error {
 					var resp Response
 					var err error
@@ -407,8 +405,7 @@ func (r *Dispatcher) registerMiddlwareService() error {
 					return r.outgoing.Add(resp)
 				},
 				fun.WorkerGroupConfNumWorkers(r.conf.Workers),
-			)
-
+			).Run(ctx)
 		},
 	})
 }

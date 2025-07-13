@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 
-	git "github.com/go-git/go-git/v5"
 	"github.com/mitchellh/go-homedir"
 
 	"github.com/tychoish/fun"
@@ -27,21 +26,22 @@ import (
 	"github.com/tychoish/grip/x/telegram"
 	"github.com/tychoish/grip/x/xmpp"
 	"github.com/tychoish/jasper/util"
+	"github.com/tychoish/sardis/repo"
 	sutil "github.com/tychoish/sardis/util"
 )
 
 type Configuration struct {
-	Settings         Settings           `bson:"settings" json:"settings" yaml:"settings"`
-	Repo             []RepoConf         `bson:"repo" json:"repo" yaml:"repo"`
-	Links            []LinkConf         `bson:"links" json:"links" yaml:"links"`
-	Hosts            []HostConf         `bson:"hosts" json:"hosts" yaml:"hosts"`
-	System           SystemConf         `bson:"system" json:"system" yaml:"system"`
-	Commands         []CommandGroupConf `bson:"commands" json:"commands" yaml:"commands"`
-	TerminalCommands []CommandConf      `bson:"terminals" json:"terminals" yaml:"terminals"`
-	Blog             []BlogConf         `bson:"blog" json:"blog" yaml:"blog"`
-	Menus            []MenuConf         `bson:"menu" json:"menu" yaml:"menu"`
+	Settings         Settings             `bson:"settings" json:"settings" yaml:"settings"`
+	Repo             []repo.Configuration `bson:"repo" json:"repo" yaml:"repo"`
+	Links            []LinkConf           `bson:"links" json:"links" yaml:"links"`
+	Hosts            []HostConf           `bson:"hosts" json:"hosts" yaml:"hosts"`
+	System           SystemConf           `bson:"system" json:"system" yaml:"system"`
+	Commands         []CommandGroupConf   `bson:"commands" json:"commands" yaml:"commands"`
+	TerminalCommands []CommandConf        `bson:"terminals" json:"terminals" yaml:"terminals"`
+	Blog             []BlogConf           `bson:"blog" json:"blog" yaml:"blog"`
+	Menus            []MenuConf           `bson:"menu" json:"menu" yaml:"menu"`
 
-	repoTags         map[string][]*RepoConf
+	repoTags         map[string][]*repo.Configuration
 	indexedRepoCount int
 	linkedFilesRead  bool
 	caches           struct {
@@ -50,22 +50,6 @@ type Configuration struct {
 		comandGroupNames adt.Once[[]string]
 		validation       adt.Once[error]
 	}
-}
-
-type RepoConf struct {
-	Name       string   `bson:"name" json:"name" yaml:"name"`
-	Path       string   `bson:"path" json:"path" yaml:"path"`
-	Remote     string   `bson:"remote" json:"remote" yaml:"remote"`
-	RemoteName string   `bson:"remote_name" json:"remote_name" yaml:"remote_name"`
-	Branch     string   `bson:"branch" json:"branch" yaml:"branch"`
-	LocalSync  bool     `bson:"sync" json:"sync" yaml:"sync"`
-	Fetch      bool     `bson:"fetch" json:"fetch" yaml:"fetch"`
-	Notify     bool     `bson:"notify" json:"notify" yaml:"notify"`
-	Disabled   bool     `bson:"disabled" json:"disabled" yaml:"disabled"`
-	Pre        []string `bson:"pre" json:"pre" yaml:"pre"`
-	Post       []string `bson:"post" json:"post" yaml:"post"`
-	Mirrors    []string `bson:"mirrors" json:"mirrors" yaml:"mirrors"`
-	Tags       []string `bson:"tags" json:"tags" yaml:"tags"`
 }
 
 type ArchLinuxConf struct {
@@ -565,12 +549,12 @@ func (conf *Configuration) expandLinks(catcher *erc.Collector) []LinkConf {
 	return links
 }
 
-func (conf *Configuration) GetTaggedRepos(tags ...string) dt.Slice[RepoConf] {
+func (conf *Configuration) GetTaggedRepos(tags ...string) dt.Slice[repo.Configuration] {
 	if len(tags) == 0 {
 		return nil
 	}
 
-	var out []RepoConf
+	var out []repo.Configuration
 
 	for _, t := range tags {
 		rs, ok := conf.repoTags[t]
@@ -591,7 +575,7 @@ func (conf *Configuration) shouldIndexRepos() bool { return len(conf.Repo) != co
 func (conf *Configuration) mapReposByTags() {
 	defer func() { conf.indexedRepoCount = len(conf.Repo) }()
 
-	conf.repoTags = make(map[string][]*RepoConf)
+	conf.repoTags = make(map[string][]*repo.Configuration)
 
 	for idx := range conf.Repo {
 		for _, tag := range conf.Repo[idx].Tags {
@@ -731,31 +715,7 @@ func (conf *ArchLinuxConf) Validate() error {
 	return catcher.Resolve()
 }
 
-func (conf *RepoConf) Validate() error {
-	if conf.Branch == "" {
-		conf.Branch = "main"
-	}
-
-	if conf.RemoteName == "" {
-		conf.RemoteName = "origin"
-	}
-
-	if conf.Remote == "" {
-		return fmt.Errorf("'%s' does not specify a remote", conf.Name)
-	}
-
-	if conf.Fetch && conf.LocalSync {
-		return errors.New("cannot specify sync and fetch")
-	}
-
-	conf.Path = util.TryExpandHomedir(conf.Path)
-	conf.Post = sutil.TryExpandHomeDirs(conf.Post)
-	conf.Pre = sutil.TryExpandHomeDirs(conf.Pre)
-
-	return nil
-}
-
-func (conf *Configuration) GetRepo(name string) *RepoConf {
+func (conf *Configuration) GetRepo(name string) *repo.Configuration {
 	for idx := range conf.Repo {
 		if conf.Repo[idx].Name == name {
 			return &conf.Repo[idx]
@@ -771,28 +731,6 @@ func (conf *Configuration) GetBlog(name string) *BlogConf {
 		}
 	}
 	return nil
-}
-
-func (conf *RepoConf) HasChanges() (bool, error) {
-	if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
-		return true, nil
-	}
-
-	repo, err := git.PlainOpen(conf.Path)
-	if err != nil {
-		return false, err
-	}
-	wt, err := repo.Worktree()
-	if err != nil {
-		return false, err
-	}
-
-	stat, err := wt.Status()
-	if err != nil {
-		return false, err
-	}
-
-	return !stat.IsClean(), nil
 }
 
 func (conf *LinkConf) Validate() error {

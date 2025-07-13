@@ -94,7 +94,7 @@ func nightly() *cmdr.Commander {
 			}
 
 			for idx := range conf.Repo {
-				ec.Push(dist.Send(ctx, units.NewRepoCleanupJob(conf.Repo[idx].Path)))
+				ec.Push(dist.Send(ctx, units.NewRepoCleanupJob(conf.Repo[idx])))
 			}
 
 			for idx := range conf.System.Services {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -23,27 +22,29 @@ import (
 )
 
 func (conf *Configuration) FetchJob() fun.Worker {
+	const opName = "repo-fetch"
 	return func(ctx context.Context) (err error) {
 		start := time.Now()
+		hostname := util.GetHostname()
 		defer func() {
-			grip.Info(message.Fields{
-				"op":    "repo-fetch",
-				"path":  conf.Path,
-				"err":   err != nil,
-				"repo":  conf.Remote,
-				"dur":   time.Since(start).String(),
-				"host":  util.GetHostname(),
-				"dir":   conf.Path,
-				"npre":  len(conf.Pre),
-				"npost": len(conf.Post),
-			})
+			grip.Build().Level(level.Notice).
+				Pair("op", opName).
+				Pair("repo", conf.Name).
+				Pair("err", err != nil).
+				Pair("dur", time.Since(start)).
+				Pair("path", conf.Path).
+				Send()
 		}()
 
 		if !util.FileExists(conf.Path) {
-			grip.Info(message.Fields{
-				"path": conf.Path,
-				"op":   "repo doesn't exist; cloning",
-			})
+			grip.Info(message.
+				BuildPair().
+				Pair("op", opName).
+				Pair("repo", conf.Name).
+				Pair("path", conf.Path).
+				Pair("msg", "repo doesn't exist; cloning").
+				Pair("host", hostname),
+			)
 
 			return conf.CloneJob().Run(ctx)
 		}
@@ -54,14 +55,11 @@ func (conf *Configuration) FetchJob() fun.Worker {
 
 		cmd := jasper.Context(ctx).
 			CreateCommand(ctx).
-			Directory(conf.Path)
-			// SetOutputSender(level.Trace, sender).
-			// SetErrorSender(level.Debug, sender)
+			Directory(conf.Path).
+			SetOutputSender(level.Trace, grip.Sender()).
+			SetErrorSender(level.Debug, grip.Sender())
 
-		if conf.LocalSync && slices.Contains(conf.Tags, "mail") {
-			cmd.Append(conf.Pre...)
-		}
-
+		cmd.Append(conf.Pre...)
 		cmd.AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", conf.RemoteName, conf.Branch)
 		cmd.Append(conf.Post...)
 
@@ -79,7 +77,7 @@ func (conf *Configuration) CloneJob() fun.Worker {
 		if _, err := os.Stat(conf.Path); !os.IsNotExist(err) {
 			grip.Info(message.Fields{
 				"op":   opName,
-				"msg":  "repo exists, skipping clone, running update jobs as needed",
+				"msg":  "repo exists, skipping clone, running update jobs",
 				"path": conf.Path,
 				"repo": conf.Remote,
 				"host": hostname,
@@ -89,6 +87,7 @@ func (conf *Configuration) CloneJob() fun.Worker {
 				rconfCopy := conf
 				rconfCopy.Pre = nil
 				rconfCopy.Post = nil
+
 				return rconfCopy.Sync(hostname).Run(ctx)
 			}
 
@@ -273,6 +272,35 @@ func (conf *Configuration) Sync(host string) fun.Worker {
 
 		grip.Info(msg)
 		return nil
+	}
+}
+
+func (conf *Configuration) CleanupJob() fun.Worker {
+	return func(ctx context.Context) (err error) {
+		if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
+			return fmt.Errorf("cannot cleanup %s, no repository exists", conf.Path)
+		}
+
+		start := time.Now()
+
+		defer func() {
+			grip.Notice(message.Fields{
+				"op":    "repo-cleanup",
+				"repo":  conf.Path,
+				"dur":   time.Since(start),
+				"error": err != nil,
+			})
+		}()
+
+		sender := grip.Context(ctx).Sender()
+
+		return jasper.Context(ctx).CreateCommand(ctx).Priority(level.Info).
+			Directory(conf.Path).
+			SetOutputSender(level.Debug, sender).
+			SetErrorSender(level.Warning, sender).
+			AppendArgs("git", "gc").
+			AppendArgs("git", "prune").
+			Run(ctx)
 	}
 }
 

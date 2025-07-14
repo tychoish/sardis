@@ -14,11 +14,8 @@ import (
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/level"
-	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
@@ -41,7 +38,7 @@ func RunCommand() *cmdr.Commander {
 			if err != nil {
 				return err
 			}
-			return runConfiguredCommand(ctx, args.conf, cmds)
+			return runConfiguredCommand(ctx, cmds)
 		})
 }
 
@@ -76,51 +73,11 @@ func getcmds(cmds []sardis.CommandConf, args []string) ([]sardis.CommandConf, er
 	return out, nil
 }
 
-func runConfiguredCommand(ctx context.Context, conf *sardis.Configuration, cmds []sardis.CommandConf) (err error) {
-	wg := &fun.WaitGroup{}
-	ec := &erc.Collector{}
-
-	jpm := jasper.Context(ctx)
-
-	for idx := range cmds {
-		cmd, idx := cmds[idx], idx
-
-		wg.Launch(ctx, jpm.CreateCommand(ctx).
-			Directory(cmd.Directory).
-			Environment(cmd.Environment).
-			AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
-			ID(fmt.Sprintf("%s.%d/%d", cmd.Name, idx+1, len(cmds))).
-			SetOutputSender(level.Info, grip.Sender()).
-			SetErrorSender(level.Error, grip.Sender()).
-			Background(ft.Ref(cmd.Background)).
-			Append(cmd.Command).
-			Append(cmd.Commands...).
-			Prerequisite(func() bool {
-				grip.Info(message.Fields{
-					"op":   cmd.Name,
-					"host": util.GetHostname(),
-					"dir":  cmd.Directory,
-					"cmd":  cmd.Command,
-					"cmds": cmd.Commands,
-					"num":  idx + 1,
-					"len":  len(cmds),
-				})
-				return true
-			}).
-			PostHook(func(err error) error {
-				notify := sardis.DesktopNotify(ctx)
-				if err != nil {
-					notify.Error(message.WrapError(err, cmd.Name))
-					grip.Critical(err)
-					return err
-				}
-				notify.Notice(message.Whenln(ft.Ref(cmd.Notify), cmd.Name, "completed"))
-				return nil
-			}).Worker().Operation(ec.Push))
-	}
-
-	return wg.Worker().Join(func(context.Context) error { return ec.Resolve() }).Run(ctx)
-
+func runConfiguredCommand(ctx context.Context, cmds dt.Slice[sardis.CommandConf]) error {
+	return cmds.Stream().Parallel(func(ctx context.Context, conf sardis.CommandConf) error { return conf.Worker().Run(ctx) },
+		fun.WorkerGroupConfContinueOnError(),
+		fun.WorkerGroupConfWorkerPerCPU(),
+	).Run(ctx)
 }
 
 func listCommands() *cmdr.Commander {

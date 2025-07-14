@@ -1,6 +1,7 @@
 package sardis
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -25,6 +26,7 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/x/telegram"
 	"github.com/tychoish/grip/x/xmpp"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/repo"
 	sutil "github.com/tychoish/sardis/util"
@@ -988,6 +990,44 @@ func (conf *Configuration) doExportCommandGroups() map[string]CommandGroupConf {
 		}
 	}
 	return out
+}
+
+func (conf *CommandConf) Worker() fun.Worker {
+	sender := grip.Sender()
+	hn := util.GetHostname()
+
+	return func(ctx context.Context) error {
+		return jasper.Context(ctx).CreateCommand(ctx).
+			ID(fmt.Sprintf("CMD(%s).HOST(%s).NUM(%s)", conf.Name, util.GetHostname(), 1+len(conf.Commands))).
+			Directory(conf.Directory).
+			Environment(conf.Environment).
+			AddEnv(EnvVarSardisLogQuietStdOut, "true").
+			SetOutputSender(level.Info, sender).
+			SetErrorSender(level.Error, sender).
+			Background(ft.Ref(conf.Background)).
+			Append(conf.Command).
+			Append(conf.Commands...).
+			Prerequisite(func() bool {
+				grip.Info(message.BuildPair().
+					Pair("op", conf.Name).
+					Pair("host", hn).
+					Pair("dir", conf.Directory).
+					Pair("cmd", conf.Command).
+					Pair("cmds", conf.Commands))
+				return true
+			}).
+			PostHook(func(err error) error {
+				if err != nil {
+					m := message.WrapError(err, conf.Name)
+					DesktopNotify(ctx).Error(m)
+					grip.Critical(err)
+					return err
+				}
+				DesktopNotify(ctx).Notice(message.Whenln(ft.Ref(conf.Notify), conf.Name, "completed"))
+				return nil
+			}).Run(ctx)
+	}
+
 }
 
 func (conf *Configuration) AlacrittySocket() string {

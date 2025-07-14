@@ -142,11 +142,12 @@ func dmenuGroupSelector(ctx context.Context, conf *sardis.Configuration) error {
 		godmenu.Sorted(),
 	)
 
-	if ers.Is(err, godmenu.ErrSelectionMissing) {
+	switch {
+	case err == nil:
+		break
+	case ers.Is(err, godmenu.ErrSelectionMissing):
 		return nil
-	}
-
-	if err != nil {
+	default:
 		return err
 	}
 
@@ -181,5 +182,5 @@ func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, cmds []sa
 		return err
 	}
 
-	return runConfiguredCommand(ctx, conf, ops)
+	return runConfiguredCommand(ctx, ops)
 }

@@ -998,7 +998,7 @@ func (conf *CommandConf) Worker() fun.Worker {
 
 	return func(ctx context.Context) error {
 		return jasper.Context(ctx).CreateCommand(ctx).
-			ID(fmt.Sprintf("CMD(%s).HOST(%s).NUM(%s)", conf.Name, util.GetHostname(), 1+len(conf.Commands))).
+			ID(fmt.Sprintf("CMD(%s).HOST(%s).NUM(%d)", conf.Name, util.GetHostname(), 1+len(conf.Commands))).
 			Directory(conf.Directory).
 			Environment(conf.Environment).
 			AddEnv(EnvVarSardisLogQuietStdOut, "true").

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -198,6 +199,10 @@ func (conf *Configuration) Sync(host string) fun.Worker {
 	}
 
 	return func(ctx context.Context) error {
+		if host != hn || !slices.Contains(conf.Mirrors, host) {
+			return fmt.Errorf("remote named %q is not a configured host for this repo.", host)
+		}
+
 		if stat, err := os.Stat(conf.Path); os.IsNotExist(err) {
 			return fmt.Errorf("path '%s' for %q does not exist", conf.Path, buildID)
 		} else if !stat.IsDir() {

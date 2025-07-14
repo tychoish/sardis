@@ -30,6 +30,7 @@ func addOpCommand[T cmdr.FlagTypes](
 		if err != nil {
 			return nil, err
 		}
+
 		out := &opsCmdArgs[T]{conf: conf}
 		ops := cmdr.GetFlag[T](cc, name)
 		var zero T
@@ -86,6 +87,11 @@ func addOpCommand[T cmdr.FlagTypes](
 
 		return out, nil
 	}).SetMiddleware(func(ctx context.Context, args *opsCmdArgs[T]) context.Context {
-		return sardis.WithRemoteNotify(ctx, args.conf)
+		return sardis.ContextSetup(
+			sardis.WithConfiguration,
+			sardis.WithAppLogger,
+			sardis.WithJasper,
+			sardis.WithRemoteNotify,
+		)(ctx, args.conf)
 	}).SetAction(op).Add)
 }

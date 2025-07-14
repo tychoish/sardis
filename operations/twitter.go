@@ -14,7 +14,6 @@ func Tweet() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("tweet").
 		SetUsage("send a tweet").
-		With(cmdr.SpecBuilder(ResolveConfiguration).SetMiddleware(sardis.WithConfiguration).Add).
 		Flags(cmdr.FlagBuilder("").
 			SetName("message", "m").
 			SetUsage("message to tweet").

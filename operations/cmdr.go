@@ -68,6 +68,15 @@ func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configu
 	return conf, nil
 }
 
+func DefaultCommandSpec() *cmdr.OperationSpec[*sardis.Configuration] {
+	return cmdr.SpecBuilder(ResolveConfiguration).
+		SetMiddleware(sardis.ContextSetup(
+			sardis.WithConfiguration,
+			sardis.WithAppLogger,
+			sardis.WithJasper,
+		))
+}
+
 func Commander() *cmdr.Commander {
 	return cmdr.MakeRootCommander().
 		Flags(cmdr.FlagBuilder(false).SetName("jsonLog").SetUsage("format logs as json").Flag(),
@@ -95,12 +104,6 @@ func Commander() *cmdr.Commander {
 					grip.Sender().SetPriority(priority)
 					return nil
 				}).Flag()).
-		With(cmdr.SpecBuilder(ResolveConfiguration).
-			SetMiddleware(sardis.ContextSetup(
-				sardis.WithConfiguration,
-				sardis.WithAppLogger,
-				sardis.WithJasper,
-			)).Add).
 		Middleware(sardis.WithDesktopNotify).
 		Middleware(func(ctx context.Context) context.Context {
 			return srv.SetWorkerPool(ctx,

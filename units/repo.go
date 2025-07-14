@@ -11,3 +11,4 @@ func SyncRepo(conf repo.Configuration) fun.Worker                    { return co
 func NewLocalRepoSyncJob(conf repo.Configuration) fun.Worker         { return conf.Sync("LOCAL") }
 func NewRepoSyncJob(host string, conf repo.Configuration) fun.Worker { return conf.Sync(host) }
 func NewRepoCleanupJob(conf repo.Configuration) fun.Worker           { return conf.CleanupJob() }
+func NewRepoStatusJob(conf repo.Configuration) fun.Worker            { return conf.StatusJob() }

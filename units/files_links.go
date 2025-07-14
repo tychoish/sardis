@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
+	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
 )
 
@@ -32,7 +33,7 @@ func NewSymlinkCreateJob(conf sardis.LinkConf) fun.Worker {
 
 		jpm := jasper.Context(ctx)
 
-		if _, err = os.Stat(conf.Path); !os.IsNotExist(err) {
+		if util.FileExists(conf.Path) {
 			if !conf.Update {
 				return
 			}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -22,18 +23,17 @@ import (
 	sutil "github.com/tychoish/sardis/util"
 )
 
-const commandFlagName = "command"
+const commandFlagName string = "command"
 
 func RunCommand() *cmdr.Commander {
-	cmd := cmdr.MakeCommander().SetName("run").
+	return addOpCommand(cmdr.MakeCommander().SetName("run").
 		SetUsage("runs a predefined command").
 		Subcommanders(
 			listCommands(),
 			dmenuCommand(dmenuCommandAll).SetName("dmenu").SetUsage("use dmennu to select from all configured commands"),
 			qrCode(),
-		)
-	return addOpCommand(cmd, "command",
-		func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+		),
+		commandFlagName, func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 			cmds, err := getcmds(args.conf.ExportAllCommands(), args.ops)
 			if err != nil {
 				return err
@@ -73,11 +73,24 @@ func getcmds(cmds []sardis.CommandConf, args []string) ([]sardis.CommandConf, er
 	return out, nil
 }
 
+func toWorkers(st *fun.Stream[sardis.CommandConf]) *fun.Stream[fun.Worker] {
+	return fun.MakeConverter(func(conf sardis.CommandConf) fun.Worker { return conf.Worker() }).Stream(st)
+}
+
 func runConfiguredCommand(ctx context.Context, cmds dt.Slice[sardis.CommandConf]) error {
-	return cmds.Stream().Parallel(func(ctx context.Context, conf sardis.CommandConf) error { return conf.Worker().Run(ctx) },
-		fun.WorkerGroupConfContinueOnError(),
-		fun.WorkerGroupConfWorkerPerCPU(),
-	).Run(ctx)
+	size := cmds.Len()
+	switch {
+	case size == 1:
+		return ft.Ptr(cmds.Index(0)).Worker().Run(ctx)
+	case size < runtime.NumCPU():
+		return fun.MAKE.WorkerPool(toWorkers(cmds.Stream())).Run(ctx)
+	default:
+		return cmds.Stream().Parallel(func(ctx context.Context, conf sardis.CommandConf) error { return conf.Worker().Run(ctx) },
+			fun.WorkerGroupConfContinueOnError(),
+			fun.WorkerGroupConfWorkerPerCPU(),
+		).Run(ctx)
+	}
+
 }
 
 func listCommands() *cmdr.Commander {
@@ -85,7 +98,7 @@ func listCommands() *cmdr.Commander {
 		SetName("list").
 		Aliases("ls").
 		SetUsage("return a list of defined commands").
-		With(cmdr.SpecBuilder(ResolveConfiguration).
+		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 				homedir := util.GetHomedir()
 

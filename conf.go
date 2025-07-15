@@ -300,7 +300,6 @@ func (conf *Configuration) expandLocalNativeOps() {
 			Commands: []CommandConf{
 				{
 					Name:      "update",
-					Aliases:   []string{"sync"},
 					Directory: repo.Path,
 					Command:   "update",
 				},

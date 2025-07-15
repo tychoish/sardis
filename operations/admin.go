@@ -30,14 +30,7 @@ func Admin() *cmdr.Commander {
 func hacking() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("hack").
-		With(cmdr.SpecBuilder(ResolveConfiguration).SetMiddleware(
-			sardis.ContextSetup(
-				sardis.WithConfiguration,
-				sardis.WithAppLogger,
-				sardis.WithJasper,
-				sardis.WithRemoteNotify,
-			),
-		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
+		With(StandardSardisOperationSpec().SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 			grip.Noticeln("has conf", conf != nil)
 			grip.Noticeln("has jasper", jasper.HasManager(ctx))
 
@@ -58,7 +51,7 @@ func setupLinks() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("setup-links").
 		SetUsage("setup all configured links").
-		With(cmdr.SpecBuilder(ResolveConfiguration).
+		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 				ec := &erc.Collector{}
 				wg := &fun.WaitGroup{}
@@ -77,7 +70,7 @@ func configCheck() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("config").
 		SetUsage("validated configuration").
-		With(cmdr.SpecBuilder(ResolveConfiguration).
+		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 				// this is redundant, as the resolve
 				// configuration does this correctly.

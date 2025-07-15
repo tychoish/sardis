@@ -68,7 +68,7 @@ func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configu
 	return conf, nil
 }
 
-func DefaultCommandSpec() *cmdr.OperationSpec[*sardis.Configuration] {
+func StandardSardisOperationSpec() *cmdr.OperationSpec[*sardis.Configuration] {
 	return cmdr.SpecBuilder(ResolveConfiguration).
 		SetMiddleware(sardis.ContextSetup(
 			sardis.WithConfiguration,

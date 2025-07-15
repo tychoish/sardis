@@ -30,7 +30,7 @@ func notifyPipe() *cmdr.Commander {
 		SetName("pipe").
 		Aliases("xmpp").
 		SetUsage("send the contents of standard input over xmpp").
-		With(cmdr.SpecBuilder(ResolveConfiguration).
+		With(StandardSardisOperationSpec().
 			SetMiddleware(sardis.WithRemoteNotify).
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 				logger := sardis.RemoteNotify(ctx)

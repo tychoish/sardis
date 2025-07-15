@@ -23,59 +23,57 @@ func Blog() *cmdr.Commander {
 }
 
 func blogPublish() *cmdr.Commander {
-	const blogNameFlag = "blog"
-	cmd := cmdr.MakeCommander().SetName("publish").
-		SetUsage("run the publication operation")
+	return addOpCommand(cmdr.MakeCommander().SetName("publish").
+		SetUsage("run the publication operation"),
+		"blog", func(ctx context.Context, args *opsCmdArgs[string]) error {
+			conf := args.conf
+			name := args.ops
 
-	return addOpCommand(cmd, blogNameFlag, func(ctx context.Context, args *opsCmdArgs[string]) error {
-		conf := args.conf
-		name := args.ops
+			if conf == nil || len(conf.Blog) == 0 {
+				return errors.New("no blog configured")
+			}
 
-		if conf == nil || len(conf.Blog) == 0 {
-			return errors.New("no blog configured")
-		}
+			blog := conf.GetBlog(name)
+			if blog == nil {
+				return fmt.Errorf("blog %q is not defined", name)
+			}
 
-		blog := conf.GetBlog(name)
-		if blog == nil {
-			return fmt.Errorf("blog %q is not defined", name)
-		}
+			repo := conf.GetRepo(name)
+			if repo == nil {
+				return fmt.Errorf("repo %q for corresponding blog is not defined", name)
+			}
+			if !blog.Enabled {
+				grip.Info(message.Fields{
+					"op":   "blog publish",
+					"repo": repo.Name,
+					"msg":  "publication disabled",
+				})
+				return nil
+			}
 
-		repo := conf.GetRepo(name)
-		if repo == nil {
-			return fmt.Errorf("repo %q for corresponding blog is not defined", name)
-		}
-		if !blog.Enabled {
-			grip.Info(message.Fields{
-				"op":   "blog publish",
-				"repo": repo.Name,
-				"msg":  "publication disabled",
-			})
+			if err := units.NewRepoSyncJob(conf.Settings.Runtime.Hostname, *repo)(ctx); err != nil {
+				return fmt.Errorf("problem syncing blog repo: %w", err)
+			}
+
+			err := jasper.Context(ctx).CreateCommand(ctx).
+				Append(blog.DeployCommands...).
+				Directory(repo.Path).
+				AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
+				SetOutputSender(level.Info, grip.Sender()).
+				SetErrorSender(level.Error, grip.Sender()).
+				Run(ctx)
+
+			if err != nil {
+				sardis.RemoteNotify(ctx).Error(message.WrapError(err, message.Fields{
+					"op":   "blog-publish",
+					"repo": repo.Name,
+					"path": repo.Path,
+				}))
+				return fmt.Errorf("problem running deploy command: %w", err)
+			}
+
+			grip.Infof("blog publication complete for %q", name)
+
 			return nil
-		}
-
-		if err := units.NewRepoSyncJob(conf.Settings.Runtime.Hostname, *repo)(ctx); err != nil {
-			return fmt.Errorf("problem syncing blog repo: %w", err)
-		}
-
-		err := jasper.Context(ctx).CreateCommand(ctx).
-			Append(blog.DeployCommands...).
-			Directory(repo.Path).
-			AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
-			SetOutputSender(level.Info, grip.Sender()).
-			SetErrorSender(level.Error, grip.Sender()).
-			Run(ctx)
-
-		if err != nil {
-			sardis.RemoteNotify(ctx).Error(message.WrapError(err, message.Fields{
-				"op":   "blog-publish",
-				"repo": repo.Name,
-				"path": repo.Path,
-			}))
-			return fmt.Errorf("problem running deploy command: %w", err)
-		}
-
-		grip.Infof("blog publication complete for %q", name)
-
-		return nil
-	})
+		})
 }

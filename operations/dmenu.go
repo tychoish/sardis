@@ -26,11 +26,101 @@ const (
 	dmenuCommandGroups
 )
 
+func DMenu() *cmdr.Commander {
+	return addOpCommand(cmdr.MakeCommander().
+		SetName("dmenu").
+		Subcommanders(
+			dmenuCommand(dmenuCommandAll).SetName("all").SetUsage("select a command from all configured commands"),
+			dmenuCommand(dmenuCommandGroups).SetName("groups").SetUsage("use nested menu, starting with command groups"),
+			listMenus(),
+		),
+		commandFlagName, func(ctx context.Context, args *opsCmdArgs[string]) error {
+			return runDmenuOperation(ctx, args.conf, ft.Default(args.ops, "all"))
+		})
+}
+
+func dmenuCommand(kind dmenuCommandType) *cmdr.Commander {
+	return cmdr.MakeCommander().With(StandardSardisOperationSpec().
+		SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
+			switch kind {
+			case dmenuCommandAll:
+				return dmenuForCommands(ctx, conf, conf.ExportAllCommands())
+			case dmenuCommandGroups:
+				return dmenuGroupSelector(ctx, conf)
+			default:
+				panic(fmt.Sprintf("undefined command kind %d", kind))
+			}
+		}).Add)
+}
+
+func runDmenuOperation(ctx context.Context, conf *sardis.Configuration, name string) error {
+	if group, ok := conf.ExportCommandGroups()[name]; ok {
+		return dmenuForCommands(ctx, conf, group.Commands)
+	}
+
+	cmds, err := getcmds(conf.ExportAllCommands(), []string{name})
+	if err != nil {
+		return err
+	}
+
+	return runConfiguredCommand(ctx, cmds)
+}
+
+func dmenuGroupSelector(ctx context.Context, conf *sardis.Configuration) error {
+	cmd, err := godmenu.Run(ctx,
+		godmenu.ExtendSelections(conf.ExportGroupNames()),
+		godmenu.WithFlags(conf.Settings.DMenu),
+		godmenu.Sorted(),
+	)
+
+	switch {
+	case err == nil:
+		break
+	case ers.Is(err, godmenu.ErrSelectionMissing):
+		return nil
+	default:
+		return err
+	}
+
+	return dmenuForCommands(ctx, conf, conf.ExportCommandGroups().Get(cmd).Commands)
+}
+
+func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, cmds []sardis.CommandConf) error {
+	if len(cmds) == 0 {
+		return errors.New("no selection")
+	}
+
+	seen := dt.Set[string]{}
+
+	seen.AppendStream(fun.MakeConverter(func(cmd *sardis.CommandConf) string { return cmd.Name }).Stream(dt.SlicePtrs(cmds).Stream()))
+
+	cmd, err := godmenu.Run(ctx,
+		godmenu.ExtendSelections(fun.NewGenerator(seen.Stream().Slice).Force().Resolve()),
+		godmenu.WithFlags(conf.Settings.DMenu),
+		godmenu.Sorted(),
+	)
+	switch {
+	case err == nil:
+		break
+	case ers.Is(err, godmenu.ErrSelectionMissing):
+		return nil
+	default:
+		return err
+	}
+
+	ops, err := getcmds(cmds, strings.Fields(strings.TrimSpace(cmd)))
+	if err != nil {
+		return err
+	}
+
+	return runConfiguredCommand(ctx, ops)
+}
+
 func listMenus() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("list").
 		SetUsage("prints all commands, group, and aliases.").
-		With(cmdr.SpecBuilder(ResolveConfiguration).
+		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 				table := tabby.New()
 				table.AddHeader("Name", "Selections")
@@ -85,102 +175,4 @@ func listMenus() *cmdr.Commander {
 				table.Print()
 				return nil
 			}).Add)
-}
-
-func DMenu() *cmdr.Commander {
-	return cmdr.MakeCommander().
-		SetName("dmenu").
-		Subcommanders(
-			dmenuCommand(dmenuCommandAll).SetName("all").SetUsage("select a command from all configured commands"),
-			dmenuCommand(dmenuCommandGroups).SetName("groups").SetUsage("use nested menu, starting with command groups"),
-			listMenus(),
-		).
-		Flags(cmdr.FlagBuilder("").
-			SetName(commandFlagName, "c").
-			SetUsage("specify a default flag name").
-			Flag()).
-		With(cmdr.SpecBuilder(ResolveConfiguration).SetMiddleware(sardis.WithConfiguration).Add).
-		Middleware(sardis.WithDesktopNotify).
-		With(StringSpecBuilder(commandFlagName, ft.Ptr("all")).SetAction(runDmenuOperation).Add)
-}
-
-func dmenuCommand(kind dmenuCommandType) *cmdr.Commander {
-	return cmdr.MakeCommander().With(cmdr.SpecBuilder(ResolveConfiguration).
-		SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			switch kind {
-			case dmenuCommandAll:
-				return dmenuForCommands(ctx, conf, conf.ExportAllCommands())
-			case dmenuCommandGroups:
-				return dmenuGroupSelector(ctx, conf)
-			default:
-				panic(fmt.Sprintf("undefined command kind %d", kind))
-			}
-		}).Add)
-}
-
-func runDmenuOperation(ctx context.Context, name string) error {
-	conf := sardis.AppConfiguration(ctx)
-
-	cmdGrp := conf.ExportCommandGroups()
-
-	if group, ok := cmdGrp[name]; ok {
-		return dmenuForCommands(ctx, conf, group.Commands)
-	}
-
-	cmds, err := getcmds(conf.ExportAllCommands(), []string{name})
-	if err != nil {
-		return err
-	}
-
-	return dmenuForCommands(ctx, conf, cmds)
-}
-
-func dmenuGroupSelector(ctx context.Context, conf *sardis.Configuration) error {
-	cmd, err := godmenu.Run(ctx,
-		godmenu.ExtendSelections(conf.ExportGroupNames()),
-		godmenu.WithFlags(conf.Settings.DMenu),
-		godmenu.Sorted(),
-	)
-
-	switch {
-	case err == nil:
-		break
-	case ers.Is(err, godmenu.ErrSelectionMissing):
-		return nil
-	default:
-		return err
-	}
-
-	return dmenuForCommands(ctx, conf, conf.ExportCommandGroups().Get(cmd).Commands)
-}
-
-func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, cmds []sardis.CommandConf) error {
-	if len(cmds) == 0 {
-		return errors.New("no selection")
-	}
-
-	seen := dt.Set[string]{}
-
-	seen.AppendStream(fun.MakeConverter(func(cmd *sardis.CommandConf) string { return cmd.Name }).Stream(dt.SlicePtrs(cmds).Stream()))
-
-	cmd, err := godmenu.Run(ctx,
-		godmenu.ExtendSelections(fun.NewGenerator(seen.Stream().Slice).Force().Resolve()),
-		godmenu.WithFlags(conf.Settings.DMenu),
-		godmenu.Sorted(),
-	)
-	switch {
-	case err == nil:
-		break
-	case ers.Is(err, godmenu.ErrSelectionMissing):
-		return nil
-	default:
-		return err
-	}
-
-	ops, err := getcmds(cmds, strings.Fields(strings.TrimSpace(cmd)))
-	if err != nil {
-		return err
-	}
-
-	return runConfiguredCommand(ctx, ops)
 }

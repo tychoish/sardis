@@ -25,7 +25,7 @@ func bulkCreateTickets() *cmdr.Commander {
 
 	return cmdr.MakeCommander().SetName("create").
 		SetUsage("create tickets").
-		With(cmdr.SpecBuilder(ResolveConfiguration).SetMiddleware(sardis.WithConfiguration).Add).
+		With(StandardSardisOperationSpec().Add).
 		Flags(cmdr.FlagBuilder(ft.Must(os.Getwd())).
 			SetName(pathFlagName).
 			SetUsage("specify the name of a file that holds jira tickets").

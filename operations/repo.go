@@ -66,119 +66,122 @@ func repoList() *cmdr.Commander {
 }
 
 func repoUpdate() *cmdr.Commander {
-	cmd := cmdr.MakeCommander().
-		SetName("update").
-		Aliases("sync")
+	const opName = "repo-update"
 
-	const opName = "repo-sync"
+	return addOpCommand(
+		cmdr.MakeCommander().
+			SetName("update").
+			Aliases("sync"),
+		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+			started := time.Now()
 
-	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-		started := time.Now()
-
-		repos := args.conf.GetTaggedRepos(args.ops...)
-		if len(repos) == 0 {
-			return fmt.Errorf("no tagged repository named '%v' configured", args.ops)
-		}
-
-		shouldNotify := false
-		repoNames := make([]string, 0, len(args.ops))
-		filterd := repos.Stream().Filter(func(conf repo.Configuration) bool {
-			shouldNotify = shouldNotify || conf.Disabled && conf.Notify
-			if ft.Not(conf.Disabled) {
-				repoNames = append(repoNames, conf.Name)
-				return true
+			repos := args.conf.GetTaggedRepos(args.ops...)
+			if len(repos) == 0 {
+				return fmt.Errorf("no tagged repository named '%v' configured", args.ops)
 			}
-			return false
-		})
 
-		jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.FullSync() }).Stream(filterd)
-
-		grip.Info(message.BuildPair().
-			Pair("op", opName).
-			Pair("state", "starting").
-			Pair("args", args.ops).
-			Pair("repos", repoNames).
-			Pair("host", args.conf.Settings.Runtime.Hostname),
-		)
-
-		err := jobs.Parallel(
-			func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-			fun.WorkerGroupConfContinueOnError(),
-			fun.WorkerGroupConfWorkerPerCPU(),
-		).Run(ctx)
-
-		// QUESTION: should we send notification here
-		grip.Notice(message.BuildPair().
-			Pair("op", opName).
-			Pair("err", ers.IsError(err)).
-			Pair("state", "complete").
-			Pair("host", args.conf.Settings.Runtime.Hostname).
-			Pair("args", args.ops).
-			Pair("n", len(repoNames)).
-			Pair("repos", repoNames).
-			Pair("dur", time.Since(started)),
-		)
-
-		if err != nil {
-			sardis.RemoteNotify(ctx).NoticeWhen(shouldNotify, message.Fields{
-				"arg":   args.ops,
-				"repos": repoNames,
-				"op":    opName,
-				"dur":   time.Since(started).Seconds(),
+			shouldNotify := false
+			repoNames := make([]string, 0, len(args.ops))
+			filterd := repos.Stream().Filter(func(conf repo.Configuration) bool {
+				shouldNotify = shouldNotify || conf.Disabled && conf.Notify
+				if ft.Not(conf.Disabled) {
+					repoNames = append(repoNames, conf.Name)
+					return true
+				}
+				return false
 			})
-			return err
-		}
 
-		return nil
-	})
+			var err error
+			jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.FullSync() }).Stream(filterd)
+
+			grip.Info(message.BuildPair().
+				Pair("op", opName).
+				Pair("state", "starting").
+				Pair("ops", args.ops).
+				Pair("host", args.conf.Settings.Runtime.Hostname),
+			)
+			defer func() {
+				// QUESTION: should we send notification here
+				grip.Notice(message.BuildPair().
+					Pair("op", opName).
+					Pair("err", ers.IsError(err)).
+					Pair("state", "complete").
+					Pair("host", args.conf.Settings.Runtime.Hostname).
+					Pair("args", args.ops).
+					Pair("repos", repoNames).
+					Pair("dur", time.Since(started)),
+				)
+			}()
+
+			err = jobs.Parallel(
+				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+				fun.WorkerGroupConfContinueOnError(),
+				fun.WorkerGroupConfWorkerPerCPU(),
+			).Run(ctx)
+
+			if err != nil {
+				sardis.RemoteNotify(ctx).NoticeWhen(shouldNotify, message.Fields{
+					"arg":   args.ops,
+					"repos": repoNames,
+					"op":    opName,
+					"dur":   time.Since(started).Seconds(),
+				})
+				return err
+			}
+
+			return nil
+		},
+	)
 }
 
 func repoCleanup() *cmdr.Commander {
-	cmd := cmdr.MakeCommander().
-		SetName("gc").
-		Aliases("cleanup").
-		SetUsage("run repository cleanup")
+	return addOpCommand(
+		cmdr.MakeCommander().
+			SetName("gc").
+			Aliases("cleanup").
+			SetUsage("run repository cleanup"),
+		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+			repos := args.conf.GetTaggedRepos(args.ops...).Stream()
 
-	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-		repos := args.conf.GetTaggedRepos(args.ops...).Stream()
+			jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.CleanupJob() }).Stream(repos)
 
-		jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.CleanupJob() }).Stream(repos)
-
-		return jobs.Parallel(
-			func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-			fun.WorkerGroupConfContinueOnError(),
-			fun.WorkerGroupConfWorkerPerCPU(),
-		).Run(ctx)
-	})
+			return jobs.Parallel(
+				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+				fun.WorkerGroupConfContinueOnError(),
+				fun.WorkerGroupConfWorkerPerCPU(),
+			).Run(ctx)
+		},
+	)
 }
 
 func repoClone() *cmdr.Commander {
-	cmd := cmdr.MakeCommander().
-		SetName("clone").
-		SetUsage("clone a repository or all matching repositories")
-	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-		repos := args.conf.GetTaggedRepos(args.ops...).Stream()
+	return addOpCommand(
+		cmdr.MakeCommander().
+			SetName("clone").
+			SetUsage("clone a repository or all matching repositories"),
+		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+			repos := args.conf.GetTaggedRepos(args.ops...).Stream()
 
-		missingRepos := repos.Filter(func(rc repo.Configuration) bool {
-			if _, err := os.Stat(rc.Path); os.IsNotExist(err) {
-				return true
-			}
-			grip.Warning(message.Fields{
-				"path":    rc.Path,
-				"op":      "clone",
-				"outcome": "skipping",
+			missingRepos := repos.Filter(func(rc repo.Configuration) bool {
+				if _, err := os.Stat(rc.Path); os.IsNotExist(err) {
+					return true
+				}
+				grip.Warning(message.Fields{
+					"path":    rc.Path,
+					"op":      "clone",
+					"outcome": "skipping",
+				})
+				return false
 			})
-			return false
+
+			jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.CloneJob() }).Stream(missingRepos)
+
+			return jobs.Parallel(
+				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+				fun.WorkerGroupConfContinueOnError(),
+				fun.WorkerGroupConfWorkerPerCPU(),
+			).Run(ctx)
 		})
-
-		jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.CloneJob() }).Stream(missingRepos)
-
-		return jobs.Parallel(
-			func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-			fun.WorkerGroupConfContinueOnError(),
-			fun.WorkerGroupConfWorkerPerCPU(),
-		).Run(ctx)
-	})
 }
 
 func fallbackTo[T comparable](first T, args ...T) (out T) {
@@ -232,38 +235,40 @@ func repoGithubClone() *cmdr.Commander {
 }
 
 func repoStatus() *cmdr.Commander {
-	cmd := cmdr.MakeCommander().
-		SetName("status").
-		SetUsage("report on the status of repos")
-	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-		ec := &erc.Collector{}
+	return addOpCommand(
+		cmdr.MakeCommander().
+			SetName("status").
+			SetUsage("report on the status of repos"),
+		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+			ec := &erc.Collector{}
 
-		repos := args.conf.GetTaggedRepos(args.ops...).Stream()
+			repos := args.conf.GetTaggedRepos(args.ops...).Stream()
 
-		jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { grip.Info(rc.Name); return rc.StatusJob() }).Stream(repos)
+			jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { grip.Info(rc.Name); return rc.StatusJob() }).Stream(repos)
 
-		ops := fun.MakeConverter(func(wf fun.Worker) fun.Operation { return wf.Operation(ec.Push) }).Stream(jobs)
+			ops := fun.MakeConverter(func(wf fun.Worker) fun.Operation { return wf.Operation(ec.Push) }).Stream(jobs)
 
-		ec.Push(ops.ReadAll(func(op fun.Operation) { op.Run(ctx) }).Run(ctx))
+			ec.Push(ops.ReadAll(func(op fun.Operation) { op.Run(ctx) }).Run(ctx))
 
-		return ec.Resolve()
-	})
+			return ec.Resolve()
+		},
+	)
 }
 
 func repoFetch() *cmdr.Commander {
-	cmd := cmdr.MakeCommander().
-		SetName("fetch").
-		SetUsage("fetch one or more repos")
+	return addOpCommand(
+		cmdr.MakeCommander().
+			SetName("fetch").
+			SetUsage("fetch one or more repos"),
+		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+			repos := args.conf.GetTaggedRepos(args.ops...).Stream().Filter(func(repo repo.Configuration) bool { return repo.Fetch })
 
-	return addOpCommand(cmd, "repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-		repos := args.conf.GetTaggedRepos(args.ops...).Stream().Filter(func(repo repo.Configuration) bool { return repo.Fetch })
+			jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.FetchJob() }).Stream(repos)
 
-		jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.FetchJob() }).Stream(repos)
-
-		return jobs.Parallel(
-			func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-			fun.WorkerGroupConfContinueOnError(),
-			fun.WorkerGroupConfWorkerPerCPU(),
-		).Run(ctx)
-	})
+			return jobs.Parallel(
+				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+				fun.WorkerGroupConfContinueOnError(),
+				fun.WorkerGroupConfWorkerPerCPU(),
+			).Run(ctx)
+		})
 }

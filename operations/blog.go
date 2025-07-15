@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -23,11 +25,14 @@ func Blog() *cmdr.Commander {
 }
 
 func blogPublish() *cmdr.Commander {
-	return addOpCommand(cmdr.MakeCommander().SetName("publish").
-		SetUsage("run the publication operation"),
-		"blog", func(ctx context.Context, args *opsCmdArgs[string]) error {
+	const opName string = "blog-publish"
+	return addOpCommand(
+		cmdr.MakeCommander().SetName("publish").
+			SetUsage("run the publication operation"),
+		"name", func(ctx context.Context, args *opsCmdArgs[string]) error {
 			conf := args.conf
 			name := args.ops
+			startAt := time.Now()
 
 			if conf == nil || len(conf.Blog) == 0 {
 				return errors.New("no blog configured")
@@ -38,41 +43,53 @@ func blogPublish() *cmdr.Commander {
 				return fmt.Errorf("blog %q is not defined", name)
 			}
 
-			repo := conf.GetRepo(name)
+			repo := conf.GetRepo(blog.RepoName)
 			if repo == nil {
 				return fmt.Errorf("repo %q for corresponding blog is not defined", name)
 			}
+
 			if !blog.Enabled {
-				grip.Info(message.Fields{
-					"op":   "blog publish",
-					"repo": repo.Name,
+				grip.Warning(message.Fields{
+					"op":   opName,
 					"msg":  "publication disabled",
+					"name": name,
+					"repo": blog.RepoName,
+					"path": repo.Path,
+					"host": conf.Settings.Runtime.Hostname,
 				})
 				return nil
 			}
+			defer func() {
+				grip.Notice(message.BuildPair().
+					Pair("op", opName).
+					Pair("name", name).
+					Pair("repo", blog.RepoName).
+					Pair("path", repo.Path).
+					Pair("dur", time.Since(startAt)),
+				)
+			}()
 
-			if err := units.NewRepoSyncJob(conf.Settings.Runtime.Hostname, *repo)(ctx); err != nil {
-				return fmt.Errorf("problem syncing blog repo: %w", err)
-			}
-
-			err := jasper.Context(ctx).CreateCommand(ctx).
+			err := units.NewRepoSyncJob(conf.Settings.Runtime.Hostname, *repo).WithErrorFilter(func(err error) error {
+				return ers.Wrapf(err, "problem syncing blog %q repo", name)
+			}).Join(jasper.Context(ctx).CreateCommand(ctx).
 				Append(blog.DeployCommands...).
 				Directory(repo.Path).
 				AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
 				SetOutputSender(level.Info, grip.Sender()).
-				SetErrorSender(level.Error, grip.Sender()).
-				Run(ctx)
+				SetErrorSender(level.Error, grip.Sender()).Worker(),
+			).Run(ctx)
 
 			if err != nil {
 				sardis.RemoteNotify(ctx).Error(message.WrapError(err, message.Fields{
-					"op":   "blog-publish",
+					"op":   opName,
 					"repo": repo.Name,
 					"path": repo.Path,
+					"host": conf.Settings.Runtime.Hostname,
 				}))
-				return fmt.Errorf("problem running deploy command: %w", err)
+				return fmt.Errorf("problem deploying the blog %q: %w", name, err)
 			}
 
-			grip.Infof("blog publication complete for %q", name)
+			grip.Noticef("blog publication complete for %q", name)
 
 			return nil
 		})

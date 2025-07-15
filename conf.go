@@ -202,6 +202,7 @@ type CommandConf struct {
 }
 
 type BlogConf struct {
+	Name           string   `bson:"name" json:"name" yaml:"name"`
 	RepoName       string   `bson:"repo" json:"repo" yaml:"repo"`
 	Notify         bool     `bson:"notify" json:"notify" yaml:"notify"`
 	Enabled        bool     `bson:"enabled" json:"enabled" yaml:"enabled"`
@@ -261,6 +262,7 @@ func (conf *Configuration) doValidate() error {
 	for idx := range conf.Repo {
 		ec.Wrapf(conf.Repo[idx].Validate(), "%d/%d of %T is not valid", idx, len(conf.Repo), conf.Repo[idx])
 	}
+	ec.Wrap(conf.validateBlogs(), "blog build/push configuration is invalid")
 
 	conf.Links = conf.expandLinks(ec)
 	for idx := range conf.Links {
@@ -554,6 +556,9 @@ func (conf *Configuration) GetTaggedRepos(tags ...string) dt.Slice[repo.Configur
 	if len(tags) == 0 {
 		return nil
 	}
+	if conf.shouldIndexRepos() {
+		conf.mapReposByTags()
+	}
 
 	var out []repo.Configuration
 
@@ -721,12 +726,45 @@ func (conf *Configuration) GetRepo(name string) *repo.Configuration {
 		if conf.Repo[idx].Name == name {
 			return &conf.Repo[idx]
 		}
+
 	}
 	return nil
 }
 
+func (conf *Configuration) validateBlogs() error {
+	set := &dt.Set[string]{}
+	ec := &erc.Collector{}
+	for idx := range conf.Blog {
+		bc := conf.Blog[idx]
+		if bc.Name == "" && bc.RepoName == "" {
+			ec.Add(fmt.Errorf("blog at index %x is missing a name and a repo name", idx))
+		}
+		bc.Name = ft.Default(bc.Name, bc.RepoName)
+		bc.RepoName = ft.Default(bc.RepoName, bc.Name)
+
+		if set.Check(bc.Name) {
+			ec.Add(fmt.Errorf("blog named %s has a duplicate blog configured", bc.Name))
+		}
+
+		if set.Check(bc.RepoName) {
+			ec.Add(fmt.Errorf("blog with repo %s (named %s) has a duplicate name", bc.RepoName, bc.Name))
+		}
+		if repos := conf.GetTaggedRepos(bc.RepoName); repos.Len() != 1 {
+			ec.Add(fmt.Errorf("blog named %s does not have a corresponding configured repo %s", bc.Name, bc.RepoName))
+		}
+		set.Add(bc.Name)
+		set.Add(bc.RepoName)
+	}
+
+	return ec.Resolve()
+}
+
 func (conf *Configuration) GetBlog(name string) *BlogConf {
 	for idx := range conf.Blog {
+		if conf.Blog[idx].Name == name {
+			return &conf.Blog[idx]
+		}
+
 		if conf.Blog[idx].RepoName == name {
 			return &conf.Blog[idx]
 		}

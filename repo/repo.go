@@ -6,7 +6,7 @@ import (
 	"os"
 
 	git "github.com/go-git/go-git/v5"
-	"github.com/tychoish/jasper/util"
+	jutil "github.com/tychoish/jasper/util"
 	sutil "github.com/tychoish/sardis/util"
 )
 
@@ -43,7 +43,7 @@ func (conf *Configuration) Validate() error {
 		return errors.New("cannot specify sync and fetch")
 	}
 
-	conf.Path = util.TryExpandHomedir(conf.Path)
+	conf.Path = jutil.TryExpandHomedir(conf.Path)
 	conf.Post = sutil.TryExpandHomeDirs(conf.Post)
 	conf.Pre = sutil.TryExpandHomeDirs(conf.Pre)
 

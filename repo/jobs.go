@@ -13,6 +13,8 @@ import (
 	git "github.com/go-git/go-git/v5"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -31,21 +33,23 @@ func (conf *Configuration) FetchJob() fun.Worker {
 			return err
 		}
 
+		id := fmt.Sprintf("fetch.REPO(%s).REMOTE(%s).OPERATOR(%s)", conf.Name, conf.RemoteName, util.GetHostname())
+
 		start := time.Now()
 		hostname := util.GetHostname()
 		defer func() {
-			grip.Build().Level(level.Notice).
+			grip.Notice(message.BuildPair().
 				Pair("op", opName).
 				Pair("repo", conf.Name).
 				Pair("err", err != nil).
 				Pair("dur", time.Since(start)).
 				Pair("path", conf.Path).
-				Send()
+				Pair("host", hostname),
+			)
 		}()
 
 		if !util.FileExists(conf.Path) {
-			grip.Info(message.
-				BuildPair().
+			grip.Info(message.BuildPair().
 				Pair("op", opName).
 				Pair("repo", conf.Name).
 				Pair("path", conf.Path).
@@ -60,17 +64,34 @@ func (conf *Configuration) FetchJob() fun.Worker {
 			return errors.New("repo-fetch requires defined remote name and branch for the repo")
 		}
 
-		cmd := jasper.Context(ctx).
+		proclog, procbuf := newProcessLogger(id)
+		defer procbuf.Close()
+		proclog.Infoln(ruler, id, ruler)
+
+		return jasper.Context(ctx).
 			CreateCommand(ctx).
+			ID(id).
+			SetOutputSender(level.Info, procbuf).
+			SetErrorSender(level.Info, procbuf).
 			Directory(conf.Path).
-			SetOutputSender(level.Trace, grip.Sender()).
-			SetErrorSender(level.Debug, grip.Sender())
-
-		cmd.Append(conf.Pre...)
-		cmd.AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", conf.RemoteName, conf.Branch)
-		cmd.Append(conf.Post...)
-
-		return cmd.Run(ctx)
+			Append(conf.Pre...).
+			AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", conf.RemoteName, conf.Branch).
+			Append(conf.Post...).
+			Worker().
+			WithErrorFilter(func(err error) error {
+				if err != nil {
+					grip.Error(procbuf.renderAll())
+					grip.Critical(message.BuildPair().
+						Pair("op", opName).
+						Pair("id", id).
+						Pair("repo", conf.Name).
+						Pair("path", conf.Path).
+						Pair("err", err),
+					)
+					proclog.Infoln(ruler, id, ruler)
+				}
+				return err
+			}).PostHook(fn.MakeFuture(procbuf.Close).Ignore()).Run(ctx)
 	}
 }
 
@@ -136,6 +157,7 @@ func (conf *Configuration) CloneJob() fun.Worker {
 		}
 
 		grip.Notice(msg)
+
 		return nil
 	}
 }
@@ -204,15 +226,18 @@ func (conf *Configuration) Sync(host string) fun.Worker {
 		buildID = fmt.Sprintf("sync.REMOTE(%s).REPO(%s).OPERATOR(%s)", host, conf.Name, hn)
 	}
 
+	bullet := fmt.Sprintf("%s.PATH(%s)", buildID, conf.Path)
+
+	const opName = "repo-sync"
 	return func(ctx context.Context) error {
 		// double check this because we might have a stale
 		// version of the config
 		if err := conf.Validate(); err != nil {
-			return err
+			return ers.Wrap(err, bullet)
 		}
 
 		if host != hn && !slices.Contains(conf.Mirrors, host) {
-			return fmt.Errorf("remote named %q is not a configured host for this repo.", host)
+			return ers.Wrap(fmt.Errorf("remote %q is not a configured", host), bullet)
 		}
 
 		if stat, err := os.Stat(conf.Path); os.IsNotExist(err) {
@@ -222,32 +247,23 @@ func (conf *Configuration) Sync(host string) fun.Worker {
 		}
 		started := time.Now()
 
-		procout := &bufsend{}
-		procout.SetPriority(level.Info)
-		procout.SetName(buildID)
-		procout.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
-		proclog := grip.NewLogger(procout)
-		proclog.Noticeln(
-			ruler,
-			"repo:", strings.ToUpper(conf.Name), "---",
-			"host:", strings.ToUpper(host), "---",
-			"path:", strings.ToUpper(conf.Path),
-			ruler,
-		)
+		proclog, procbuf := newProcessLogger(buildID)
+		defer procbuf.Close()
+		proclog.Noticeln(ruler, bullet, ruler)
 
 		grip.Info(message.BuildPair().
-			Pair("op", "repo-sync").
+			Pair("op", opName).
 			Pair("state", "started").
 			Pair("id", buildID).
 			Pair("path", conf.Path).
-			Pair("host", host),
+			Pair("host", host).
+			Pair("operator", hn),
 		)
 
 		err := jasper.Context(ctx).
 			CreateCommand(ctx).
-			SetOutputSender(level.Info, procout).
-			SetErrorSender(level.Info, procout).
-			Priority(level.Debug).
+			SetOutputSender(level.Info, procbuf).
+			SetErrorSender(level.Error, procbuf).
 			ID(buildID).
 			Directory(conf.Path).
 			AppendArgsWhen(ft.Not(isLocal), "ssh", host, fmt.Sprintf("cd %s && %s", conf.Path, fmt.Sprintf(syncCmdTemplate, buildID))).
@@ -261,63 +277,86 @@ func (conf *Configuration) Sync(host string) fun.Worker {
 			AppendArgsWhen(ft.Not(isLocal), "ssh", host, fmt.Sprintf("cd %s && %s", conf.Path, fmt.Sprintf(syncCmdTemplate, buildID))).
 			BashWhen(ft.Not(isLocal), "git fetch origin && git rebase origin/$(git rev-parse --abbrev-ref HEAD)").
 			Append(conf.Post...).
+			Worker().
+			WithErrorFilter(func(err error) error {
+				if err != nil {
+					proclog.Noticeln(ruler, bullet, ruler)
+					grip.Critical(message.BuildPair().
+						Pair("op", opName).
+						Pair("state", "errored").
+						Pair("host", host).
+						Pair("id", buildID).
+						Pair("repo", conf.Name).
+						Pair("path", conf.Path).
+						Pair("operator", hn).
+						Pair("dur", time.Since(started)).
+						Pair("err", err),
+					)
+					grip.Error(procbuf.renderAll())
+				}
+				return err
+			}).
 			Run(ctx)
 
-		msg := message.BuildPair().
-			Pair("op", "repo-sync").
+		grip.Info(message.BuildPair().
+			Pair("op", opName).
 			Pair("state", "completed").
+			Pair("err", err != nil).
 			Pair("host", host).
-			Pair("errors", err != nil).
 			Pair("id", buildID).
-			Pair("path", conf.Path).
-			Pair("dur", time.Since(started))
+			Pair("path", conf.Path),
+		)
 
-		if err != nil {
-			proclog.Noticeln(
-				ruler,
-				"repo:", strings.ToUpper(conf.Name), "----",
-				"host:", strings.ToUpper(host), "----",
-				"path:", strings.ToUpper(conf.Path),
-				ruler,
-			)
-
-			grip.Error(msg)
-			grip.Error(procout.buffer.String())
-
-			return err
-		}
-
-		grip.Info(msg)
 		return nil
 	}
 }
 
 func (conf *Configuration) CleanupJob() fun.Worker {
+	const opName = "repo-cleanup"
 	return func(ctx context.Context) (err error) {
 		if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
 			return fmt.Errorf("cannot cleanup %s, no repository exists", conf.Path)
 		}
+		id := fmt.Sprintf("cleanup.REPO(%s).OPERATOR(%s)", conf.Name, util.GetHostname())
 
 		start := time.Now()
 
 		defer func() {
-			grip.Notice(message.Fields{
-				"op":    "repo-cleanup",
-				"repo":  conf.Path,
-				"dur":   time.Since(start),
-				"error": err != nil,
-			})
+			grip.Critical(message.BuildPair().
+				Pair("op", opName).
+				Pair("id", id).
+				Pair("repo", conf.Name).
+				Pair("path", conf.Path).
+				Pair("dur", time.Since(start)).
+				Pair("err", err != nil),
+			)
 		}()
 
-		sender := grip.Context(ctx).Sender()
+		proclog, procbuf := newProcessLogger(id)
+		defer procbuf.Close()
+		proclog.Infoln(ruler, id, ruler)
 
 		return jasper.Context(ctx).CreateCommand(ctx).Priority(level.Info).
 			Directory(conf.Path).
-			SetOutputSender(level.Debug, sender).
-			SetErrorSender(level.Warning, sender).
+			SetOutputSender(level.Info, procbuf).
+			SetErrorSender(level.Error, procbuf).
 			AppendArgs("git", "gc").
 			AppendArgs("git", "prune").
-			Run(ctx)
+			Worker().
+			WithErrorFilter(func(err error) error {
+				if err != nil {
+					proclog.Infoln(ruler, id, ruler)
+					grip.Critical(message.BuildPair().
+						Pair("op", opName).
+						Pair("id", id).
+						Pair("repo", conf.Name).
+						Pair("path", conf.Path).
+						Pair("err", err),
+					)
+					grip.Error(procbuf.renderAll())
+				}
+				return err
+			}).PostHook(fn.MakeFuture(procbuf.Close).Ignore()).Run(ctx)
 	}
 }
 

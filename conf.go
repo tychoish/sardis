@@ -195,6 +195,9 @@ type CommandConf struct {
 	Background      *bool                  `bson:"bson" json:"bson" yaml:"bson"`
 	Host            *string                `bson:"host" json:"host" yaml:"host"`
 
+	// if possible call the operation rather
+	// than execing
+	operation     fun.Worker
 	unaliasedName string
 }
 
@@ -295,18 +298,15 @@ func (conf *Configuration) expandLocalNativeOps() {
 		conf.Commands = append(conf.Commands, CommandGroupConf{
 			Name:          "repo",
 			Notify:        ft.Ptr(repo.Notify),
-			Command:       "sardis repo {{command}} {{prefix}}",
 			CmdNamePrefix: repo.Name,
 			Commands: []CommandConf{
 				{
 					Name:      "update",
-					Directory: repo.Path,
-					Command:   "update",
+					operation: repo.FullSync(),
 				},
 				{
 					Name:      "fetch",
-					Directory: repo.Path,
-					Command:   "fetch",
+					operation: repo.FetchJob(),
 				},
 				{
 					Name:            "status",
@@ -992,6 +992,10 @@ func (conf *Configuration) doExportCommandGroups() map[string]CommandGroupConf {
 }
 
 func (conf *CommandConf) Worker() fun.Worker {
+	if conf.operation != nil {
+		return conf.operation
+	}
+
 	sender := grip.Sender()
 	hn := util.GetHostname()
 

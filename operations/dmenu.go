@@ -40,7 +40,7 @@ func DMenu() *cmdr.Commander {
 }
 
 func dmenuCommand(kind dmenuCommandType) *cmdr.Commander {
-	return cmdr.MakeCommander().With(StandardSardisOperationSpec().
+	return cmdr.MakeCommander().With(cmdr.SpecBuilder(ResolveConfiguration).
 		SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 			switch kind {
 			case dmenuCommandAll:

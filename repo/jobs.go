@@ -25,6 +25,12 @@ import (
 func (conf *Configuration) FetchJob() fun.Worker {
 	const opName = "repo-fetch"
 	return func(ctx context.Context) (err error) {
+		// double check this because we might have a stale
+		// version of the config
+		if err := conf.Validate(); err != nil {
+			return err
+		}
+
 		start := time.Now()
 		hostname := util.GetHostname()
 		defer func() {
@@ -199,7 +205,13 @@ func (conf *Configuration) Sync(host string) fun.Worker {
 	}
 
 	return func(ctx context.Context) error {
-		if host != hn || !slices.Contains(conf.Mirrors, host) {
+		// double check this because we might have a stale
+		// version of the config
+		if err := conf.Validate(); err != nil {
+			return err
+		}
+
+		if host != hn && !slices.Contains(conf.Mirrors, host) {
 			return fmt.Errorf("remote named %q is not a configured host for this repo.", host)
 		}
 

@@ -891,6 +891,7 @@ func (conf *CommandGroupConf) Validate() error {
 
 		cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
 		cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", conf.Name)
+		cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", ft.Ref(conf.Host))
 		cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", conf.CmdNamePrefix)
 
 		if len(cmd.Aliases) >= 1 {
@@ -903,6 +904,7 @@ func (conf *CommandGroupConf) Validate() error {
 		for idx := range cmd.Commands {
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
+			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{host}}", ft.Ref(conf.Host))
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", conf.Name)
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{prefix}}", conf.Name)
 

@@ -50,18 +50,32 @@ func blogPublish() *cmdr.Commander {
 
 			if !blog.Enabled {
 				grip.Warning(message.Fields{
-					"op":   opName,
-					"msg":  "publication disabled",
-					"name": name,
-					"repo": blog.RepoName,
-					"path": repo.Path,
-					"host": conf.Settings.Runtime.Hostname,
+					"op":    opName,
+					"state": "disabled",
+					"name":  name,
+					"repo":  blog.RepoName,
+					"path":  repo.Path,
+					"host":  conf.Settings.Runtime.Hostname,
 				})
 				return nil
 			}
+
+			grip.Notice(message.BuildPair().
+				Pair("op", opName).
+				Pair("state", "started").
+				Pair("name", name).
+				Pair("repo", blog.RepoName).
+				Pair("path", repo.Path).
+				Pair("dur", time.Since(startAt)),
+			)
+
+			var err error
+
 			defer func() {
 				grip.Notice(message.BuildPair().
 					Pair("op", opName).
+					Pair("state", "completed").
+					Pair("err", err != nil).
 					Pair("name", name).
 					Pair("repo", blog.RepoName).
 					Pair("path", repo.Path).
@@ -69,7 +83,7 @@ func blogPublish() *cmdr.Commander {
 				)
 			}()
 
-			err := units.NewRepoSyncJob(conf.Settings.Runtime.Hostname, *repo).WithErrorFilter(func(err error) error {
+			err = units.NewRepoSyncJob(conf.Settings.Runtime.Hostname, *repo).WithErrorFilter(func(err error) error {
 				return ers.Wrapf(err, "problem syncing blog %q repo", name)
 			}).Join(jasper.Context(ctx).CreateCommand(ctx).
 				Append(blog.DeployCommands...).

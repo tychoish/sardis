@@ -188,17 +188,11 @@ type CommandGroupConf struct {
 func (cg *CommandGroupConf) NamesAtIndex(idx int) []string {
 	fun.Invariant.Ok(idx >= 0 && idx < len(cg.Commands), "command out of bounds", cg.Name)
 	ops := []string{}
-	var base string
-	if cg.CmdNamePrefix == "" {
-		base = "."
-	} else {
-		base = fmt.Sprint(".", cg.CmdNamePrefix, ".")
-	}
 
 	for _, grp := range append([]string{cg.Name}, cg.Aliases...) {
 		cmd := cg.Commands[idx]
 		for _, name := range append([]string{cmd.Name}, cmd.Aliases...) {
-			ops = append(ops, fmt.Sprint(grp, base, name))
+			ops = append(ops, fmt.Sprint(grp, ".", name))
 		}
 	}
 
@@ -380,10 +374,10 @@ func (conf *Configuration) expandLocalNativeOps() {
 		// TODO these have a worker function already
 		// implemented in units for setup.
 		conf.Commands = append(conf.Commands, CommandGroupConf{
-			Name:          "systemd.service",
+			Name:          "systemd",
 			Directory:     conf.Settings.Runtime.Hostname,
 			Notify:        ft.Ptr(true),
-			CmdNamePrefix: service.Name,
+			CmdNamePrefix: fmt.Sprint("service." + service.Name),
 			Command:       fmt.Sprintf("%s {{name}} %s", command, service.Unit),
 			Commands: []CommandConf{
 				{Name: "restart"},

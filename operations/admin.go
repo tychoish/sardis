@@ -2,7 +2,10 @@ package operations
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"slices"
+	"strings"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
@@ -41,6 +44,13 @@ func hacking() *cmdr.Commander {
 				sardis.EnvVarAlacrittySocket: os.Getenv(sardis.EnvVarAlacrittySocket),
 				sardis.EnvVarSSHAgentSocket:  os.Getenv(sardis.EnvVarSSHAgentSocket),
 			})
+			for cg := range slices.Values(conf.Commands) {
+				fmt.Println("START GROUP", cg.Name, "--------")
+				for i := 0; i < len(cg.Commands); i++ {
+					fmt.Println("--- ", strings.Join(cg.NamesAtIndex(i), "\n     "))
+				}
+				fmt.Println("END GROUP", cg.Name, "---------")
+			}
 
 			return nil
 		}).Add)

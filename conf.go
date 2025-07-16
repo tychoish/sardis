@@ -43,10 +43,10 @@ type Configuration struct {
 	Blog             []BlogConf           `bson:"blog" json:"blog" yaml:"blog"`
 	Menus            []MenuConf           `bson:"menu" json:"menu" yaml:"menu"`
 
-	repoTags         map[string][]*repo.Configuration
-	indexedRepoCount int
-	linkedFilesRead  bool
-	caches           struct {
+	repoTags        map[string][]*repo.Configuration
+	repoTagsMapped  bool
+	linkedFilesRead bool
+	caches          struct {
 		commandGroups    adt.Once[map[string]CommandGroupConf]
 		allCommdands     adt.Once[[]CommandConf]
 		comandGroupNames adt.Once[[]string]
@@ -218,16 +218,23 @@ type MenuConf struct {
 }
 
 func LoadConfiguration(fn string) (*Configuration, error) {
+	out, err := readConfiguration(fn)
+	if err != nil {
+		return nil, err
+	}
+	if err := out.Validate(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func readConfiguration(fn string) (*Configuration, error) {
 	out := &Configuration{}
 
 	if err := sutil.UnmarshalFile(fn, out); err != nil {
 		return nil, fmt.Errorf("problem unmarshaling config data: %w", err)
 	}
-
-	if err := out.Validate(); err != nil {
-		return nil, err
-	}
-
 	return out, nil
 }
 
@@ -284,15 +291,14 @@ func (conf *Configuration) doValidate() error {
 		ec.Wrapf(conf.Menus[idx].Validate(), "%d of %T is not valid", idx, conf.Menus[idx])
 	}
 
-	if conf.shouldIndexRepos() {
-		conf.mapReposByTags()
-	}
+	conf.mapReposByTags()
 
 	return ec.Resolve()
 }
 
 func (conf *Configuration) expandLocalNativeOps() {
-	for _, repo := range conf.Repo {
+	for idx := range conf.Repo {
+		repo := conf.Repo[idx]
 		if repo.Disabled || (!repo.LocalSync && !repo.Fetch) {
 			continue
 		}
@@ -374,10 +380,10 @@ func (conf *Configuration) expandLinkedFiles(catcher *erc.Collector) {
 	pipe := make(chan *Configuration, len(conf.Settings.ConfigPaths))
 
 	wg := &sync.WaitGroup{}
-	for idx, fn := range conf.Settings.ConfigPaths {
-		if _, err := os.Stat(fn); os.IsNotExist(err) {
+	for idx, fileName := range conf.Settings.ConfigPaths {
+		if _, err := os.Stat(fileName); os.IsNotExist(err) {
 			grip.Warning(message.Fields{
-				"file": fn,
+				"file": fileName,
 				"msg":  "config file does not exist",
 			})
 			continue
@@ -386,7 +392,7 @@ func (conf *Configuration) expandLinkedFiles(catcher *erc.Collector) {
 		wg.Add(1)
 		go func(idx int, fn string) {
 			defer wg.Done()
-			conf, err := LoadConfiguration(fn)
+			conf, err := readConfiguration(fn)
 			if err != nil {
 				catcher.Add(fmt.Errorf("problem reading linked config file %q: %w", fn, err))
 				return
@@ -400,7 +406,7 @@ func (conf *Configuration) expandLinkedFiles(catcher *erc.Collector) {
 				"nested file %q specified additional files %v, which is invalid",
 				fn, conf.Settings.ConfigPaths)
 			pipe <- conf
-		}(idx, fn)
+		}(idx, fileName)
 	}
 
 	wg.Wait()
@@ -486,29 +492,26 @@ func (conf *Configuration) resolveCommands() {
 }
 
 func (conf *Configuration) Merge(mcfs ...*Configuration) {
-	out := &Configuration{}
-	mcfs = append([]*Configuration{conf}, mcfs...)
+	mcfs = append([]*Configuration{}, mcfs...)
+	reposAdded := 0
 	for idx := range mcfs {
 		mcf := mcfs[idx]
 		if mcf == nil {
 			continue
 		}
 
-		out.Blog = append(out.Blog, mcf.Blog...)
-		out.Commands = append(out.Commands, mcf.Commands...)
-		out.Hosts = append(out.Hosts, mcf.Hosts...)
-		out.Links = append(out.Links, mcf.Links...)
-		out.Menus = append(out.Menus, mcf.Menus...)
-		out.Repo = append(out.Repo, mcf.Repo...)
-		out.System.Arch.AurPackages = append(out.System.Arch.AurPackages, mcf.System.Arch.AurPackages...)
-		out.System.Arch.Packages = append(out.System.Arch.Packages, mcf.System.Arch.Packages...)
-		out.System.GoPackages = append(out.System.GoPackages, mcf.System.GoPackages...)
-		out.System.Services = append(out.System.Services, mcf.System.Services...)
-		out.TerminalCommands = append(out.TerminalCommands, mcf.TerminalCommands...)
-	}
-
-	if out.shouldIndexRepos() {
-		out.mapReposByTags()
+		reposAdded += len(mcf.Repo)
+		conf.Blog = append(conf.Blog, mcf.Blog...)
+		conf.Commands = append(conf.Commands, mcf.Commands...)
+		conf.Hosts = append(conf.Hosts, mcf.Hosts...)
+		conf.Links = append(conf.Links, mcf.Links...)
+		conf.Menus = append(conf.Menus, mcf.Menus...)
+		conf.Repo = append(conf.Repo, mcf.Repo...)
+		conf.System.Arch.AurPackages = append(conf.System.Arch.AurPackages, mcf.System.Arch.AurPackages...)
+		conf.System.Arch.Packages = append(conf.System.Arch.Packages, mcf.System.Arch.Packages...)
+		conf.System.GoPackages = append(conf.System.GoPackages, mcf.System.GoPackages...)
+		conf.System.Services = append(conf.System.Services, mcf.System.Services...)
+		conf.TerminalCommands = append(conf.TerminalCommands, mcf.TerminalCommands...)
 	}
 }
 
@@ -556,9 +559,8 @@ func (conf *Configuration) GetTaggedRepos(tags ...string) dt.Slice[repo.Configur
 	if len(tags) == 0 {
 		return nil
 	}
-	if conf.shouldIndexRepos() {
-		conf.mapReposByTags()
-	}
+
+	conf.mapReposByTags()
 
 	var out []repo.Configuration
 
@@ -576,10 +578,11 @@ func (conf *Configuration) GetTaggedRepos(tags ...string) dt.Slice[repo.Configur
 	return out
 }
 
-func (conf *Configuration) shouldIndexRepos() bool { return len(conf.Repo) != conf.indexedRepoCount }
-
 func (conf *Configuration) mapReposByTags() {
-	defer func() { conf.indexedRepoCount = len(conf.Repo) }()
+	defer func() { conf.repoTagsMapped = true }()
+	if conf.repoTagsMapped {
+		return
+	}
 
 	conf.repoTags = make(map[string][]*repo.Configuration)
 
@@ -1025,6 +1028,7 @@ func (conf *Configuration) doExportCommandGroups() map[string]CommandGroupConf {
 		group := conf.Commands[idx]
 		out[group.Name] = group
 		for idx := range group.Aliases {
+			group := conf.Commands[idx]
 			out[group.Aliases[idx]] = group
 		}
 	}

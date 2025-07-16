@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -40,17 +41,28 @@ func Repo() *cmdr.Commander {
 }
 
 func repoList() *cmdr.Commander {
-	return cmdr.MakeCommander().SetName("list").
-		SetUsage("return a list of configured repos").
-		With(cmdr.SpecBuilder(
-			ResolveConfiguration,
-		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
+	return addOpCommand(
+		cmdr.MakeCommander().
+			SetName("list").
+			Aliases("ls").
+			SetUsage("return a list of configured repos"),
+		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 			homedir := util.GetHomedir()
 
 			table := tabby.New()
 			table.AddHeader("Name", "Path", "Local", "Enabled", "Tags")
 
-			for _, repo := range conf.Repo {
+			var repos []repo.Configuration
+
+			if len(args.ops) == 0 {
+				repos = args.conf.Repo
+			} else {
+				repos = args.conf.GetTaggedRepos(args.ops...)
+			}
+
+			sort.Slice(repos, func(i, j int) bool { return repos[i].Path < repos[j].Path })
+
+			for _, repo := range repos {
 				table.AddLine(
 					repo.Name,
 					strings.Replace(repo.Path, homedir, "~", 1),
@@ -62,7 +74,8 @@ func repoList() *cmdr.Commander {
 			table.Print()
 
 			return nil
-		}).Add)
+		},
+	)
 }
 
 func repoUpdate() *cmdr.Commander {

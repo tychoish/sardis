@@ -119,7 +119,7 @@ func listCommands() *cmdr.Commander {
 						nms := strings.Join(append([]string{cmd.Name}, cmd.Aliases...), ", ")
 						cmds := append([]string{cmd.Command}, cmd.Commands...)
 						for idx := range cmds {
-							if maxLen := 52; len(cmds[idx]) > maxLen {
+							if maxLen := 48; len(cmds[idx]) > maxLen {
 								cmds[idx] = fmt.Sprintf("<%s...>", cmds[idx][:maxLen])
 							}
 						}

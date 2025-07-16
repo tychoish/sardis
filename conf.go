@@ -331,7 +331,7 @@ func (conf *Configuration) expandLocalNativeOps() {
 		}
 		if !repo.Fetch && !repo.LocalSync {
 			continue
-}
+		}
 
 		cg := CommandGroupConf{
 			Name:          "repo",

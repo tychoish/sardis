@@ -341,7 +341,7 @@ func (conf *Configuration) expandLocalNativeOps() {
 				Name:            "status",
 				Directory:       repo.Path,
 				OverrideDefault: true,
-				Command:         "alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command 'sardis repo status {{prefix}}'",
+				Command:         "alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command sardis repo status {{prefix}}",
 			}},
 		}
 

@@ -394,7 +394,7 @@ func (conf *Configuration) expandLocalNativeOps() {
 				{Name: "setup", Command: defaultState},
 				{
 					Name:            "logs",
-					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command journalctl --follow --pager-end --catalog --unit %s", service.Unit),
+					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command journalctl --follow --pager-end --unit %s", service.Unit),
 					OverrideDefault: true,
 				},
 				{

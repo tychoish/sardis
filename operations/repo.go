@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
@@ -45,7 +47,49 @@ func repoList() *cmdr.Commander {
 		cmdr.MakeCommander().
 			SetName("list").
 			Aliases("ls").
-			SetUsage("return a list of configured repos"),
+			SetUsage("return a list of configured repos").
+			Subcommanders(addOpCommand(
+				cmdr.MakeCommander().
+					SetName("tags").
+					SetUsage("list repos by tag groups"),
+				"tag", func(ctx context.Context, arg *opsCmdArgs[[]string]) error {
+					table := tabby.New()
+					tags := arg.conf.RepoTags()
+
+					matcher := dt.NewSetFromSlice(arg.ops)
+					table.AddHeader("Tag", "Count", "Repositories")
+					err := tags.Stream().Filter(func(tp dt.Pair[string, dt.Slice[*repo.Configuration]]) bool {
+
+						// if this is a "list all" situation then only give us the tags; but if we
+						// ask for a specific term, give us the full match.
+						return (matcher.Len() == 0 && (len(tp.Value) > 1 || tp.Value[0].Name != tp.Key)) ||
+							matcher.Check(tp.Key)
+
+					}).ReadAll(func(rpt dt.Pair[string, dt.Slice[*repo.Configuration]]) {
+						rns, err := fun.MakeConverter(func(r *repo.Configuration) string { return r.Name }).
+							Stream(dt.NewSlice(rpt.Value).Stream()).Slice(ctx)
+						grip.Error(message.WrapError(err, "problem rendering repo names"))
+
+						subsequent := false
+						for chunk := range slices.Chunk(rns, 5) {
+							if !subsequent {
+								table.AddLine(rpt.Key, len(rns), strings.Join(chunk, ", "))
+								subsequent = true
+								continue
+							}
+							table.AddLine("", "", strings.Join(chunk, ", "))
+						}
+						table.AddLine("", "", "")
+					}).Run(ctx)
+
+					if err != nil {
+						return ers.Wrap(err, "problem finding repo tags for table")
+					}
+
+					table.Print()
+					return nil
+				},
+			)),
 		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 			homedir := util.GetHomedir()
 
@@ -60,15 +104,15 @@ func repoList() *cmdr.Commander {
 				repos = args.conf.GetTaggedRepos(args.ops...)
 			}
 
-			sort.Slice(repos, func(i, j int) bool { return repos[i].Path < repos[j].Path })
+			sort.Slice(repos, func(i, j int) bool { return repos[i].Name < repos[j].Name })
 
 			for _, repo := range repos {
 				table.AddLine(
 					repo.Name,
 					strings.Replace(repo.Path, homedir, "~", 1),
 					util.FileExists(repo.Path),
-					repo.LocalSync || repo.Fetch,
-					repo.Tags)
+					!repo.Disabled,
+					strings.Join(repo.Tags, ", "))
 			}
 
 			table.Print()

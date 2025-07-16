@@ -47,7 +47,7 @@ type Configuration struct {
 	repoTagsEvaluated bool
 	linkedFilesRead   bool
 
-	repoTags map[string][]*repo.Configuration
+	repoTags dt.Map[string, dt.Slice[*repo.Configuration]]
 	caches   struct {
 		commandGroups    adt.Once[map[string]CommandGroupConf]
 		allCommdands     adt.Once[[]CommandConf]
@@ -300,13 +300,13 @@ func (conf *Configuration) doValidate() error {
 		ec.Wrapf(conf.Hosts[idx].Validate(), "%d of %T is not valid", idx, conf.Hosts[idx])
 	}
 
+	conf.mapReposByTags()
 	conf.expandLocalNativeOps()
 	for idx := range conf.Commands {
 		ec.Wrapf(conf.Commands[idx].Validate(), "%d of %T is not valid", idx, conf.Commands[idx])
 	}
 	conf.resolveCommands()
 
-	conf.mapReposByTags()
 	ec.Wrap(conf.validateBlogs(), "blog build/push configuration is invalid")
 
 	return ec.Resolve()
@@ -331,29 +331,81 @@ func (conf *Configuration) expandLocalNativeOps() {
 			Name:          "repo",
 			Notify:        ft.Ptr(repo.Notify),
 			CmdNamePrefix: repo.Name,
-			Commands: []CommandConf{{
-				Name:            "status",
-				Directory:       repo.Path,
-				OverrideDefault: true,
-				Command:         "alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command sardis repo status {{prefix}}",
-			}},
-		}
-
-		if repo.Fetch || repo.LocalSync {
-			cg.Commands = append(cg.Commands, CommandConf{
-				Name:      "fetch",
-				operation: repo.FetchJob(),
-			})
+			Commands: []CommandConf{
+				CommandConf{
+					Name:      "fetch",
+					operation: repo.FetchJob(),
+				},
+				// TODO figure out why this err doesn't really work
+				//      - implementation problem with the underlying operation
+				//      - also need to wrap it in a pager at some level.
+				//      - and disable syslogging
+				// {
+				// 	Name:            "status",
+				// 	Directory:       repo.Path,
+				// 	OverrideDefault: true,
+				// 	Command:         "alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command sardis repo status {{prefix}}",
+				// },
+			},
 		}
 
 		if repo.LocalSync {
 			cg.Commands = append(cg.Commands, CommandConf{
 				Name:      "update",
+				Aliases:   []string{"sync"},
 				operation: repo.FullSync(),
 			})
 		}
 
 		conf.Commands = append(conf.Commands, cg)
+	}
+
+	for tag, repos := range conf.repoTags {
+		if len(repos) == 0 {
+			continue
+		}
+		if len(repos) == 1 && repos[0].Name == tag {
+			continue
+		}
+
+		tagName := tag
+
+		conf.Commands = append(conf.Commands, CommandGroupConf{
+			Name:          "repo",
+			Notify:        ft.Ptr(true),
+			CmdNamePrefix: fmt.Sprint("tagged.", tagName),
+			Commands: []CommandConf{
+				{
+					Name: "fetch",
+					operation: func(ctx context.Context) error {
+						repos := fun.MakeConverter(func(r *repo.Configuration) fun.Worker {
+							return r.FetchJob()
+						}).Stream(conf.repoTags.Get(tagName).Stream())
+
+						return repos.Parallel(
+							func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+							fun.WorkerGroupConfContinueOnError(),
+							fun.WorkerGroupConfWorkerPerCPU(),
+						).Run(ctx)
+					},
+				},
+				{
+					Name:    "update",
+					Aliases: []string{"sync"},
+					operation: func(ctx context.Context) error {
+						repos := fun.MakeConverter(func(r *repo.Configuration) fun.Worker {
+							return r.FullSync()
+						}).Stream(conf.repoTags.Get(tagName).Stream())
+
+						return repos.Parallel(
+							func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+							fun.WorkerGroupConfContinueOnError(),
+							fun.WorkerGroupConfWorkerPerCPU(),
+						).Run(ctx)
+					},
+				},
+			},
+		})
 	}
 
 	for _, service := range conf.System.Services {
@@ -399,6 +451,7 @@ func (conf *Configuration) expandLocalNativeOps() {
 			},
 		})
 	}
+
 }
 
 func (conf *Configuration) expandLinkedFiles(ec *erc.Collector) {
@@ -611,13 +664,18 @@ func (conf *Configuration) GetTaggedRepos(tags ...string) dt.Slice[repo.Configur
 	return out
 }
 
+func (conf *Configuration) RepoTags() dt.Map[string, dt.Slice[*repo.Configuration]] {
+	conf.mapReposByTags()
+	return conf.repoTags
+}
+
 func (conf *Configuration) mapReposByTags() {
 	defer func() { conf.repoTagsEvaluated = true }()
 	if conf.repoTagsEvaluated {
 		return
 	}
 
-	conf.repoTags = make(map[string][]*repo.Configuration)
+	conf.repoTags = make(map[string]dt.Slice[*repo.Configuration])
 
 	for idx := range conf.Repo {
 		for _, tag := range conf.Repo[idx].Tags {

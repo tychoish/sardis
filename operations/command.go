@@ -20,6 +20,7 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/subexec"
 	sutil "github.com/tychoish/sardis/util"
 )
 
@@ -34,7 +35,7 @@ func RunCommand() *cmdr.Commander {
 			qrCode(),
 		),
 		commandFlagName, func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-			cmds, err := getcmds(args.conf.ExportAllCommands(), args.ops)
+			cmds, err := getcmds(args.conf.Operations.ExportAllCommands(), args.ops)
 			if err != nil {
 				return err
 			}
@@ -42,8 +43,8 @@ func RunCommand() *cmdr.Commander {
 		})
 }
 
-func getcmds(cmds []sardis.CommandConf, args []string) ([]sardis.CommandConf, error) {
-	out := make([]sardis.CommandConf, 0, len(args))
+func getcmds(cmds []subexec.Command, args []string) ([]subexec.Command, error) {
+	out := make([]subexec.Command, 0, len(args))
 
 	ops := dt.NewSetFromSlice(args)
 	collected := dt.Set[string]{}
@@ -73,11 +74,11 @@ func getcmds(cmds []sardis.CommandConf, args []string) ([]sardis.CommandConf, er
 	return out, nil
 }
 
-func toWorkers(st *fun.Stream[sardis.CommandConf]) *fun.Stream[fun.Worker] {
-	return fun.MakeConverter(func(conf sardis.CommandConf) fun.Worker { return conf.Worker() }).Stream(st)
+func toWorkers(st *fun.Stream[subexec.Command]) *fun.Stream[fun.Worker] {
+	return fun.MakeConverter(func(conf subexec.Command) fun.Worker { return conf.Worker() }).Stream(st)
 }
 
-func runConfiguredCommand(ctx context.Context, cmds dt.Slice[sardis.CommandConf]) error {
+func runConfiguredCommand(ctx context.Context, cmds dt.Slice[subexec.Command]) error {
 	size := cmds.Len()
 	switch {
 	case size == 1:
@@ -85,7 +86,7 @@ func runConfiguredCommand(ctx context.Context, cmds dt.Slice[sardis.CommandConf]
 	case size < runtime.NumCPU():
 		return fun.MAKE.WorkerPool(toWorkers(cmds.Stream())).Run(ctx)
 	default:
-		return cmds.Stream().Parallel(func(ctx context.Context, conf sardis.CommandConf) error { return conf.Worker().Run(ctx) },
+		return cmds.Stream().Parallel(func(ctx context.Context, conf subexec.Command) error { return conf.Worker().Run(ctx) },
 			fun.WorkerGroupConfContinueOnError(),
 			fun.WorkerGroupConfWorkerPerCPU(),
 		).Run(ctx)
@@ -105,7 +106,7 @@ func listCommands() *cmdr.Commander {
 				table := tabby.New()
 				table.AddHeader("Group", "Name", "Command", "Directory")
 
-				for _, group := range conf.Commands {
+				for _, group := range conf.Operations.Commands {
 					for _, cmd := range group.Commands {
 						if cmd.Directory == homedir {
 							cmd.Directory = ""

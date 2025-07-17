@@ -2,11 +2,10 @@ package operations
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"slices"
-	"strings"
 
+	"github.com/cheynewallace/tabby"
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
@@ -35,23 +34,28 @@ func hacking() *cmdr.Commander {
 		SetName("hack").
 		With(StandardSardisOperationSpec().SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 			grip.Noticeln("has conf", conf != nil)
-			grip.Noticeln("has jasper", jasper.HasManager(ctx))
+			grip.Noticeln("has default jasper", jasper.HasManager(ctx))
 
 			grip.Info(message.Fields{
 				"version":                    sardis.BuildRevision,
-				"alacritty":                  conf.AlacrittySocket(),
-				"ssh_agent":                  conf.SSHAgentSocket(),
+				"alacritty":                  conf.Operations.AlacrittySocket(),
+				"ssh_agent":                  conf.Operations.SSHAgentSocket(),
 				sardis.EnvVarAlacrittySocket: os.Getenv(sardis.EnvVarAlacrittySocket),
 				sardis.EnvVarSSHAgentSocket:  os.Getenv(sardis.EnvVarSSHAgentSocket),
 			})
-			for cg := range slices.Values(conf.Commands) {
-				fmt.Println("START GROUP", cg.Name, "--------")
+			table := tabby.New()
+			table.AddHeader("Group", "Command")
+			for cg := range slices.Values(conf.Operations.Commands) {
 				for i := 0; i < len(cg.Commands); i++ {
-					fmt.Println("--- ", strings.Join(cg.NamesAtIndex(i), "\n     "))
+					if i == 0 {
+						table.AddLine(cg.Name, cg.NamesAtIndex(i)[0:])
+						continue
+					}
+					table.AddLine("", cg.NamesAtIndex(i)[0:])
 				}
-				fmt.Println("END GROUP", cg.Name, "---------")
+				table.AddLine("", "")
 			}
-
+			table.Print()
 			return nil
 		}).Add)
 

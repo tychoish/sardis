@@ -4,17 +4,19 @@ shared configuration resources for the sardis application.
 */
 package sardis
 
+import "github.com/tychoish/sardis/global"
+
 // BuildRevision stores the commit in the git repository at build time
 // and is specified with -ldflags at build time
 var BuildRevision = ""
 
-const ApplicationName = "sardis"
-
 const (
-	EnvVarSSHAgentSocket       = "SSH_AUTH_SOCK"
-	EnvVarAlacrittySocket      = "ALACRITTY_SOCKET"
-	EnvVarSardisLogQuietStdOut = "SARDIS_LOG_QUIET_STDOUT"
-	EnvVarSardisLogQuietSyslog = "SARDIS_LOG_QUIET_SYSLOG"
-	EnvVarSardisLogFormatJSON  = "SARDIS_LOG_FORMAT_JSON"
-	EnvVarSardisLogJSONColor   = "SARDIS_LOG_COLOR_JSON"
+	ApplicationName = global.ApplicationName
+
+	EnvVarSSHAgentSocket       = global.EnvVarSSHAgentSocket
+	EnvVarAlacrittySocket      = global.EnvVarAlacrittySocket
+	EnvVarSardisLogQuietStdOut = global.EnvVarSardisLogQuietStdOut
+	EnvVarSardisLogQuietSyslog = global.EnvVarSardisLogQuietSyslog
+	EnvVarSardisLogFormatJSON  = global.EnvVarSardisLogFormatJSON
+	EnvVarSardisLogJSONColor   = global.EnvVarSardisLogJSONColor
 )

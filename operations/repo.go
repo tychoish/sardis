@@ -149,7 +149,7 @@ func repoUpdate() *cmdr.Commander {
 			})
 
 			var err error
-			jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.FullSync() }).Stream(filterd)
+			jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.UpdateJob() }).Stream(filterd)
 
 			grip.Info(message.BuildPair().
 				Pair("op", opName).

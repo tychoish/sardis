@@ -24,6 +24,7 @@ import (
 	"github.com/tychoish/grip/x/twitter"
 	"github.com/tychoish/grip/x/xmpp"
 	"github.com/tychoish/jasper/util"
+	"github.com/tychoish/sardis/global"
 )
 
 func WithAppLogger(ctx context.Context, conf *Configuration) context.Context {
@@ -71,9 +72,11 @@ func SetupLogging(conf *Configuration) send.Sender {
 	return sender
 }
 
-func Twitter(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "twitter") }
+func Twitter(ctx context.Context) grip.Logger {
+	return grip.ContextLogger(ctx, global.ContextTwitterLogger)
+}
 func WithTwitterLogger(ctx context.Context, conf *Configuration) context.Context {
-	return grip.WithNewContextLogger(ctx, "twitter", func() send.Sender {
+	return grip.WithNewContextLogger(ctx, global.ContextTwitterLogger, func() send.Sender {
 		twitter, err := twitter.MakeSender(ctx, &twitter.Options{
 			Name:           fmt.Sprint("@", conf.Settings.Credentials.Twitter.Username, "/sardis"),
 			ConsumerKey:    conf.Settings.Credentials.Twitter.ConsumerKey,
@@ -96,22 +99,26 @@ func WithTwitterLogger(ctx context.Context, conf *Configuration) context.Context
 	})
 }
 
-func DesktopNotify(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "desktop") }
+func DesktopNotify(ctx context.Context) grip.Logger {
+	return grip.ContextLogger(ctx, global.ContextDesktopLogger)
+}
 func WithDesktopNotify(ctx context.Context) context.Context {
 	root := grip.Sender()
 	s := desktop.MakeSender()
-	s.SetName("sardis")
+	s.SetName(global.ApplicationName)
 	s.SetPriority(root.Priority())
 	sender := send.MakeMulti(s, root)
-	return grip.WithContextLogger(ctx, "desktop", grip.NewLogger(sender))
+	return grip.WithContextLogger(ctx, global.ContextDesktopLogger, grip.NewLogger(sender))
 }
 
-func RemoteNotify(ctx context.Context) grip.Logger { return grip.ContextLogger(ctx, "remote-notify") }
+func RemoteNotify(ctx context.Context) grip.Logger {
+	return grip.ContextLogger(ctx, global.ContextRemoteLogger)
+}
 func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Context) {
 	var loggers []send.Sender
 	root := grip.Sender()
 	defer func() {
-		out = grip.WithContextLogger(ctx, "remote-notify",
+		out = grip.WithContextLogger(ctx, global.ContextRemoteLogger,
 			grip.NewLogger(send.NewMulti(
 				root.Name(),
 				append(loggers, root),
@@ -172,7 +179,7 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 	}
 	if len(loggers) == 0 {
 		desktop := desktop.MakeSender()
-		desktop.SetName("sardis")
+		desktop.SetName(global.ApplicationName)
 		desktop.SetPriority(grip.Sender().Priority())
 		loggers = append(loggers, desktop)
 	}

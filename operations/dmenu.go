@@ -17,6 +17,7 @@ import (
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/subexec"
 )
 
 type dmenuCommandType int
@@ -44,7 +45,7 @@ func dmenuCommand(kind dmenuCommandType) *cmdr.Commander {
 		SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 			switch kind {
 			case dmenuCommandAll:
-				return dmenuForCommands(ctx, conf, conf.ExportAllCommands())
+				return dmenuForCommands(ctx, conf, conf.Operations.ExportAllCommands())
 			case dmenuCommandGroups:
 				return dmenuGroupSelector(ctx, conf)
 			default:
@@ -54,11 +55,11 @@ func dmenuCommand(kind dmenuCommandType) *cmdr.Commander {
 }
 
 func runDmenuOperation(ctx context.Context, conf *sardis.Configuration, name string) error {
-	if group, ok := conf.ExportCommandGroups()[name]; ok {
+	if group, ok := conf.Operations.ExportCommandGroups()[name]; ok {
 		return dmenuForCommands(ctx, conf, group.Commands)
 	}
 
-	cmds, err := getcmds(conf.ExportAllCommands(), []string{name})
+	cmds, err := getcmds(conf.Operations.ExportAllCommands(), []string{name})
 	if err != nil {
 		return err
 	}
@@ -68,7 +69,7 @@ func runDmenuOperation(ctx context.Context, conf *sardis.Configuration, name str
 
 func dmenuGroupSelector(ctx context.Context, conf *sardis.Configuration) error {
 	cmd, err := godmenu.Run(ctx,
-		godmenu.ExtendSelections(conf.ExportGroupNames()),
+		godmenu.ExtendSelections(conf.Operations.ExportGroupNames()),
 		godmenu.WithFlags(conf.Settings.DMenu),
 		godmenu.Sorted(),
 	)
@@ -82,17 +83,17 @@ func dmenuGroupSelector(ctx context.Context, conf *sardis.Configuration) error {
 		return err
 	}
 
-	return dmenuForCommands(ctx, conf, conf.ExportCommandGroups().Get(cmd).Commands)
+	return dmenuForCommands(ctx, conf, conf.Operations.ExportCommandGroups().Get(cmd).Commands)
 }
 
-func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, cmds []sardis.CommandConf) error {
+func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, cmds []subexec.Command) error {
 	if len(cmds) == 0 {
 		return errors.New("no selection")
 	}
 
 	seen := dt.Set[string]{}
 
-	seen.AppendStream(fun.MakeConverter(func(cmd *sardis.CommandConf) string { return cmd.Name }).Stream(dt.SlicePtrs(cmds).Stream()))
+	seen.AppendStream(fun.MakeConverter(func(cmd *subexec.Command) string { return cmd.Name }).Stream(dt.SlicePtrs(cmds).Stream()))
 
 	cmd, err := godmenu.Run(ctx,
 		godmenu.ExtendSelections(fun.NewGenerator(seen.Stream().Slice).Force().Resolve()),
@@ -125,7 +126,7 @@ func listMenus() *cmdr.Commander {
 				table := tabby.New()
 				table.AddHeader("Name", "Selections")
 
-				for name, group := range conf.ExportCommandGroups() {
+				for name, group := range conf.Operations.ExportCommandGroups() {
 					cmds := []string{}
 					for _, cmd := range group.Commands {
 						if cmd.Name == "" && len(cmd.Aliases) == 0 {
@@ -143,7 +144,7 @@ func listMenus() *cmdr.Commander {
 						continue
 					}
 					idx := -1
-					for chunk := range slices.Chunk(cmds, 4) {
+					for chunk := range slices.Chunk(cmds, 3) {
 						idx++
 						if idx == 0 {
 							table.AddLine(name, strings.Join(chunk, "; "))
@@ -161,7 +162,7 @@ func listMenus() *cmdr.Commander {
 					}
 
 					idx := -1
-					for chunk := range slices.Chunk(m.Selections, 4) {
+					for chunk := range slices.Chunk(m.Selections, 3) {
 						idx++
 						if idx == 0 {
 							table.AddLine(m.Name, strings.Join(chunk, "; "))

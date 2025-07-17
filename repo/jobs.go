@@ -2,16 +2,19 @@ package repo
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
@@ -116,7 +119,7 @@ func (conf *Configuration) CloneJob() fun.Worker {
 				rconfCopy.Pre = nil
 				rconfCopy.Post = nil
 
-				return rconfCopy.Sync(hostname).Run(ctx)
+				return rconfCopy.SyncRemoteJob(hostname).Run(ctx)
 			}
 
 			if conf.Fetch {
@@ -162,7 +165,9 @@ func (conf *Configuration) CloneJob() fun.Worker {
 	}
 }
 
-func (conf *Configuration) FullSync() fun.Worker {
+func (conf *Configuration) UpdateJob() fun.Worker {
+	const opName = "repo-update"
+	count := &atomic.Int64{}
 	return func(ctx context.Context) error {
 		wg := &fun.WaitGroup{}
 		ec := &erc.Collector{}
@@ -170,6 +175,30 @@ func (conf *Configuration) FullSync() fun.Worker {
 		hostname := util.GetHostname()
 
 		hasMirrors := false
+		startAt := time.Now()
+
+		id := fmt.Sprintf("%s[%d]", strings.ToLower(rand.Text()[8]), count.Add(1))
+
+		grip.Info(message.BuildPair().
+			Pair("op", opName).
+			Pair("state", "started").
+			Pair("id", id).
+			Pair("path", conf.Path).
+			Pair("host", host).
+			Pair("operator", hostname),
+		)
+
+		defer func() {
+			grip.Info(message.BuildPair().
+				Pair("op", opName).
+				Pair("state", "completed").
+				Pair("dur", time.Since(startAt)).
+				Pair("id", id).
+				Pair("path", conf.Path).
+				Pair("host", host).
+				Pair("operator", hostname),
+			)()
+		}()
 
 		for _, mirror := range conf.Mirrors {
 			if strings.Contains(mirror, hostname) {
@@ -179,7 +208,7 @@ func (conf *Configuration) FullSync() fun.Worker {
 			}
 
 			hasMirrors = true
-			wg.Launch(ctx, conf.Sync(mirror).Operation(ec.Push))
+			wg.Launch(ctx, conf.SyncRemoteJob(mirror).Operation(ec.Push))
 		}
 
 		wg.Worker().Operation(ec.Push).Run(ctx)
@@ -190,16 +219,23 @@ func (conf *Configuration) FullSync() fun.Worker {
 
 		if conf.LocalSync {
 			if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
-				return conf.FetchJob().Run(ctx)
+				conf.FetchJob().Operation(ec.Push).Run(ctx)
+				return ec.Resolve()
 			}
 
 			if changes, err := conf.HasChanges(); changes || err != nil {
-				return conf.Sync(hostname).Run(ctx)
+				grip.Warning(message.Wrapf(err, dt.Map[string, any]{
+					"op": opName, "id": id, "host": host,
+					"msg": "problem detecting changes in the repository, may be routine, recoverable",
+				}))
+				conf.SyncRemoteJob(hostname).Operation(ec.Push).Run(ctx)
+				return ec.Resolve()
 			}
 		}
 
 		if conf.Fetch || hasMirrors || conf.LocalSync {
-			return conf.FetchJob().Run(ctx)
+			conf.FetchJob().Operation(ec.Push).Run(ctx)
+			return ec.Resolve()
 		}
 
 		return nil
@@ -212,7 +248,9 @@ const (
 	ruler                   = "---------"
 )
 
-func (conf *Configuration) Sync(host string) fun.Worker {
+// this "remote" in the sense of a git remote, which means it might be
+// the local repository in some cases
+func (conf *Configuration) SyncRemoteJob(host string) fun.Worker {
 	hn := util.GetHostname()
 	if host == "LOCAL" {
 		host = hn

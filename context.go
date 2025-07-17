@@ -35,11 +35,20 @@ func WithConfiguration(ctx context.Context, conf *Configuration) context.Context
 func WithJasper(ctx context.Context, conf *Configuration) context.Context {
 	jpm := jasper.NewManager(
 		jasper.ManagerOptionSetSynchronized(),
-		jasper.ManagerOptionWithEnvVar(EnvVarAlacrittySocket, conf.AlacrittySocket()),
-		jasper.ManagerOptionWithEnvVar(EnvVarSSHAgentSocket, conf.SSHAgentSocket()),
+		jasper.ManagerOptionWithEnvVar(EnvVarAlacrittySocket, conf.Operations.AlacrittySocket()),
+		jasper.ManagerOptionWithEnvVar(EnvVarSSHAgentSocket, conf.Operations.SSHAgentSocket()),
 	)
-
 	srv.AddCleanup(ctx, jpm.Close)
+
+	noStdOut := jasper.NewManager(
+		jasper.ManagerOptionSetSynchronized(),
+		jasper.ManagerOptionWithEnvVar(EnvVarAlacrittySocket, conf.Operations.AlacrittySocket()),
+		jasper.ManagerOptionWithEnvVar(EnvVarSSHAgentSocket, conf.Operations.SSHAgentSocket()),
+		jasper.ManagerOptionWithEnvVar(EnvVarSardisLogQuietStdOut, "true"),
+	)
+	srv.AddCleanup(ctx, noStdOut.Close)
+
+	jasper.WithContextManager(ctx, "without-std-out", noStdOut)
 	return jasper.WithManager(ctx, jpm)
 }
 

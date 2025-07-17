@@ -16,7 +16,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
@@ -26,33 +25,32 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/x/telegram"
 	"github.com/tychoish/grip/x/xmpp"
-	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/repo"
+	"github.com/tychoish/sardis/subexec"
 	sutil "github.com/tychoish/sardis/util"
 )
 
 type Configuration struct {
-	Settings         Settings             `bson:"settings" json:"settings" yaml:"settings"`
-	Repo             []repo.Configuration `bson:"repo" json:"repo" yaml:"repo"`
-	Links            []LinkConf           `bson:"links" json:"links" yaml:"links"`
-	Hosts            []HostConf           `bson:"hosts" json:"hosts" yaml:"hosts"`
-	System           SystemConf           `bson:"system" json:"system" yaml:"system"`
-	Commands         []CommandGroupConf   `bson:"commands" json:"commands" yaml:"commands"`
-	TerminalCommands []CommandConf        `bson:"terminals" json:"terminals" yaml:"terminals"`
-	Blog             []BlogConf           `bson:"blog" json:"blog" yaml:"blog"`
-	Menus            []MenuConf           `bson:"menu" json:"menu" yaml:"menu"`
+	Settings   *Settings             `bson:"settings" json:"settings" yaml:"settings"`
+	Repo       []repo.Configuration  `bson:"repo" json:"repo" yaml:"repo"`
+	Links      []LinkConf            `bson:"links" json:"links" yaml:"links"`
+	Hosts      []HostConf            `bson:"hosts" json:"hosts" yaml:"hosts"`
+	System     SystemConf            `bson:"system" json:"system" yaml:"system"`
+	Operations subexec.Configuration `bson:"operations" json:"operations" yaml:"operations"`
+	Blog       []BlogConf            `bson:"blog" json:"blog" yaml:"blog"`
+	Menus      []MenuConf            `bson:"menu" json:"menu" yaml:"menu"`
+
+	CommandsCOMPAT []subexec.Group `bson:"commands" json:"commands" yaml:"commands"`
 
 	generatedLocalOps bool
 	repoTagsEvaluated bool
 	linkedFilesRead   bool
+	originalPath      string
 
 	repoTags dt.Map[string, dt.Slice[*repo.Configuration]]
 	caches   struct {
-		commandGroups    adt.Once[map[string]CommandGroupConf]
-		allCommdands     adt.Once[[]CommandConf]
-		comandGroupNames adt.Once[[]string]
-		validation       adt.Once[error]
+		validation adt.Once[error]
 	}
 }
 
@@ -169,55 +167,6 @@ type CredentialsAWS struct {
 	Token   string `bson:"token" json:"token" yaml:"token"`
 }
 
-type CommandGroupConf struct {
-	Name          string                 `bson:"name" json:"name" yaml:"name"`
-	Aliases       []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
-	Directory     string                 `bson:"directory" json:"directory" yaml:"directory"`
-	Environment   dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
-	CmdNamePrefix string                 `bson:"command_name_prefix" json:"command_name_prefix" yaml:"command_name_prefix"`
-	Command       string                 `bson:"default_command" json:"default_command" yaml:"default_command"`
-	Notify        *bool                  `bson:"notify" json:"notify" yaml:"notify"`
-	Background    *bool                  `bson:"background" json:"background" yaml:"background"`
-	Host          *string                `bson:"host" json:"host" yaml:"host"`
-	Commands      []CommandConf          `bson:"commands" json:"commands" yaml:"commands"`
-
-	unaliasedName string
-	exportCache   *adt.Once[map[string]CommandConf]
-}
-
-func (cg *CommandGroupConf) NamesAtIndex(idx int) []string {
-	fun.Invariant.Ok(idx >= 0 && idx < len(cg.Commands), "command out of bounds", cg.Name)
-	ops := []string{}
-
-	for _, grp := range append([]string{cg.Name}, cg.Aliases...) {
-		cmd := cg.Commands[idx]
-		for _, name := range append([]string{cmd.Name}, cmd.Aliases...) {
-			ops = append(ops, fmt.Sprint(grp, ".", name))
-		}
-	}
-
-	return ops
-}
-
-type CommandConf struct {
-	Name            string                 `bson:"name" json:"name" yaml:"name"`
-	GroupName       string                 `bson:"-" json:"-" yaml:"-"`
-	Aliases         []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
-	Directory       string                 `bson:"directory" json:"directory" yaml:"directory"`
-	Environment     dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
-	Command         string                 `bson:"command" json:"command" yaml:"command"`
-	Commands        []string               `bson:"commands" json:"commands" yaml:"commands"`
-	OverrideDefault bool                   `bson:"override_default" json:"override_default" yaml:"override_default"`
-	Notify          *bool                  `bson:"notify" json:"notify" yaml:"notify"`
-	Background      *bool                  `bson:"bson" json:"bson" yaml:"bson"`
-	Host            *string                `bson:"host" json:"host" yaml:"host"`
-
-	// if possible call the operation rather
-	// than execing
-	operation     fun.Worker
-	unaliasedName string
-}
-
 type BlogConf struct {
 	Name           string   `bson:"name" json:"name" yaml:"name"`
 	RepoName       string   `bson:"repo" json:"repo" yaml:"repo"`
@@ -239,6 +188,7 @@ func LoadConfiguration(fn string) (*Configuration, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if err := out.Validate(); err != nil {
 		return nil, err
 	}
@@ -252,6 +202,7 @@ func readConfiguration(fn string) (*Configuration, error) {
 	if err := sutil.UnmarshalFile(fn, out); err != nil {
 		return nil, fmt.Errorf("problem unmarshaling config data: %w", err)
 	}
+	out.originalPath = fn
 	return out, nil
 }
 
@@ -272,10 +223,11 @@ func (conf *MenuConf) Validate() error {
 func (conf *Configuration) Validate() error { return conf.caches.validation.Call(conf.doValidate) }
 func (conf *Configuration) doValidate() error {
 	ec := &erc.Collector{}
+	conf.Settings = ft.DefaultNew(conf.Settings)
 
-	ec.Add(conf.Settings.Validate())
-	ec.Add(conf.System.Arch.Validate())
-	conf.expandLinkedFiles(ec)
+	ec.Push(conf.Settings.Validate())
+	ec.Push(conf.System.Arch.Validate())
+	ec.Push(conf.expandLinkedFiles())
 
 	for idx := range conf.System.Services {
 		ec.Wrapf(conf.System.Services[idx].Validate(), "%d of %T is not valid", idx, len(conf.System.Services), conf.System.Services[idx])
@@ -293,7 +245,7 @@ func (conf *Configuration) doValidate() error {
 	conf.Links = conf.expandLinks(ec)
 	for idx := range conf.Links {
 		ec.Wrapf(conf.Links[idx].Validate(), "%d/%d of %T is not valid", idx, len(conf.Links), conf.Links[idx])
-		conf.Links[idx].Target = strings.ReplaceAll(conf.Links[idx].Target, "{{hostname}}", conf.Settings.Runtime.Hostname)
+		conf.Links[idx].Target = strings.ReplaceAll(conf.Links[idx].Target, "{{hostname}}", conf.Operations.Settings.Hostname)
 	}
 
 	for idx := range conf.Hosts {
@@ -302,10 +254,7 @@ func (conf *Configuration) doValidate() error {
 
 	conf.mapReposByTags()
 	conf.expandLocalNativeOps()
-	for idx := range conf.Commands {
-		ec.Wrapf(conf.Commands[idx].Validate(), "%d of %T is not valid", idx, conf.Commands[idx])
-	}
-	conf.resolveCommands()
+	ec.Push(conf.Operations.Validate())
 
 	ec.Wrap(conf.validateBlogs(), "blog build/push configuration is invalid")
 
@@ -318,6 +267,7 @@ func (conf *Configuration) expandLocalNativeOps() {
 	}
 	defer func() { conf.generatedLocalOps = true }()
 
+	grps := make([]subexec.Group, 0, len(conf.Repo)+len(conf.repoTags)+len(conf.System.Services)+len(conf.Menus))
 	for idx := range conf.Repo {
 		repo := conf.Repo[idx]
 		if repo.Disabled {
@@ -327,14 +277,14 @@ func (conf *Configuration) expandLocalNativeOps() {
 			continue
 		}
 
-		cg := CommandGroupConf{
+		cg := subexec.Group{
 			Name:          "repo",
 			Notify:        ft.Ptr(repo.Notify),
 			CmdNamePrefix: repo.Name,
-			Commands: []CommandConf{
-				CommandConf{
-					Name:      "fetch",
-					operation: repo.FetchJob(),
+			Commands: []subexec.Command{
+				subexec.Command{
+					Name:             "pull",
+					WorkerDefinition: repo.FetchJob(),
 				},
 				// TODO figure out why this err doesn't really work
 				//      - implementation problem with the underlying operation
@@ -350,14 +300,13 @@ func (conf *Configuration) expandLocalNativeOps() {
 		}
 
 		if repo.LocalSync {
-			cg.Commands = append(cg.Commands, CommandConf{
-				Name:      "update",
-				Aliases:   []string{"sync"},
-				operation: repo.FullSync(),
+			cg.Commands = append(cg.Commands, subexec.Command{
+				Name:             "update",
+				WorkerDefinition: repo.UpdateJob(),
 			})
 		}
 
-		conf.Commands = append(conf.Commands, cg)
+		grps = append(grps, cg)
 	}
 
 	for tag, repos := range conf.repoTags {
@@ -367,17 +316,28 @@ func (conf *Configuration) expandLocalNativeOps() {
 		if len(repos) == 1 && repos[0].Name == tag {
 			continue
 		}
+		anyActive := false
+		for _, r := range repos {
+			if r.Disabled || (r.Fetch == false && r.LocalSync == false) {
+				continue
+			}
+			anyActive = true
+			break
+		}
+		if !anyActive {
+			continue
+		}
 
 		tagName := tag
 
-		conf.Commands = append(conf.Commands, CommandGroupConf{
+		grps = append(grps, subexec.Group{
 			Name:          "repo",
 			Notify:        ft.Ptr(true),
 			CmdNamePrefix: fmt.Sprint("tagged.", tagName),
-			Commands: []CommandConf{
+			Commands: []subexec.Command{
 				{
-					Name: "fetch",
-					operation: func(ctx context.Context) error {
+					Name: "pull",
+					WorkerDefinition: func(ctx context.Context) error {
 						repos := fun.MakeConverter(func(r *repo.Configuration) fun.Worker {
 							return r.FetchJob()
 						}).Stream(conf.repoTags.Get(tagName).Stream())
@@ -390,11 +350,10 @@ func (conf *Configuration) expandLocalNativeOps() {
 					},
 				},
 				{
-					Name:    "update",
-					Aliases: []string{"sync"},
-					operation: func(ctx context.Context) error {
+					Name: "update",
+					WorkerDefinition: func(ctx context.Context) error {
 						repos := fun.MakeConverter(func(r *repo.Configuration) fun.Worker {
-							return r.FullSync()
+							return r.UpdateJob()
 						}).Stream(conf.repoTags.Get(tagName).Stream())
 
 						return repos.Parallel(
@@ -423,15 +382,15 @@ func (conf *Configuration) expandLocalNativeOps() {
 			defaultState = "disable"
 		}
 
-		// TODO these have a worker function already
+		// TODO these have a fun.Worker function already
 		// implemented in units for setup.
-		conf.Commands = append(conf.Commands, CommandGroupConf{
+		grps = append(grps, subexec.Group{
 			Name:          "systemd",
-			Directory:     conf.Settings.Runtime.Hostname,
+			Directory:     conf.Operations.Settings.Hostname,
 			Notify:        ft.Ptr(true),
 			CmdNamePrefix: fmt.Sprint("service." + service.Name),
 			Command:       fmt.Sprintf("%s {{name}} %s", command, service.Unit),
-			Commands: []CommandConf{
+			Commands: []subexec.Command{
 				{Name: "restart"},
 				{Name: "stop"},
 				{Name: "start"},
@@ -451,15 +410,29 @@ func (conf *Configuration) expandLocalNativeOps() {
 			},
 		})
 	}
+	for _, menus := range conf.Menus {
+		cmdGroup := subexec.Group{
+			Name:       menus.Name,
+			Command:    fmt.Sprintf("%s {{command}}", menus.Command),
+			Notify:     ft.Ptr(menus.Notify),
+			Background: ft.Ptr(menus.Background),
+		}
+		for _, operation := range menus.Selections {
+			cmdGroup.Commands = append(cmdGroup.Commands, subexec.Command{Name: operation, Command: operation})
+		}
+		grps = append(grps, cmdGroup)
+	}
 
+	conf.Operations.Commands = append(conf.Operations.Commands, grps...)
 }
 
-func (conf *Configuration) expandLinkedFiles(ec *erc.Collector) {
+func (conf *Configuration) expandLinkedFiles() error {
 	if conf.linkedFilesRead {
-		return
+		return nil
 	}
 	defer func() { conf.linkedFilesRead = true }()
 
+	ec := &erc.Collector{}
 	pipe := make(chan *Configuration, len(conf.Settings.ConfigPaths))
 
 	wg := &sync.WaitGroup{}
@@ -477,7 +450,7 @@ func (conf *Configuration) expandLinkedFiles(ec *erc.Collector) {
 			defer wg.Done()
 			conf, err := readConfiguration(fn)
 			if err != nil {
-				ec.Add(fmt.Errorf("problem reading linked config file %q: %w", fn, err))
+				ec.Push(fmt.Errorf("problem reading linked config file %q: %w", fn, err))
 				return
 			}
 			if conf == nil {
@@ -485,9 +458,8 @@ func (conf *Configuration) expandLinkedFiles(ec *erc.Collector) {
 				return
 			}
 
-			ec.Whenf(len(conf.Settings.ConfigPaths) != 0,
-				"nested file %q specified additional files %v, which is invalid",
-				fn, conf.Settings.ConfigPaths)
+			ec.Whenf(conf.Settings != nil, "nested file %q specified system configuration", fn)
+
 			pipe <- conf
 		}(idx, fileName)
 	}
@@ -500,83 +472,14 @@ func (conf *Configuration) expandLinkedFiles(ec *erc.Collector) {
 		confs = append(confs, c)
 	}
 
-	conf.Merge(confs...)
+	ec.Push(conf.Merge(confs...))
+	return ec.Resolve()
 }
 
-func (conf *Configuration) resolveCommands() {
-	// expand aliases
-	if len(conf.Commands) == 0 {
-		return
-	}
-	withAliases := make([]CommandGroupConf, 0, len(conf.Commands)+len(conf.Commands)/2+1)
-	for idx := range conf.Commands {
-		cg := conf.Commands[idx]
-		withAliases = append(withAliases, cg)
-		if len(cg.Aliases) == 0 {
-			continue
-		}
-
-		for _, alias := range cg.Aliases {
-			acg := cg
-			acg.Aliases = nil
-			acg.Name = alias
-			withAliases = append(withAliases, acg)
-		}
-		cg.Aliases = nil
-	}
-	conf.Commands = withAliases
-
-	index := make(map[string]int, len(conf.Commands))
-	haveMerged := false
-	for idx := range conf.Commands {
-		lhn := conf.Commands[idx].Name
-
-		if _, ok := index[lhn]; !ok {
-			index[lhn] = idx
-			continue
-		}
-
-		cg := &conf.Commands[index[lhn]]
-		cg.Merge(conf.Commands[idx])
-		conf.Commands[index[lhn]] = *cg
-		haveMerged = true
-	}
-
-	if !haveMerged {
-		return
-	}
-
-	// get map of names -> indexes as an ordered sequence
-	sparse := dt.NewMap(index).Pairs()
-
-	// reorder it because it came off of a default map in random order
-	sparse.SortQuick(cmp.LessThanConverter(func(p dt.Pair[string, int]) int { return p.Value }))
-
-	// make an output structure
-	resolved := dt.NewSlice(make([]CommandGroupConf, 0, len(index)))
-
-	// read the resolution inside out...
-	//
-	// ⬇️ ingest the contents of the converted and reordered stream
-	// into the resolved slice
-	resolved.Populate(
-		// use the .Index accessor to pull the groups out of the
-		// stream of sparse indexes of now merged groups ⬇️
-		fun.MakeConverter(dt.NewSlice(conf.Commands).Index).Stream(
-			// ⬇️ convert it into the (sparse) indexes of merged groups ⬆
-			fun.MakeConverter(func(p dt.Pair[string, int]) int { return p.Value }).Stream(
-				// ⬇️ take the (now ordered) pairs that we merged and ⬆
-				sparse.Stream(),
-			),
-		),
-	).Must().Wait()
-
-	conf.Commands = resolved
-}
-
-func (conf *Configuration) Merge(mcfs ...*Configuration) {
+func (conf *Configuration) Merge(mcfs ...*Configuration) error {
 	mcfs = append([]*Configuration{}, mcfs...)
 	reposAdded := 0
+	ec := &erc.Collector{}
 
 	for idx := range mcfs {
 		mcf := mcfs[idx]
@@ -586,7 +489,8 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) {
 
 		reposAdded += len(mcf.Repo)
 		conf.Blog = append(conf.Blog, mcf.Blog...)
-		conf.Commands = append(conf.Commands, mcf.Commands...)
+		conf.CommandsCOMPAT = append(conf.CommandsCOMPAT, mcf.CommandsCOMPAT...)
+		conf.Operations.Commands = append(conf.Operations.Commands, mcf.Operations.Commands...)
 		conf.Hosts = append(conf.Hosts, mcf.Hosts...)
 		conf.Links = append(conf.Links, mcf.Links...)
 		conf.Menus = append(conf.Menus, mcf.Menus...)
@@ -595,12 +499,17 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) {
 		conf.System.Arch.Packages = append(conf.System.Arch.Packages, mcf.System.Arch.Packages...)
 		conf.System.GoPackages = append(conf.System.GoPackages, mcf.System.GoPackages...)
 		conf.System.Services = append(conf.System.Services, mcf.System.Services...)
-		conf.TerminalCommands = append(conf.TerminalCommands, mcf.TerminalCommands...)
+
+		ec.Whenf(ft.NotZero(mcf.Operations.Settings), "config file at %q has defined operational settings that are not mergable", mcf.originalPath)
+		ec.Whenf(mcf.Settings != nil, "config file at %q has defined global settings that are not mergable", mcf.originalPath)
 	}
+	conf.Operations.Commands = append(conf.Operations.Commands, conf.CommandsCOMPAT...)
+	conf.CommandsCOMPAT = nil
 
 	if reposAdded > 0 {
 		conf.repoTagsEvaluated = false
 	}
+	return ec.Resolve()
 }
 
 func (conf *Configuration) expandLinks(catcher *erc.Collector) []LinkConf {
@@ -931,247 +840,4 @@ func (conf *Configuration) GetHost(name string) (*HostConf, error) {
 	}
 
 	return nil, fmt.Errorf("could not find a host named '%s'", name)
-}
-
-func (conf *CommandGroupConf) Validate() error {
-	var err error
-	home := util.GetHomedir()
-	ec := &erc.Collector{}
-
-	ec.When(conf.Name == "", ers.Error("command group must have name"))
-	if conf.unaliasedName == "" {
-		conf.unaliasedName = conf.Name
-	}
-
-	var aliased []CommandConf
-
-	for idx := range conf.Commands {
-		cmd := conf.Commands[idx]
-		cmd.GroupName = conf.Name
-
-		ec.Whenf(cmd.Name == "", "command in group [%s](%d) must have a name", conf.Name, idx)
-
-		if cmd.Directory == "" {
-			cmd.Directory = home
-		}
-
-		if conf.Environment != nil || cmd.Environment != nil {
-			env := dt.Map[string, string]{}
-			if conf.Environment != nil {
-				env.ExtendWithStream(conf.Environment.Stream()).Ignore().Wait()
-			}
-			if cmd.Environment != nil {
-				env.ExtendWithStream(cmd.Environment.Stream()).Ignore().Wait()
-			}
-
-			cmd.Environment = env
-		}
-
-		if cmd.Command == "" {
-			ec.Whenf(cmd.OverrideDefault, "cannot override default without an override, in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
-			if conf.Command != "" {
-				cmd.Command = conf.Command
-			} else {
-				cmd.Command = cmd.Name
-			}
-			ec.Whenf(cmd.Command == "", "cannot resolve default command in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
-		}
-
-		ec.Whenf(strings.Contains(cmd.Command, " {{command}}"), "unresolveable token found in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
-
-		if conf.Command != "" && !cmd.OverrideDefault {
-			cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
-		}
-
-		cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
-		cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", conf.Name)
-		cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", ft.Ref(conf.Host))
-		cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", conf.CmdNamePrefix)
-
-		if len(cmd.Aliases) >= 1 {
-			cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Aliases[0])
-		}
-		for idx, alias := range cmd.Aliases {
-			cmd.Command = strings.ReplaceAll(cmd.Command, fmt.Sprintf("{{alias[%d]}}", idx), alias)
-		}
-
-		for idx := range cmd.Commands {
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{host}}", ft.Ref(conf.Host))
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", conf.Name)
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{prefix}}", conf.Name)
-
-			if len(cmd.Aliases) >= 1 {
-				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{alias}}", cmd.Aliases[0])
-			}
-
-			for idx, alias := range cmd.Aliases {
-				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], fmt.Sprintf("{{alias[%d]}}", idx), alias)
-			}
-		}
-
-		if conf.CmdNamePrefix != "" {
-			cmd.Name = fmt.Sprintf("%s.%s", conf.CmdNamePrefix, cmd.Name)
-		}
-
-		cmd.Notify = ft.Default(cmd.Notify, conf.Notify)
-		cmd.Background = ft.Default(cmd.Background, conf.Background)
-		cmd.Host = ft.Default(cmd.Host, conf.Host)
-		cmd.Directory, err = homedir.Expand(cmd.Directory)
-		ec.Add(ers.Wrapf(err, "command group(%s)  %q at %d", cmd.GroupName, cmd.Name, idx))
-
-		for _, alias := range cmd.Aliases {
-			acmd := cmd
-			if conf.CmdNamePrefix != "" {
-				acmd.Name = fmt.Sprintf("%s.%s", conf.CmdNamePrefix, alias)
-			} else {
-				acmd.Name = alias
-			}
-			acmd.Aliases = nil
-			acmd.unaliasedName = cmd.Name
-			aliased = append(aliased, acmd)
-		}
-		cmd.Aliases = nil
-		conf.Commands[idx] = cmd
-	}
-	conf.Commands = append(conf.Commands, aliased...)
-
-	return ec.Resolve()
-}
-
-func (conf *CommandConf) NamePrime() string { return ft.Default(conf.unaliasedName, conf.Name) }
-
-func (conf *CommandGroupConf) Merge(rhv CommandGroupConf) bool {
-	if conf.Name != rhv.Name {
-		return false
-	}
-
-	conf.Commands = append(conf.Commands, rhv.Commands...)
-	conf.Command = ""
-	conf.Aliases = nil
-	conf.Environment = nil
-	return true
-}
-
-func (conf *Configuration) ExportAllCommands() []CommandConf {
-	return conf.caches.allCommdands.Call(conf.doExportAllCommands)
-}
-func (conf *Configuration) doExportAllCommands() []CommandConf {
-	out := dt.NewSlice([]CommandConf{})
-
-	for _, cg := range conf.Commands {
-		if hn, ok := ft.RefOk(cg.Host); ok && hn == conf.Settings.Runtime.Hostname && !conf.Settings.Runtime.IncludeLocalSHH {
-			continue
-		}
-
-		for cidx := range cg.Commands {
-			if hn, ok := ft.RefOk(cg.Commands[cidx].Host); ok && hn == conf.Settings.Runtime.Hostname && !conf.Settings.Runtime.IncludeLocalSHH {
-				continue
-			}
-
-			cmd := cg.Commands[cidx]
-			cmd.Name = fmt.Sprintf("%s.%s", cg.Name, cmd.Name)
-			out = append(out, cmd)
-		}
-	}
-	for _, menus := range conf.Menus {
-		for _, operation := range menus.Selections {
-			var cmd CommandConf
-			cmd.Name = fmt.Sprintf("%s.%s", menus.Name, operation)
-
-			if menus.Command == "" {
-				cmd.Command = operation
-			} else {
-				cmd.Command = fmt.Sprintf("%s %s", menus.Command, operation)
-			}
-
-			cmd.Notify = ft.Ptr(menus.Notify)
-			cmd.Background = ft.Ptr(menus.Background)
-
-			out = append(out, cmd)
-		}
-	}
-
-	return out
-}
-
-func (conf *Configuration) ExportCommandGroups() dt.Map[string, CommandGroupConf] {
-	return conf.caches.commandGroups.Call(conf.doExportCommandGroups)
-}
-func (conf *Configuration) ExportGroupNames() dt.Slice[string] {
-	return conf.caches.comandGroupNames.Call(conf.doExportGroupNames)
-}
-func (conf *Configuration) doExportGroupNames() []string {
-	return fun.NewGenerator(conf.ExportCommandGroups().Keys().Slice).Force().Resolve()
-}
-
-func (conf *Configuration) doExportCommandGroups() map[string]CommandGroupConf {
-	out := make(map[string]CommandGroupConf, len(conf.Commands))
-	for idx := range conf.Commands {
-		group := conf.Commands[idx]
-		out[group.Name] = group
-		for idx := range group.Aliases {
-			alias := group.Aliases[idx]
-			ag := conf.Commands[idx]
-			out[alias] = ag
-		}
-	}
-	return out
-}
-
-func (conf *CommandConf) Worker() fun.Worker {
-	if conf.operation != nil {
-		return conf.operation
-	}
-
-	sender := grip.Sender()
-	hn := util.GetHostname()
-
-	return func(ctx context.Context) error {
-		return jasper.Context(ctx).CreateCommand(ctx).
-			ID(fmt.Sprintf("CMD(%s).HOST(%s).NUM(%d)", conf.Name, util.GetHostname(), 1+len(conf.Commands))).
-			Directory(conf.Directory).
-			Environment(conf.Environment).
-			AddEnv(EnvVarSardisLogQuietStdOut, "true").
-			SetOutputSender(level.Info, sender).
-			SetErrorSender(level.Error, sender).
-			Background(ft.Ref(conf.Background)).
-			Append(conf.Command).
-			Append(conf.Commands...).
-			Prerequisite(func() bool {
-				grip.Info(message.BuildPair().
-					Pair("op", conf.Name).
-					Pair("host", hn).
-					Pair("dir", conf.Directory).
-					Pair("cmd", conf.Command).
-					Pair("cmds", conf.Commands))
-				return true
-			}).
-			PostHook(func(err error) error {
-				if err != nil {
-					m := message.WrapError(err, conf.Name)
-					DesktopNotify(ctx).Error(m)
-					grip.Critical(err)
-					return err
-				}
-				DesktopNotify(ctx).Notice(message.Whenln(ft.Ref(conf.Notify), conf.Name, "completed"))
-				return nil
-			}).Run(ctx)
-	}
-
-}
-
-func (conf *Configuration) AlacrittySocket() string {
-	if conf.Settings.AlacrittySocketPath == "" {
-		conf.Settings.AlacrittySocketPath = ft.Must(sutil.GetAlacrittySocketPath())
-	}
-	return conf.Settings.AlacrittySocketPath
-}
-
-func (conf *Configuration) SSHAgentSocket() string {
-	if conf.Settings.SSHAgentSocketPath == "" {
-		conf.Settings.SSHAgentSocketPath = ft.Must(sutil.GetSSHAgentPath())
-	}
-	return conf.Settings.SSHAgentSocketPath
 }

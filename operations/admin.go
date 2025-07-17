@@ -112,8 +112,8 @@ func nightly() *cmdr.Commander {
 				ec.Push(dist.Send(ctx, units.NewSymlinkCreateJob(conf.Links[idx])))
 			}
 
-			for idx := range conf.Repo {
-				ec.Push(dist.Send(ctx, units.NewRepoCleanupJob(conf.Repo[idx])))
+			for idx := range conf.Repos.GitRepos {
+				ec.Push(dist.Send(ctx, units.NewRepoCleanupJob(conf.Repos.GitRepos[idx])))
 			}
 
 			for idx := range conf.System.Services {

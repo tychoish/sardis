@@ -54,19 +54,19 @@ func repoList() *cmdr.Commander {
 					SetUsage("list repos by tag groups"),
 				"tag", func(ctx context.Context, arg *opsCmdArgs[[]string]) error {
 					table := tabby.New()
-					tags := arg.conf.RepoTags()
+					tags := arg.conf.Repos.Tags()
 
 					matcher := dt.NewSetFromSlice(arg.ops)
 					table.AddHeader("Tag", "Count", "Repositories")
-					err := tags.Stream().Filter(func(tp dt.Pair[string, dt.Slice[*repo.Configuration]]) bool {
+					err := tags.Stream().Filter(func(tp dt.Pair[string, dt.Slice[*repo.GitRepository]]) bool {
 
 						// if this is a "list all" situation then only give us the tags; but if we
 						// ask for a specific term, give us the full match.
 						return (matcher.Len() == 0 && (len(tp.Value) > 1 || tp.Value[0].Name != tp.Key)) ||
 							matcher.Check(tp.Key)
 
-					}).ReadAll(func(rpt dt.Pair[string, dt.Slice[*repo.Configuration]]) {
-						rns, err := fun.MakeConverter(func(r *repo.Configuration) string { return r.Name }).
+					}).ReadAll(func(rpt dt.Pair[string, dt.Slice[*repo.GitRepository]]) {
+						rns, err := fun.MakeConverter(func(r *repo.GitRepository) string { return r.Name }).
 							Stream(dt.NewSlice(rpt.Value).Stream()).Slice(ctx)
 						grip.Error(message.WrapError(err, "problem rendering repo names"))
 
@@ -96,12 +96,12 @@ func repoList() *cmdr.Commander {
 			table := tabby.New()
 			table.AddHeader("Name", "Path", "Local", "Enabled", "Tags")
 
-			var repos []repo.Configuration
+			var repos []repo.GitRepository
 
 			if len(args.ops) == 0 {
-				repos = args.conf.Repo
+				repos = args.conf.Repos.GitRepos
 			} else {
-				repos = args.conf.GetTaggedRepos(args.ops...)
+				repos = args.conf.Repos.FindAll(args.ops...)
 			}
 
 			sort.Slice(repos, func(i, j int) bool { return repos[i].Name < repos[j].Name })
@@ -132,14 +132,14 @@ func repoUpdate() *cmdr.Commander {
 		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 			started := time.Now()
 
-			repos := args.conf.GetTaggedRepos(args.ops...)
+			repos := args.conf.Repos.FindAll(args.ops...)
 			if len(repos) == 0 {
 				return fmt.Errorf("no tagged repository named '%v' configured", args.ops)
 			}
 
 			shouldNotify := false
 			repoNames := make([]string, 0, len(args.ops))
-			filterd := repos.Stream().Filter(func(conf repo.Configuration) bool {
+			filterd := repos.Stream().Filter(func(conf repo.GitRepository) bool {
 				shouldNotify = shouldNotify || conf.Disabled && conf.Notify
 				if ft.Not(conf.Disabled) {
 					repoNames = append(repoNames, conf.Name)
@@ -149,7 +149,7 @@ func repoUpdate() *cmdr.Commander {
 			})
 
 			var err error
-			jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.UpdateJob() }).Stream(filterd)
+			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.UpdateJob() }).Stream(filterd)
 
 			grip.Info(message.BuildPair().
 				Pair("op", opName).
@@ -198,9 +198,9 @@ func repoCleanup() *cmdr.Commander {
 			Aliases("cleanup").
 			SetUsage("run repository cleanup"),
 		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-			repos := args.conf.GetTaggedRepos(args.ops...).Stream()
+			repos := args.conf.Repos.FindAll(args.ops...).Stream()
 
-			jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.CleanupJob() }).Stream(repos)
+			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.CleanupJob() }).Stream(repos)
 
 			return jobs.Parallel(
 				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
@@ -217,9 +217,9 @@ func repoClone() *cmdr.Commander {
 			SetName("clone").
 			SetUsage("clone a repository or all matching repositories"),
 		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-			repos := args.conf.GetTaggedRepos(args.ops...).Stream()
+			repos := args.conf.Repos.FindAll(args.ops...).Stream()
 
-			missingRepos := repos.Filter(func(rc repo.Configuration) bool {
+			missingRepos := repos.Filter(func(rc repo.GitRepository) bool {
 				if _, err := os.Stat(rc.Path); os.IsNotExist(err) {
 					return true
 				}
@@ -231,7 +231,7 @@ func repoClone() *cmdr.Commander {
 				return false
 			})
 
-			jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.CloneJob() }).Stream(missingRepos)
+			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.CloneJob() }).Stream(missingRepos)
 
 			return jobs.Parallel(
 				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
@@ -299,13 +299,14 @@ func repoStatus() *cmdr.Commander {
 		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
 			ec := &erc.Collector{}
 
-			repos := args.conf.GetTaggedRepos(args.ops...).Stream()
+			repos := args.conf.Repos.FindAll(args.ops...).Stream()
 
-			jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { grip.Info(rc.Name); return rc.StatusJob() }).Stream(repos)
-
-			ops := fun.MakeConverter(func(wf fun.Worker) fun.Operation { return wf.Operation(ec.Push) }).Stream(jobs)
-
-			ec.Push(ops.ReadAll(func(op fun.Operation) { op.Run(ctx) }).Run(ctx))
+			fun.MakeConverter(
+				func(rc repo.GitRepository) fun.Operation {
+					grip.Info(rc.Name)
+					return rc.StatusJob().Operation(ec.Push)
+				},
+			).Stream(repos).ReadAll(func(op fun.Operation) { op.Run(ctx) }).Operation(ec.Push).Run(ctx)
 
 			return ec.Resolve()
 		},
@@ -318,9 +319,9 @@ func repoFetch() *cmdr.Commander {
 			SetName("fetch").
 			SetUsage("fetch one or more repos"),
 		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-			repos := args.conf.GetTaggedRepos(args.ops...).Stream().Filter(func(repo repo.Configuration) bool { return repo.Fetch })
+			repos := args.conf.Repos.FindAll(args.ops...).Stream().Filter(func(repo repo.GitRepository) bool { return repo.Fetch })
 
-			jobs := fun.MakeConverter(func(rc repo.Configuration) fun.Worker { return rc.FetchJob() }).Stream(repos)
+			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.FetchJob() }).Stream(repos)
 
 			return jobs.Parallel(
 				func(ctx context.Context, op fun.Worker) error { return op(ctx) },

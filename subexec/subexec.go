@@ -151,13 +151,17 @@ func (conf *Configuration) doExportAllCommands() []Command {
 	out := dt.NewSlice([]Command{})
 
 	for _, grp := range conf.Commands {
-		if hn, ok := ft.RefOk(grp.Host); ok && hn == conf.Settings.Hostname && !conf.Settings.IncludeLocalSHH {
-			continue
+		if conf.Settings.Hostname != "" && !conf.Settings.IncludeLocalSHH {
+			if hn, ok := ft.RefOk(grp.Host); ok && hn == conf.Settings.Hostname {
+				continue
+			}
 		}
 
 		for cidx := range grp.Commands {
-			if hn, ok := ft.RefOk(grp.Commands[cidx].Host); ok && hn == conf.Settings.Hostname && !conf.Settings.IncludeLocalSHH {
-				continue
+			if conf.Settings.Hostname != "" && !conf.Settings.IncludeLocalSHH {
+				if hn, ok := ft.RefOk(grp.Commands[cidx].Host); ok && hn == conf.Settings.Hostname && !conf.Settings.IncludeLocalSHH {
+					continue
+				}
 			}
 
 			cmd := grp.Commands[cidx]

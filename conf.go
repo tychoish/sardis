@@ -1,7 +1,6 @@
 package sardis
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
@@ -33,7 +31,7 @@ import (
 
 type Configuration struct {
 	Settings   *Settings             `bson:"settings" json:"settings" yaml:"settings"`
-	Repo       []repo.Configuration  `bson:"repo" json:"repo" yaml:"repo"`
+	Repos      repo.Configuration    `bson:"repositories" json:"repositories" yaml:"repositories"`
 	Links      []LinkConf            `bson:"links" json:"links" yaml:"links"`
 	Hosts      []HostConf            `bson:"hosts" json:"hosts" yaml:"hosts"`
 	System     SystemConf            `bson:"system" json:"system" yaml:"system"`
@@ -41,15 +39,14 @@ type Configuration struct {
 	Blog       []BlogConf            `bson:"blog" json:"blog" yaml:"blog"`
 	Menus      []MenuConf            `bson:"menu" json:"menu" yaml:"menu"`
 
-	CommandsCOMPAT []subexec.Group `bson:"commands" json:"commands" yaml:"commands"`
+	CommandsCOMPAT []subexec.Group      `bson:"commands" json:"commands" yaml:"commands"`
+	RepoCOMPAT     []repo.GitRepository `bson:"repo" json:"repo" yaml:"repo"`
 
 	generatedLocalOps bool
-	repoTagsEvaluated bool
 	linkedFilesRead   bool
 	originalPath      string
 
-	repoTags dt.Map[string, dt.Slice[*repo.Configuration]]
-	caches   struct {
+	caches struct {
 		validation adt.Once[error]
 	}
 }
@@ -233,9 +230,7 @@ func (conf *Configuration) doValidate() error {
 		ec.Wrapf(conf.System.Services[idx].Validate(), "%d of %T is not valid", idx, len(conf.System.Services), conf.System.Services[idx])
 	}
 
-	for idx := range conf.Repo {
-		ec.Wrapf(conf.Repo[idx].Validate(), "%d/%d of %T is not valid", idx, len(conf.Repo), conf.Repo[idx])
-	}
+	ec.Push(conf.Repos.Validate()) // contains repomapping; needs to happen before commands are expanded with native ops
 
 	for idx := range conf.Menus {
 		ec.Whenf(conf.Menus[idx].Name == "", "must specify name for menu spec at item %d", idx)
@@ -252,8 +247,9 @@ func (conf *Configuration) doValidate() error {
 		ec.Wrapf(conf.Hosts[idx].Validate(), "%d of %T is not valid", idx, conf.Hosts[idx])
 	}
 
-	conf.mapReposByTags()
-	conf.expandLocalNativeOps()
+	conf.Operations.Commands = append(conf.Operations.Commands, conf.Repos.ConcreteTaskGroups()...)
+	conf.Operations.Commands = append(conf.Operations.Commands, conf.Repos.SyntheticTaskGroups()...)
+	conf.expandLocalNativeOps() // this adds fake commands into the conf.Operations, so must happen late
 	ec.Push(conf.Operations.Validate())
 
 	ec.Wrap(conf.validateBlogs(), "blog build/push configuration is invalid")
@@ -267,111 +263,16 @@ func (conf *Configuration) expandLocalNativeOps() {
 	}
 	defer func() { conf.generatedLocalOps = true }()
 
-	grps := make([]subexec.Group, 0, len(conf.Repo)+len(conf.repoTags)+len(conf.System.Services)+len(conf.Menus))
-	for idx := range conf.Repo {
-		repo := conf.Repo[idx]
-		if repo.Disabled {
-			continue
-		}
-		if !repo.Fetch && !repo.LocalSync {
-			continue
-		}
-
-		cg := subexec.Group{
-			Name:          "repo",
-			Notify:        ft.Ptr(repo.Notify),
-			CmdNamePrefix: repo.Name,
-			Commands: []subexec.Command{
-				subexec.Command{
-					Name:             "pull",
-					WorkerDefinition: repo.FetchJob(),
-				},
-				// TODO figure out why this err doesn't really work
-				//      - implementation problem with the underlying operation
-				//      - also need to wrap it in a pager at some level.
-				//      - and disable syslogging
-				// {
-				// 	Name:            "status",
-				// 	Directory:       repo.Path,
-				// 	OverrideDefault: true,
-				// 	Command:         "alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command sardis repo status {{prefix}}",
-				// },
-			},
-		}
-
-		if repo.LocalSync {
-			cg.Commands = append(cg.Commands, subexec.Command{
-				Name:             "update",
-				WorkerDefinition: repo.UpdateJob(),
-			})
-		}
-
-		grps = append(grps, cg)
-	}
-
-	for tag, repos := range conf.repoTags {
-		if len(repos) == 0 {
-			continue
-		}
-		if len(repos) == 1 && repos[0].Name == tag {
-			continue
-		}
-		anyActive := false
-		for _, r := range repos {
-			if r.Disabled || (r.Fetch == false && r.LocalSync == false) {
-				continue
-			}
-			anyActive = true
-			break
-		}
-		if !anyActive {
-			continue
-		}
-
-		tagName := tag
-
-		grps = append(grps, subexec.Group{
-			Name:          "repo",
-			Notify:        ft.Ptr(true),
-			CmdNamePrefix: fmt.Sprint("tagged.", tagName),
-			Commands: []subexec.Command{
-				{
-					Name: "pull",
-					WorkerDefinition: func(ctx context.Context) error {
-						repos := fun.MakeConverter(func(r *repo.Configuration) fun.Worker {
-							return r.FetchJob()
-						}).Stream(conf.repoTags.Get(tagName).Stream())
-
-						return repos.Parallel(
-							func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-							fun.WorkerGroupConfContinueOnError(),
-							fun.WorkerGroupConfWorkerPerCPU(),
-						).Run(ctx)
-					},
-				},
-				{
-					Name: "update",
-					WorkerDefinition: func(ctx context.Context) error {
-						repos := fun.MakeConverter(func(r *repo.Configuration) fun.Worker {
-							return r.UpdateJob()
-						}).Stream(conf.repoTags.Get(tagName).Stream())
-
-						return repos.Parallel(
-							func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-							fun.WorkerGroupConfContinueOnError(),
-							fun.WorkerGroupConfWorkerPerCPU(),
-						).Run(ctx)
-					},
-				},
-			},
-		})
-	}
+	grps := make([]subexec.Group, 0, len(conf.System.Services)+len(conf.Menus))
 
 	for _, service := range conf.System.Services {
 		var command string
+		var opString string
 		if service.User {
+			opString = "user."
 			command = "systemctl --user"
 		} else {
+			opString = ""
 			command = "sudo systemctl"
 		}
 
@@ -388,15 +289,33 @@ func (conf *Configuration) expandLocalNativeOps() {
 			Name:          "systemd",
 			Directory:     conf.Operations.Settings.Hostname,
 			Notify:        ft.Ptr(true),
-			CmdNamePrefix: fmt.Sprint("service." + service.Name),
+			CmdNamePrefix: fmt.Sprint(opString, "service"),
 			Command:       fmt.Sprintf("%s {{name}} %s", command, service.Unit),
 			Commands: []subexec.Command{
-				{Name: "restart"},
-				{Name: "stop"},
-				{Name: "start"},
-				{Name: "enable"},
-				{Name: "disable"},
-				{Name: "setup", Command: defaultState},
+				{
+					Name:    fmt.Sprint("restart.", service.Unit),
+					Command: "restart",
+				},
+				{
+					Name:    fmt.Sprint("stop.", service.Unit),
+					Command: "stop",
+				},
+				{
+					Name:    fmt.Sprint("start.", service.Unit),
+					Command: "start",
+				},
+				{
+					Name:    fmt.Sprint("enable.", service.Unit),
+					Command: "enable",
+				},
+				{
+					Name:    fmt.Sprint("disable.", service.Unit),
+					Command: "disable",
+				},
+				{
+					Name:    fmt.Sprint("setup.", service.Unit),
+					Command: defaultState,
+				},
 				{
 					Name:            "logs",
 					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command journalctl --follow --pager-end --unit %s", service.Unit),
@@ -487,14 +406,19 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) error {
 			continue
 		}
 
-		reposAdded += len(mcf.Repo)
+		reposAdded += len(mcf.RepoCOMPAT)
+		reposAdded += len(mcf.Repos.GitRepos)
+
 		conf.Blog = append(conf.Blog, mcf.Blog...)
-		conf.CommandsCOMPAT = append(conf.CommandsCOMPAT, mcf.CommandsCOMPAT...)
-		conf.Operations.Commands = append(conf.Operations.Commands, mcf.Operations.Commands...)
 		conf.Hosts = append(conf.Hosts, mcf.Hosts...)
 		conf.Links = append(conf.Links, mcf.Links...)
 		conf.Menus = append(conf.Menus, mcf.Menus...)
-		conf.Repo = append(conf.Repo, mcf.Repo...)
+
+		conf.CommandsCOMPAT = append(conf.CommandsCOMPAT, mcf.CommandsCOMPAT...)
+		conf.Operations.Commands = append(conf.Operations.Commands, mcf.Operations.Commands...)
+		conf.RepoCOMPAT = append(conf.RepoCOMPAT, mcf.RepoCOMPAT...)
+		conf.Repos.GitRepos = append(conf.Repos.GitRepos, mcf.Repos.GitRepos...)
+
 		conf.System.Arch.AurPackages = append(conf.System.Arch.AurPackages, mcf.System.Arch.AurPackages...)
 		conf.System.Arch.Packages = append(conf.System.Arch.Packages, mcf.System.Arch.Packages...)
 		conf.System.GoPackages = append(conf.System.GoPackages, mcf.System.GoPackages...)
@@ -503,12 +427,12 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) error {
 		ec.Whenf(ft.NotZero(mcf.Operations.Settings), "config file at %q has defined operational settings that are not mergable", mcf.originalPath)
 		ec.Whenf(mcf.Settings != nil, "config file at %q has defined global settings that are not mergable", mcf.originalPath)
 	}
+
 	conf.Operations.Commands = append(conf.Operations.Commands, conf.CommandsCOMPAT...)
 	conf.CommandsCOMPAT = nil
+	conf.Repos.GitRepos = append(conf.Repos.GitRepos, conf.RepoCOMPAT...)
+	conf.RepoCOMPAT = nil
 
-	if reposAdded > 0 {
-		conf.repoTagsEvaluated = false
-	}
 	return ec.Resolve()
 }
 
@@ -550,56 +474,6 @@ func (conf *Configuration) expandLinks(catcher *erc.Collector) []LinkConf {
 	}
 
 	return links
-}
-
-func (conf *Configuration) GetTaggedRepos(tags ...string) dt.Slice[repo.Configuration] {
-	if len(tags) == 0 && len(conf.repoTags) == 0 {
-		return nil
-	}
-
-	var out []repo.Configuration
-
-	for _, t := range tags {
-		rs, ok := conf.repoTags[t]
-		if !ok {
-			continue
-		}
-
-		for idx := range rs {
-			out = append(out, *rs[idx])
-		}
-	}
-
-	return out
-}
-
-func (conf *Configuration) RepoTags() dt.Map[string, dt.Slice[*repo.Configuration]] {
-	conf.mapReposByTags()
-	return conf.repoTags
-}
-
-func (conf *Configuration) mapReposByTags() {
-	defer func() { conf.repoTagsEvaluated = true }()
-	if conf.repoTagsEvaluated {
-		return
-	}
-
-	conf.repoTags = make(map[string]dt.Slice[*repo.Configuration])
-
-	for idx := range conf.Repo {
-		for _, tag := range conf.Repo[idx].Tags {
-			rp := conf.Repo[idx]
-			conf.repoTags[tag] = append(conf.repoTags[tag], &rp)
-		}
-
-		repoName := conf.Repo[idx].Name
-
-		rp := conf.Repo[idx]
-		conf.repoTags[repoName] = append(
-			conf.repoTags[repoName],
-			&rp,
-		)
-	}
 }
 
 func (conf *Settings) Validate() error {
@@ -720,40 +594,26 @@ func (conf *ArchLinuxConf) Validate() error {
 	return catcher.Resolve()
 }
 
-func (conf *Configuration) GetRepo(name string) *repo.Configuration {
-	for idx := range conf.Repo {
-		if conf.Repo[idx].Name == name {
-			return &conf.Repo[idx]
-		}
-
-	}
-	return nil
-}
-
 func (conf *Configuration) validateBlogs() error {
 	set := &dt.Set[string]{}
 	ec := &erc.Collector{}
+
 	for idx := range conf.Blog {
 		bc := conf.Blog[idx]
 		if bc.Name == "" && bc.RepoName == "" {
-			ec.Add(fmt.Errorf("blog at index %x is missing a name and a repo name", idx))
+			ec.Add(fmt.Errorf("blog at index %d is missing a name and a repo name", idx))
+			continue
 		}
+
 		bc.Name = ft.Default(bc.Name, bc.RepoName)
 		bc.RepoName = ft.Default(bc.RepoName, bc.Name)
 
-		if set.Check(bc.Name) {
-			ec.Add(fmt.Errorf("blog named %s has a duplicate blog configured", bc.Name))
-		}
+		ec.Whenf(set.Check(bc.Name), "blog named %q(%d) has a duplicate blog configured", bc.Name, idx)
+		ec.Whenf(set.Check(bc.RepoName), "blog with repo %s (named %s(%d)) has a duplicate name", bc.RepoName, bc.Name, idx)
 
-		if set.Check(bc.RepoName) {
-			ec.Add(fmt.Errorf("blog with repo %s (named %s) has a duplicate name", bc.RepoName, bc.Name))
-		}
-
-		if repos := conf.GetTaggedRepos(bc.RepoName); repos.Len() != 1 {
-			ec.Add(fmt.Errorf("blog named %s does not have a corresponding configured repo %s", bc.Name, bc.RepoName))
-		}
 		set.Add(bc.Name)
 		set.Add(bc.RepoName)
+
 	}
 
 	return ec.Resolve()

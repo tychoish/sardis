@@ -10,7 +10,7 @@ import (
 	sutil "github.com/tychoish/sardis/util"
 )
 
-type Configuration struct {
+type GitRepository struct {
 	Name       string   `bson:"name" json:"name" yaml:"name"`
 	Path       string   `bson:"path" json:"path" yaml:"path"`
 	Remote     string   `bson:"remote" json:"remote" yaml:"remote"`
@@ -26,7 +26,7 @@ type Configuration struct {
 	Tags       []string `bson:"tags" json:"tags" yaml:"tags"`
 }
 
-func (conf *Configuration) Validate() error {
+func (conf *GitRepository) Validate() error {
 	if conf.Branch == "" {
 		conf.Branch = "main"
 	}
@@ -50,7 +50,7 @@ func (conf *Configuration) Validate() error {
 	return nil
 }
 
-func (conf *Configuration) HasChanges() (bool, error) {
+func (conf *GitRepository) HasChanges() (bool, error) {
 	if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
 		return true, nil
 	}

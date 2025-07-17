@@ -43,7 +43,10 @@ func blogPublish() *cmdr.Commander {
 				return fmt.Errorf("blog %q is not defined", name)
 			}
 
-			repo := conf.GetRepo(blog.RepoName)
+			repo, err := conf.Repos.FindOne(blog.RepoName)
+			if err != nil {
+				return err
+			}
 			if repo == nil {
 				return fmt.Errorf("repo %q for corresponding blog is not defined", name)
 			}
@@ -68,8 +71,6 @@ func blogPublish() *cmdr.Commander {
 				Pair("path", repo.Path).
 				Pair("dur", time.Since(startAt)),
 			)
-
-			var err error
 
 			defer func() {
 				grip.Notice(message.BuildPair().

@@ -27,7 +27,7 @@ import (
 	"github.com/tychoish/jasper/util"
 )
 
-func (conf *Configuration) FetchJob() fun.Worker {
+func (conf *GitRepository) FetchJob() fun.Worker {
 	const opName = "repo-fetch"
 	return func(ctx context.Context) (err error) {
 		// double check this because we might have a stale
@@ -98,7 +98,7 @@ func (conf *Configuration) FetchJob() fun.Worker {
 	}
 }
 
-func (conf *Configuration) CloneJob() fun.Worker {
+func (conf *GitRepository) CloneJob() fun.Worker {
 	const opName = "repo-clone"
 
 	return func(ctx context.Context) error {
@@ -165,27 +165,26 @@ func (conf *Configuration) CloneJob() fun.Worker {
 	}
 }
 
-func (conf *Configuration) UpdateJob() fun.Worker {
+func (conf *GitRepository) UpdateJob() fun.Worker {
 	const opName = "repo-update"
 	count := &atomic.Int64{}
 	return func(ctx context.Context) error {
 		wg := &fun.WaitGroup{}
 		ec := &erc.Collector{}
 
-		hostname := util.GetHostname()
+		host := util.GetHostname()
 
 		hasMirrors := false
 		startAt := time.Now()
 
-		id := fmt.Sprintf("%s[%d]", strings.ToLower(rand.Text()[8]), count.Add(1))
+		id := fmt.Sprintf("%s[%d]", strings.ToLower(string(rand.Text()[:8])), count.Add(1))
 
 		grip.Info(message.BuildPair().
 			Pair("op", opName).
 			Pair("state", "started").
 			Pair("id", id).
 			Pair("path", conf.Path).
-			Pair("host", host).
-			Pair("operator", hostname),
+			Pair("operator", host),
 		)
 
 		defer func() {
@@ -195,15 +194,14 @@ func (conf *Configuration) UpdateJob() fun.Worker {
 				Pair("dur", time.Since(startAt)).
 				Pair("id", id).
 				Pair("path", conf.Path).
-				Pair("host", host).
-				Pair("operator", hostname),
-			)()
+				Pair("operator", host),
+			)
 		}()
 
 		for _, mirror := range conf.Mirrors {
-			if strings.Contains(mirror, hostname) {
+			if strings.Contains(mirror, host) {
 				grip.Infof("skipping mirror %s->%s because it's probably local (%s)",
-					conf.Path, mirror, hostname)
+					conf.Path, mirror, host)
 				continue
 			}
 
@@ -224,11 +222,11 @@ func (conf *Configuration) UpdateJob() fun.Worker {
 			}
 
 			if changes, err := conf.HasChanges(); changes || err != nil {
-				grip.Warning(message.Wrapf(err, dt.Map[string, any]{
-					"op": opName, "id": id, "host": host,
+				grip.Warning(message.WrapError(err, dt.Map[string, any]{
+					"op": opName, "id": id, "operator": host,
 					"msg": "problem detecting changes in the repository, may be routine, recoverable",
 				}))
-				conf.SyncRemoteJob(hostname).Operation(ec.Push).Run(ctx)
+				conf.SyncRemoteJob(host).Operation(ec.Push).Run(ctx)
 				return ec.Resolve()
 			}
 		}
@@ -250,7 +248,7 @@ const (
 
 // this "remote" in the sense of a git remote, which means it might be
 // the local repository in some cases
-func (conf *Configuration) SyncRemoteJob(host string) fun.Worker {
+func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 	hn := util.GetHostname()
 	if host == "LOCAL" {
 		host = hn
@@ -349,7 +347,7 @@ func (conf *Configuration) SyncRemoteJob(host string) fun.Worker {
 	}
 }
 
-func (conf *Configuration) CleanupJob() fun.Worker {
+func (conf *GitRepository) CleanupJob() fun.Worker {
 	const opName = "repo-cleanup"
 	return func(ctx context.Context) (err error) {
 		if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
@@ -398,7 +396,7 @@ func (conf *Configuration) CleanupJob() fun.Worker {
 	}
 }
 
-func (conf *Configuration) StatusJob() fun.Worker {
+func (conf *GitRepository) StatusJob() fun.Worker {
 	return func(ctx context.Context) error {
 		if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
 			return fmt.Errorf("cannot check status %s, no repository exists", conf.Path)
@@ -433,14 +431,14 @@ func (conf *Configuration) StatusJob() fun.Worker {
 	}
 }
 
-func (conf *Configuration) getStatusCommandArgs() []string {
+func (conf *GitRepository) getStatusCommandArgs() []string {
 	return []string{
 		"git", "log", "--date=relative", "--decorate", "-n", "1",
 		fmt.Sprint("--format=", filepath.Base(conf.Path)), `:%N (%cr) "%s"`,
 	}
 }
 
-func (conf *Configuration) doOtherStat(logger grip.Logger) error {
+func (conf *GitRepository) doOtherStat(logger grip.Logger) error {
 	repo, err := git.PlainOpen(conf.Path)
 	if err != nil {
 		return err

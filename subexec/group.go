@@ -134,7 +134,6 @@ func (conf *Group) Validate() error {
 
 		cmd.Notify = ft.Default(cmd.Notify, conf.Notify)
 		cmd.Background = ft.Default(cmd.Background, conf.Background)
-		cmd.Host = ft.Default(cmd.Host, conf.Host)
 		cmd.Directory, err = homedir.Expand(cmd.Directory)
 		ec.Add(ers.Wrapf(err, "command group(%s)  %q at %d", cmd.GroupName, cmd.Name, idx))
 

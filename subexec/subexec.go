@@ -151,19 +151,12 @@ func (conf *Configuration) doExportAllCommands() []Command {
 	out := dt.NewSlice([]Command{})
 
 	for _, grp := range conf.Commands {
-		if conf.Settings.Hostname != "" && !conf.Settings.IncludeLocalSHH {
-			if hn, ok := ft.RefOk(grp.Host); ok && hn == conf.Settings.Hostname {
-				continue
-			}
+		hn, ok := ft.RefOk(grp.Host)
+		if ok && hn != "" && hn == conf.Settings.Hostname && !conf.Settings.IncludeLocalSHH {
+			continue
 		}
 
 		for cidx := range grp.Commands {
-			if conf.Settings.Hostname != "" && !conf.Settings.IncludeLocalSHH {
-				if hn, ok := ft.RefOk(grp.Commands[cidx].Host); ok && hn == conf.Settings.Hostname && !conf.Settings.IncludeLocalSHH {
-					continue
-				}
-			}
-
 			cmd := grp.Commands[cidx]
 			cmd.Name = fmt.Sprintf("%s.%s", grp.Name, cmd.Name)
 			out = append(out, cmd)
@@ -176,9 +169,11 @@ func (conf *Configuration) doExportAllCommands() []Command {
 func (conf *Configuration) ExportCommandGroups() dt.Map[string, Group] {
 	return conf.caches.commandGroups.Call(conf.doExportCommandGroups)
 }
+
 func (conf *Configuration) ExportGroupNames() dt.Slice[string] {
 	return conf.caches.comandGroupNames.Call(conf.doExportGroupNames)
 }
+
 func (conf *Configuration) doExportGroupNames() []string {
 	return fun.NewGenerator(conf.ExportCommandGroups().Keys().Slice).Force().Resolve()
 }

@@ -3,6 +3,7 @@ package subexec
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
@@ -26,7 +27,6 @@ type Command struct {
 	OverrideDefault bool                   `bson:"override_default" json:"override_default" yaml:"override_default"`
 	Notify          *bool                  `bson:"notify" json:"notify" yaml:"notify"`
 	Background      *bool                  `bson:"bson" json:"bson" yaml:"bson"`
-	Host            *string                `bson:"host" json:"host" yaml:"host"`
 
 	// if possible call the operation rather
 	// than execing the commands
@@ -45,6 +45,7 @@ func (conf *Command) Worker() fun.Worker {
 	hn := util.GetHostname()
 
 	return func(ctx context.Context) error {
+		startAt := time.Now()
 		return jasper.Context(ctx).CreateCommand(ctx).
 			ID(fmt.Sprintf("CMD(%s).HOST(%s).NUM(%d)", conf.Name, util.GetHostname(), 1+len(conf.Commands))).
 			Directory(conf.Directory).
@@ -56,15 +57,37 @@ func (conf *Command) Worker() fun.Worker {
 			Append(conf.Command).
 			Append(conf.Commands...).
 			Prerequisite(func() bool {
-				grip.Info(message.BuildPair().
+				msg := message.BuildPair().
 					Pair("op", conf.Name).
+					Pair("state", "starting").
 					Pair("host", hn).
 					Pair("dir", conf.Directory).
-					Pair("cmd", conf.Command).
-					Pair("cmds", conf.Commands))
+					Pair("cmd", conf.Command)
+
+				if len(conf.Commands) > 0 {
+					msg.Pair("cmds", conf.Commands)
+				}
+
+				grip.Notice(msg)
+
 				return true
 			}).
 			PostHook(func(err error) error {
+				msg := message.BuildPair().
+					Pair("op", conf.Name).
+					Pair("state", "complete").
+					Pair("dur", time.Since(startAt)).
+					Pair("err", err != nil).
+					Pair("host", hn).
+					Pair("dir", conf.Directory).
+					Pair("cmd", conf.Command)
+
+				if len(conf.Commands) > 0 {
+					msg.Pair("cmds", conf.Commands)
+				}
+
+				grip.Notice(msg)
+
 				desktop := grip.ContextLogger(ctx, global.ContextDesktopLogger)
 				if err != nil {
 					m := message.WrapError(err, conf.Name)

@@ -40,6 +40,10 @@ func hacking() *cmdr.Commander {
 				"version":                    sardis.BuildRevision,
 				"alacritty":                  conf.Operations.AlacrittySocket(),
 				"ssh_agent":                  conf.Operations.SSHAgentSocket(),
+				"ops.include_local":          conf.Operations.Settings.IncludeLocalSHH,
+				"runtime.include_local":      conf.Settings.Runtime.IncludeLocalSHH,
+				"ops.hostname":               conf.Operations.Settings.Hostname,
+				"runtime.hostname":           conf.Settings.Runtime.Hostname,
 				sardis.EnvVarAlacrittySocket: os.Getenv(sardis.EnvVarAlacrittySocket),
 				sardis.EnvVarSSHAgentSocket:  os.Getenv(sardis.EnvVarSSHAgentSocket),
 			})

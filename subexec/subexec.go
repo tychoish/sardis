@@ -182,9 +182,13 @@ func (conf *Configuration) doExportCommandGroups() map[string]Group {
 	out := make(map[string]Group, len(conf.Commands))
 	for idx := range conf.Commands {
 		group := conf.Commands[idx]
+		hn, ok := ft.RefOk(group.Host)
+		if ok && hn != "" && hn == conf.Settings.Hostname && !conf.Settings.IncludeLocalSHH {
+			continue
+		}
+
 		out[group.Name] = group
-		for idx := range group.Aliases {
-			alias := group.Aliases[idx]
+		for _, alias := range group.Aliases {
 			ag := conf.Commands[idx]
 			out[alias] = ag
 		}

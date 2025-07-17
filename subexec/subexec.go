@@ -76,6 +76,13 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	withAliases := make([]Group, 0, len(conf.Commands)+len(conf.Commands)/2+1)
 	for idx := range conf.Commands {
 		cg := conf.Commands[idx]
+		if cg.Host != nil && !conf.Settings.IncludeLocalSHH {
+			chost := ft.Ref(cg.Host)
+			if chost != "" && chost == conf.Settings.Hostname {
+				continue
+			}
+		}
+
 		withAliases = append(withAliases, cg)
 		if len(cg.Aliases) == 0 {
 			continue

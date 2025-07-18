@@ -16,6 +16,7 @@ import (
 )
 
 type Group struct {
+	Category      string                 `bson:"category" json:"category" yaml:"category"`
 	Name          string                 `bson:"name" json:"name" yaml:"name"`
 	Aliases       []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
 	Directory     string                 `bson:"directory" json:"directory" yaml:"directory"`
@@ -32,6 +33,14 @@ type Group struct {
 	exportCache *adt.Once[map[string]Command]
 }
 
+func dotJoin(elems ...string) string      { return dotJoinParts(elems) }
+func dotJoinParts(elems []string) string  { return strings.Join(elems, ".") }
+func dotSpit(in string) []string          { return strings.Split(in, ".") }
+func dotSplitN(in string, n int) []string { return strings.SplitN(in, ".", n) }
+
+func (cg *Group) ID() string       { return dotJoinParts(cg.IDPath()) }
+func (cg *Group) IDPath() []string { return []string{cg.Category, cg.Name, cg.CmdNamePrefix} }
+
 func (cg *Group) NamesAtIndex(idx int) []string {
 	fun.Invariant.Ok(idx >= 0 && idx < len(cg.Commands), "command out of bounds", cg.Name)
 	ops := []string{}
@@ -39,7 +48,7 @@ func (cg *Group) NamesAtIndex(idx int) []string {
 	for _, grp := range append([]string{cg.Name}, cg.Aliases...) {
 		cmd := cg.Commands[idx]
 		for _, name := range append([]string{cmd.Name}, cmd.Aliases...) {
-			ops = append(ops, fmt.Sprint(grp, ".", name))
+			ops = append(ops, dotJoin(cg.Category, grp, name))
 		}
 	}
 

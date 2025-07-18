@@ -37,8 +37,8 @@ type Configuration struct {
 	Hosts      []HostConf            `bson:"hosts" json:"hosts" yaml:"hosts"`
 	System     SystemConf            `bson:"system" json:"system" yaml:"system"`
 	Blog       []BlogConf            `bson:"blog" json:"blog" yaml:"blog"`
-	Menus      []MenuConf            `bson:"menu" json:"menu" yaml:"menu"`
 
+	MenusLEGACY    []MenuConf           `bson:"menu" json:"menu" yaml:"menu"`
 	CommandsCOMPAT []subexec.Group      `bson:"commands" json:"commands" yaml:"commands"`
 	RepoCOMPAT     []repo.GitRepository `bson:"repo" json:"repo" yaml:"repo"`
 
@@ -212,6 +212,7 @@ func (conf *MenuConf) Validate() error {
 		ec.Add(ers.Wrapf(err, "%s [%s] does not exist", base, conf.Command))
 	}
 
+	ec.Whenf(conf.Notify == "", "name is not defined for menu")
 	ec.Whenf(len(conf.Selections) == 0, "must specify options for %q", conf.Name)
 
 	return ec.Resolve()
@@ -225,17 +226,13 @@ func (conf *Configuration) doValidate() error {
 	ec.Push(conf.Settings.Validate())
 	ec.Push(conf.System.Arch.Validate())
 	ec.Push(conf.expandLinkedFiles())
+	ec.Push(conf.handleLegacyMenus()) // converts menus to commands
 
 	for idx := range conf.System.Services {
 		ec.Wrapf(conf.System.Services[idx].Validate(), "%d of %T is not valid", idx, len(conf.System.Services), conf.System.Services[idx])
 	}
 
 	ec.Push(conf.Repos.Validate()) // contains repomapping; needs to happen before commands are expanded with native ops
-
-	for idx := range conf.Menus {
-		ec.Whenf(conf.Menus[idx].Name == "", "must specify name for menu spec at item %d", idx)
-		ec.Wrapf(conf.Menus[idx].Validate(), "%d of %T is not valid", idx, conf.Menus[idx])
-	}
 
 	conf.Links = conf.expandLinks(ec)
 	for idx := range conf.Links {
@@ -263,7 +260,7 @@ func (conf *Configuration) expandLocalNativeOps() {
 	}
 	defer func() { conf.generatedLocalOps = true }()
 
-	grps := make([]subexec.Group, 0, len(conf.System.Services)+len(conf.Menus))
+	grps := make([]subexec.Group, 0, len(conf.System.Services))
 
 	for _, service := range conf.System.Services {
 		var command string
@@ -329,7 +326,19 @@ func (conf *Configuration) expandLocalNativeOps() {
 			},
 		})
 	}
-	for _, menus := range conf.Menus {
+	conf.Operations.Commands = append(conf.Operations.Commands, grps...)
+}
+
+func (conf *Configuration) handleLegacyMenus() error {
+	ec := &erc.Collector{}
+	groups := make([]subexec.Command, 0, len)
+	for idx := range conf.MenusLEGACY {
+		if err := conf.MenusLEGACY[idx].Validate(); err != nil {
+			ec.Wrapf(err, "invalid legacy menu at index %d", idx)
+			continue
+		}
+		menus := conf.MenusLEGACY[idx]
+
 		cmdGroup := subexec.Group{
 			Name:       menus.Name,
 			Command:    fmt.Sprintf("%s {{command}}", menus.Command),
@@ -339,10 +348,11 @@ func (conf *Configuration) expandLocalNativeOps() {
 		for _, operation := range menus.Selections {
 			cmdGroup.Commands = append(cmdGroup.Commands, subexec.Command{Name: operation, Command: operation})
 		}
-		grps = append(grps, cmdGroup)
+		groups = append(groups, cmdGroup)
 	}
-
 	conf.Operations.Commands = append(conf.Operations.Commands, grps...)
+
+	return ec.Resolve()
 }
 
 func (conf *Configuration) expandLinkedFiles() error {
@@ -412,7 +422,7 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) error {
 		conf.Blog = append(conf.Blog, mcf.Blog...)
 		conf.Hosts = append(conf.Hosts, mcf.Hosts...)
 		conf.Links = append(conf.Links, mcf.Links...)
-		conf.Menus = append(conf.Menus, mcf.Menus...)
+		conf.MenusLEGACY = append(conf.MenusLEGACY, mcf.MenusLEGACY...)
 
 		conf.CommandsCOMPAT = append(conf.CommandsCOMPAT, mcf.CommandsCOMPAT...)
 		conf.Operations.Commands = append(conf.Operations.Commands, mcf.Operations.Commands...)

@@ -135,26 +135,6 @@ func listMenus() *cmdr.Commander {
 					table.AddLine("", "")
 				}
 
-				// TODO() move menus into commands and
-				// ignore them in rendering
-				for _, m := range conf.Menus {
-					if len(m.Selections) == 0 {
-						grip.Debugf("skipping empty menu %q", m.Name)
-						continue
-					}
-
-					idx := -1
-					for chunk := range slices.Chunk(m.Selections, 3) {
-						idx++
-						if idx == 0 {
-							table.AddLine(m.Name, strings.Join(chunk, "; "))
-						} else {
-							table.AddLine("", strings.Join(chunk, "; "))
-						}
-					}
-					table.AddLine("", "")
-				}
-
 				table.Print()
 				return nil
 			}).Add)

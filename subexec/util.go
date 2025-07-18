@@ -1,7 +1,8 @@
-package repo
+package subexec
 
 import (
 	"bytes"
+	"io"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
@@ -14,21 +15,24 @@ import (
 
 var bufpool = adt.MakeBytesBufferPool(0)
 
-type bufsend struct {
+type OutputBuf struct {
 	send.Base
 	buffer *bytes.Buffer
 }
 
-func newProcessLogger(id string) (grip.Logger, *bufsend) {
-	procout := &bufsend{buffer: bufpool.Get()}
+func NewOutputBuf(id string) (grip.Logger, *OutputBuf) {
+	procout := &OutputBuf{buffer: bufpool.Get()}
 	procout.SetPriority(level.Info)
 	procout.SetName(id)
 	procout.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 	return grip.NewLogger(procout), procout
 }
 
-func (b *bufsend) renderAll() string { return b.buffer.String() }
-func (b *bufsend) Close() error {
+func (b *OutputBuf) Reader() io.Reader { return b.buffer }
+func (b *OutputBuf) Writer() io.Writer { return b.buffer }
+func (b *OutputBuf) String() string    { return b.buffer.String() }
+
+func (b *OutputBuf) Close() error {
 	if b.buffer == nil {
 		// make it safe to run more than once
 		return nil
@@ -39,7 +43,7 @@ func (b *bufsend) Close() error {
 	return nil
 }
 
-func (b *bufsend) Send(m message.Composer) {
+func (b *OutputBuf) Send(m message.Composer) {
 	if send.ShouldLog(b, m) {
 		fun.Invariant.Must(ft.IgnoreFirst(b.buffer.WriteString(m.String())))
 		fun.Invariant.Must(ft.IgnoreFirst(b.buffer.WriteString("\n")))

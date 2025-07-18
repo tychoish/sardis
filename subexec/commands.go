@@ -2,11 +2,14 @@ package subexec
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -41,25 +44,29 @@ func (conf *Command) Worker() fun.Worker {
 		return conf.WorkerDefinition
 	}
 
-	sender := grip.Sender()
+	// TODO: replace this sender with something that doesn't suck!
+	nonce := strings.ToLower(rand.Text())[:7]
+	jobID := fmt.Sprintf("CMD(%s).HOST(%s).NUM(%d)", conf.Name, util.GetHostname(), 1+len(conf.Commands))
 	hn := util.GetHostname()
+	ec := &erc.Collector{}
 
 	return func(ctx context.Context) error {
+		proclog, buf := NewOutputBuf(fmt.Sprint(jobID, ".", nonce))
 		startAt := time.Now()
 		return jasper.Context(ctx).CreateCommand(ctx).
-			ID(fmt.Sprintf("CMD(%s).HOST(%s).NUM(%d)", conf.Name, util.GetHostname(), 1+len(conf.Commands))).
+			ID(jobID).
 			Directory(conf.Directory).
 			Environment(conf.Environment).
 			AddEnv(global.EnvVarSardisLogQuietStdOut, "true").
-			SetOutputSender(level.Info, sender).
-			SetErrorSender(level.Error, sender).
+			SetOutputSender(level.Info, buf).
+			SetErrorSender(level.Error, buf).
 			Background(ft.Ref(conf.Background)).
 			Append(conf.Command).
 			Append(conf.Commands...).
 			Prerequisite(func() bool {
 				msg := message.BuildPair().
 					Pair("op", conf.Name).
-					Pair("state", "starting").
+					Pair("state", "STARTED").
 					Pair("host", hn).
 					Pair("dir", conf.Directory).
 					Pair("cmd", conf.Command)
@@ -68,14 +75,24 @@ func (conf *Command) Worker() fun.Worker {
 					msg.Pair("cmds", conf.Commands)
 				}
 
-				grip.Notice(msg)
+				grip.Info(msg)
 
 				return true
 			}).
-			PostHook(func(err error) error {
+			// END jasper command definition
+			Worker().
+			// START fun.Worker operation handling/orchestrating
+			PreHook(func(context.Context) {
+				proclog.Infoln("----------------", nonce, "---", jobID, "--->")
+			}).
+			Operation(ec.Push).
+			WithErrorHook(func() error {
+				err := ec.Resolve()
+
+				defer buf.Close()
 				msg := message.BuildPair().
 					Pair("op", conf.Name).
-					Pair("state", "complete").
+					Pair("state", "COMPLETED").
 					Pair("dur", time.Since(startAt)).
 					Pair("err", err != nil).
 					Pair("host", hn).
@@ -86,18 +103,20 @@ func (conf *Command) Worker() fun.Worker {
 					msg.Pair("cmds", conf.Commands)
 				}
 
-				grip.Notice(msg)
+				defer grip.Notice(msg)
 
 				desktop := grip.ContextLogger(ctx, global.ContextDesktopLogger)
 				if err != nil {
 					m := message.WrapError(err, conf.Name)
 					desktop.Error(m)
 					grip.Critical(err)
+
+					proclog.Infoln("<---------------", nonce, "---", jobID, "----")
+					grip.Error(buf.String())
 					return err
 				}
 				desktop.Notice(message.Whenln(ft.Ref(conf.Notify), conf.Name, "completed"))
 				return nil
 			}).Run(ctx)
 	}
-
 }

@@ -2,6 +2,7 @@ package subexec
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
@@ -45,32 +46,41 @@ func (cg *Group) NamesAtIndex(idx int) []string {
 	return ops
 }
 
-func (conf *Group) Validate() error {
+func (cg *Group) Selectors() []string {
+	set := &dt.Set[string]{}
+	for cmd := range slices.Values(cg.Commands) {
+		set.Add(cmd.Name)
+	}
+
+	return fun.NewGenerator(set.Stream().Slice).Force().Resolve()
+}
+
+func (cg *Group) Validate() error {
 	var err error
 	home := util.GetHomedir()
 	ec := &erc.Collector{}
 
-	ec.When(conf.Name == "", ers.Error("command group must have name"))
-	if conf.unaliasedName == "" {
-		conf.unaliasedName = conf.Name
+	ec.When(cg.Name == "", ers.Error("command group must have name"))
+	if cg.unaliasedName == "" {
+		cg.unaliasedName = cg.Name
 	}
 
 	var aliased []Command
 
-	for idx := range conf.Commands {
-		cmd := conf.Commands[idx]
-		cmd.GroupName = conf.Name
+	for idx := range cg.Commands {
+		cmd := cg.Commands[idx]
+		cmd.GroupName = cg.Name
 
-		ec.Whenf(cmd.Name == "", "command in group [%s](%d) must have a name", conf.Name, idx)
+		ec.Whenf(cmd.Name == "", "command in group [%s](%d) must have a name", cg.Name, idx)
 
 		if cmd.Directory == "" {
 			cmd.Directory = home
 		}
 
-		if conf.Environment != nil || cmd.Environment != nil {
+		if cg.Environment != nil || cmd.Environment != nil {
 			env := dt.Map[string, string]{}
-			if conf.Environment != nil {
-				env.ExtendWithStream(conf.Environment.Stream()).Ignore().Wait()
+			if cg.Environment != nil {
+				env.ExtendWithStream(cg.Environment.Stream()).Ignore().Wait()
 			}
 			if cmd.Environment != nil {
 				env.ExtendWithStream(cmd.Environment.Stream()).Ignore().Wait()
@@ -89,25 +99,25 @@ func (conf *Group) Validate() error {
 			//
 			//   TODO investigating
 			//      inverting this.
-			ec.Whenf(cmd.OverrideDefault, "cannot override default without an override, in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
-			if conf.Command != "" {
-				cmd.Command = conf.Command
+			ec.Whenf(cmd.OverrideDefault, "cannot override default without an override, in group [%s] command [%s](%d)", cg.Name, cmd.Name, idx)
+			if cg.Command != "" {
+				cmd.Command = cg.Command
 			} else {
 				cmd.Command = cmd.Name
 			}
-			ec.Whenf(cmd.Command == "", "cannot resolve default command in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
+			ec.Whenf(cmd.Command == "", "cannot resolve default command in group [%s] command [%s](%d)", cg.Name, cmd.Name, idx)
 		}
 
-		ec.Whenf(strings.Contains(cmd.Command, " {{command}}"), "unresolveable token found in group [%s] command [%s](%d)", conf.Name, cmd.Name, idx)
+		ec.Whenf(strings.Contains(cmd.Command, " {{command}}"), "unresolveable token found in group [%s] command [%s](%d)", cg.Name, cmd.Name, idx)
 
-		if conf.Command != "" && !cmd.OverrideDefault {
-			cmd.Command = strings.ReplaceAll(conf.Command, "{{command}}", cmd.Command)
+		if cg.Command != "" && !cmd.OverrideDefault {
+			cmd.Command = strings.ReplaceAll(cg.Command, "{{command}}", cmd.Command)
 		}
 
 		cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
-		cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", conf.Name)
-		cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", ft.Ref(conf.Host))
-		cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", conf.CmdNamePrefix)
+		cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", cg.Name)
+		cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", ft.Ref(cg.Host))
+		cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", cg.CmdNamePrefix)
 
 		if len(cmd.Aliases) >= 1 {
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Aliases[0])
@@ -119,9 +129,9 @@ func (conf *Group) Validate() error {
 		for idx := range cmd.Commands {
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{host}}", ft.Ref(conf.Host))
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", conf.Name)
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{prefix}}", conf.Name)
+			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{host}}", ft.Ref(cg.Host))
+			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", cg.Name)
+			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{prefix}}", cg.Name)
 
 			if len(cmd.Aliases) >= 1 {
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{alias}}", cmd.Aliases[0])
@@ -132,15 +142,15 @@ func (conf *Group) Validate() error {
 			}
 		}
 
-		cmd.Notify = ft.Default(cmd.Notify, conf.Notify)
-		cmd.Background = ft.Default(cmd.Background, conf.Background)
+		cmd.Notify = ft.Default(cmd.Notify, cg.Notify)
+		cmd.Background = ft.Default(cmd.Background, cg.Background)
 		cmd.Directory, err = homedir.Expand(cmd.Directory)
 		ec.Add(ers.Wrapf(err, "command group(%s)  %q at %d", cmd.GroupName, cmd.Name, idx))
 
 		for _, alias := range cmd.Aliases {
 			acmd := cmd
-			if conf.CmdNamePrefix != "" {
-				acmd.Name = fmt.Sprintf("%s.%s", conf.CmdNamePrefix, alias)
+			if cg.CmdNamePrefix != "" {
+				acmd.Name = fmt.Sprintf("%s.%s", cg.CmdNamePrefix, alias)
 			} else {
 				acmd.Name = alias
 			}
@@ -149,25 +159,25 @@ func (conf *Group) Validate() error {
 			aliased = append(aliased, acmd)
 		}
 
-		if conf.CmdNamePrefix != "" {
-			cmd.Name = fmt.Sprintf("%s.%s", conf.CmdNamePrefix, cmd.Name)
+		if cg.CmdNamePrefix != "" {
+			cmd.Name = fmt.Sprintf("%s.%s", cg.CmdNamePrefix, cmd.Name)
 		}
 		cmd.Aliases = nil
-		conf.Commands[idx] = cmd
+		cg.Commands[idx] = cmd
 	}
-	conf.Commands = append(conf.Commands, aliased...)
+	cg.Commands = append(cg.Commands, aliased...)
 
 	return ec.Resolve()
 }
 
-func (conf *Group) doMerge(rhv Group) bool {
-	if conf.Name != rhv.Name {
+func (cg *Group) doMerge(rhv Group) bool {
+	if cg.Name != rhv.Name {
 		return false
 	}
 
-	conf.Commands = append(conf.Commands, rhv.Commands...)
-	conf.Command = ""
-	conf.Aliases = nil
-	conf.Environment = nil
+	cg.Commands = append(cg.Commands, rhv.Commands...)
+	cg.Command = ""
+	cg.Aliases = nil
+	cg.Environment = nil
 	return true
 }

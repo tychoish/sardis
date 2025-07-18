@@ -448,7 +448,7 @@ func report(
 	if tr.MissingTests {
 		msg.Pair("state", "no tests")
 	} else if tr.Cached {
-		msg.Pair("state", "cached")
+		msg.Pair("state", "CACHED")
 	}
 
 	if tr.CoverageEnabled {

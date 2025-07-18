@@ -290,7 +290,7 @@ func (conf *Configuration) expandLocalNativeOps() {
 			Directory:     conf.Operations.Settings.Hostname,
 			Notify:        ft.Ptr(true),
 			CmdNamePrefix: fmt.Sprint(opString, "service"),
-			Command:       fmt.Sprintf("%s {{name}} %s", command, service.Unit),
+			Command:       fmt.Sprintf("%s {{command}} %s", command, service.Unit),
 			Commands: []subexec.Command{
 				{
 					Name:    fmt.Sprint("restart.", service.Unit),

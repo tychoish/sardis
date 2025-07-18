@@ -14,7 +14,7 @@ require (
 	github.com/tychoish/birch v0.3.0
 	github.com/tychoish/cmdr v0.4.0
 	github.com/tychoish/fun v0.12.0
-	github.com/tychoish/godmenu v0.2.0
+	github.com/tychoish/godmenu v0.2.2
 	github.com/tychoish/grip v0.4.0
 	github.com/tychoish/grip/x/desktop v0.0.0-20250626175245-f5276066a1e9
 	github.com/tychoish/grip/x/jira v0.0.0-20250626173215-d516ec138ab2

@@ -10,9 +10,7 @@ import (
 	"github.com/cheynewallace/tabby"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
@@ -30,13 +28,24 @@ const (
 func DMenu() *cmdr.Commander {
 	return addOpCommand(cmdr.MakeCommander().
 		SetName("dmenu").
+		SetUsage("unless running a subcommand, launches a menu for specific group specific group, or attmepts to run a command directly.").
 		Subcommanders(
 			dmenuCommand(dmenuCommandAll).SetName("all").SetUsage("select a command from all configured commands"),
 			dmenuCommand(dmenuCommandGroups).SetName("groups").SetUsage("use nested menu, starting with command groups"),
 			listMenus(),
 		),
 		commandFlagName, func(ctx context.Context, args *opsCmdArgs[string]) error {
-			return runDmenuOperation(ctx, args.conf, ft.Default(args.ops, "all"))
+			name := args.ops
+			if group, ok := args.conf.Operations.ExportCommandGroups()[name]; ok {
+				return dmenuForCommands(ctx, args.conf, group)
+			}
+
+			cmds, err := getcmds(args.conf.Operations.ExportAllCommands(), []string{name})
+			if err != nil {
+				return err
+			}
+
+			return runConfiguredCommand(ctx, cmds)
 		})
 }
 
@@ -45,71 +54,50 @@ func dmenuCommand(kind dmenuCommandType) *cmdr.Commander {
 		SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 			switch kind {
 			case dmenuCommandAll:
-				return dmenuForCommands(ctx, conf, conf.Operations.ExportAllCommands())
+				return dmenuForCommands(ctx, conf, subexec.Group{Name: "sardis", Commands: conf.Operations.ExportAllCommands()})
 			case dmenuCommandGroups:
-				return dmenuGroupSelector(ctx, conf)
+				return dmenuForGroups(ctx, conf)
 			default:
 				panic(fmt.Sprintf("undefined command kind %d", kind))
 			}
 		}).Add)
 }
 
-func runDmenuOperation(ctx context.Context, conf *sardis.Configuration, name string) error {
-	if group, ok := conf.Operations.ExportCommandGroups()[name]; ok {
-		return dmenuForCommands(ctx, conf, group.Commands)
-	}
-
-	cmds, err := getcmds(conf.Operations.ExportAllCommands(), []string{name})
-	if err != nil {
-		return err
-	}
-
-	return runConfiguredCommand(ctx, cmds)
-}
-
-func dmenuGroupSelector(ctx context.Context, conf *sardis.Configuration) error {
-	cmd, err := godmenu.Run(ctx,
+func dmenuForGroups(ctx context.Context, conf *sardis.Configuration) error {
+	name, err := godmenu.Run(ctx,
 		godmenu.ExtendSelections(conf.Operations.ExportGroupNames()),
-		godmenu.WithFlags(conf.Settings.DMenu),
+		godmenu.WithFlags(ft.Ptr(conf.Settings.DMenu)),
 		godmenu.Sorted(),
+		godmenu.Prompt("groups ==>>"),
 	)
-
-	switch {
-	case err == nil:
-		break
-	case ers.Is(err, godmenu.ErrSelectionMissing):
-		return nil
-	default:
-		return err
+	if err != nil {
+		return erc.NewFilter().Without(godmenu.ErrSelectionMissing).Apply(err)
 	}
 
-	return dmenuForCommands(ctx, conf, conf.Operations.ExportCommandGroups().Get(cmd).Commands)
+	if group, ok := conf.Operations.ExportCommandGroups()[name]; ok {
+		return dmenuForCommands(ctx, conf, group)
+	}
+
+	return fmt.Errorf("selection %q not found", name)
 }
 
-func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, cmds []subexec.Command) error {
-	if len(cmds) == 0 {
+func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, group subexec.Group) error {
+	if len(group.Commands) == 0 {
 		return errors.New("no selection")
 	}
 
-	seen := dt.Set[string]{}
-
-	seen.AppendStream(fun.MakeConverter(func(cmd *subexec.Command) string { return cmd.Name }).Stream(dt.SlicePtrs(cmds).Stream()))
-
 	cmd, err := godmenu.Run(ctx,
-		godmenu.ExtendSelections(fun.NewGenerator(seen.Stream().Slice).Force().Resolve()),
-		godmenu.WithFlags(conf.Settings.DMenu),
+		godmenu.ExtendSelections(group.Selectors()),
+		godmenu.WithFlags(ft.Ptr(conf.Settings.DMenu)),
 		godmenu.Sorted(),
+		godmenu.Prompt(fmt.Sprint(group.Name, " ==>>")),
 	)
-	switch {
-	case err == nil:
-		break
-	case ers.Is(err, godmenu.ErrSelectionMissing):
-		return nil
-	default:
-		return err
+
+	if err != nil {
+		return erc.NewFilter().Without(godmenu.ErrSelectionMissing).Apply(err)
 	}
 
-	ops, err := getcmds(cmds, strings.Fields(strings.TrimSpace(cmd)))
+	ops, err := getcmds(group.Commands, strings.Fields(strings.TrimSpace(cmd)))
 	if err != nil {
 		return err
 	}

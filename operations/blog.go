@@ -65,7 +65,7 @@ func blogPublish() *cmdr.Commander {
 
 			grip.Notice(message.BuildPair().
 				Pair("op", opName).
-				Pair("state", "started").
+				Pair("state", "STARTED").
 				Pair("name", name).
 				Pair("repo", blog.RepoName).
 				Pair("path", repo.Path).
@@ -75,7 +75,7 @@ func blogPublish() *cmdr.Commander {
 			defer func() {
 				grip.Notice(message.BuildPair().
 					Pair("op", opName).
-					Pair("state", "completed").
+					Pair("state", "COMPLETED").
 					Pair("err", err != nil).
 					Pair("name", name).
 					Pair("repo", blog.RepoName).

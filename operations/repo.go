@@ -153,7 +153,7 @@ func repoUpdate() *cmdr.Commander {
 
 			grip.Info(message.BuildPair().
 				Pair("op", opName).
-				Pair("state", "starting").
+				Pair("state", "STARTED").
 				Pair("ops", args.ops).
 				Pair("host", args.conf.Settings.Runtime.Hostname),
 			)
@@ -162,7 +162,7 @@ func repoUpdate() *cmdr.Commander {
 				grip.Notice(message.BuildPair().
 					Pair("op", opName).
 					Pair("err", ers.IsError(err)).
-					Pair("state", "complete").
+					Pair("state", "COMPLETED").
 					Pair("host", args.conf.Settings.Runtime.Hostname).
 					Pair("args", args.ops).
 					Pair("repos", repoNames).

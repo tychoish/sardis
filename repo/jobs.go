@@ -25,6 +25,7 @@ import (
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/util"
+	"github.com/tychoish/sardis/subexec"
 )
 
 func (conf *GitRepository) FetchJob() fun.Worker {
@@ -67,7 +68,7 @@ func (conf *GitRepository) FetchJob() fun.Worker {
 			return errors.New("repo-fetch requires defined remote name and branch for the repo")
 		}
 
-		proclog, procbuf := newProcessLogger(id)
+		proclog, procbuf := subexec.NewOutputBuf(id)
 		defer procbuf.Close()
 		proclog.Infoln(ruler, id, ruler)
 
@@ -83,7 +84,7 @@ func (conf *GitRepository) FetchJob() fun.Worker {
 			Worker().
 			WithErrorFilter(func(err error) error {
 				if err != nil {
-					grip.Error(procbuf.renderAll())
+					grip.Error(procbuf.String())
 					grip.Critical(message.BuildPair().
 						Pair("op", opName).
 						Pair("id", id).
@@ -181,7 +182,7 @@ func (conf *GitRepository) UpdateJob() fun.Worker {
 
 		grip.Info(message.BuildPair().
 			Pair("op", opName).
-			Pair("state", "started").
+			Pair("state", "STARTED").
 			Pair("id", id).
 			Pair("path", conf.Path).
 			Pair("operator", host),
@@ -190,7 +191,7 @@ func (conf *GitRepository) UpdateJob() fun.Worker {
 		defer func() {
 			grip.Info(message.BuildPair().
 				Pair("op", opName).
-				Pair("state", "completed").
+				Pair("state", "COMPLETED").
 				Pair("dur", time.Since(startAt)).
 				Pair("id", id).
 				Pair("path", conf.Path).
@@ -283,13 +284,13 @@ func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 		}
 		started := time.Now()
 
-		proclog, procbuf := newProcessLogger(buildID)
+		proclog, procbuf := subexec.NewOutputBuf(buildID)
 		defer procbuf.Close()
 		proclog.Noticeln(ruler, bullet, ruler)
 
 		grip.Info(message.BuildPair().
 			Pair("op", opName).
-			Pair("state", "started").
+			Pair("state", "STARTED").
 			Pair("id", buildID).
 			Pair("path", conf.Path).
 			Pair("host", host).
@@ -319,7 +320,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 					proclog.Noticeln(ruler, bullet, ruler)
 					grip.Critical(message.BuildPair().
 						Pair("op", opName).
-						Pair("state", "errored").
+						Pair("state", "ERRORED").
 						Pair("host", host).
 						Pair("id", buildID).
 						Pair("repo", conf.Name).
@@ -328,7 +329,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 						Pair("dur", time.Since(started)).
 						Pair("err", err),
 					)
-					grip.Error(procbuf.renderAll())
+					grip.Error(procbuf.String())
 				}
 				return err
 			}).
@@ -336,7 +337,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 
 		grip.Info(message.BuildPair().
 			Pair("op", opName).
-			Pair("state", "completed").
+			Pair("state", "COMPLETED").
 			Pair("err", err != nil).
 			Pair("host", host).
 			Pair("id", buildID).
@@ -368,7 +369,7 @@ func (conf *GitRepository) CleanupJob() fun.Worker {
 			)
 		}()
 
-		proclog, procbuf := newProcessLogger(id)
+		proclog, procbuf := subexec.NewOutputBuf(id)
 		defer procbuf.Close()
 		proclog.Infoln(ruler, id, ruler)
 
@@ -389,7 +390,7 @@ func (conf *GitRepository) CleanupJob() fun.Worker {
 						Pair("path", conf.Path).
 						Pair("err", err),
 					)
-					grip.Error(procbuf.renderAll())
+					grip.Error(procbuf.String())
 				}
 				return err
 			}).PostHook(fn.MakeFuture(procbuf.Close).Ignore()).Run(ctx)

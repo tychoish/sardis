@@ -84,9 +84,6 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 		}
 
 		withAliases = append(withAliases, cg)
-		if len(cg.Aliases) == 0 {
-			continue
-		}
 
 		for _, alias := range cg.Aliases {
 			acg := cg

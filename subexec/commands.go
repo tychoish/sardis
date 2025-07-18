@@ -22,7 +22,6 @@ import (
 type Command struct {
 	Name            string                 `bson:"name" json:"name" yaml:"name"`
 	GroupName       string                 `bson:"-" json:"-" yaml:"-"`
-	Aliases         []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
 	Directory       string                 `bson:"directory" json:"directory" yaml:"directory"`
 	Environment     dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
 	Command         string                 `bson:"command" json:"command" yaml:"command"`

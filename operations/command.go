@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"runtime"
-	"slices"
 	"strings"
 
 	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
@@ -43,23 +42,15 @@ func RunCommand() *cmdr.Commander {
 		})
 }
 
-func getcmds(cmds []subexec.Command, args []string) ([]subexec.Command, error) {
-	out := make([]subexec.Command, 0, len(args))
-
+func getcmds(cmds dt.Slice[subexec.Command], args []string) ([]subexec.Command, error) {
 	ops := dt.NewSetFromSlice(args)
-	collected := dt.Set[string]{}
-	collected.Order()
+	seen := dt.Set[string]{}
+	seen.Order()
 
-	for idx := range cmds {
-		if len(args) == collected.Len() {
-			break
-		}
-
-		if name := cmds[idx].NamePrime(); ops.Check(name) && ft.Not(collected.Check(name)) {
-			out = append(out, cmds[idx])
-			collected.Add(name)
-		}
-	}
+	out := cmds.Filter(func(cmd subexec.Command) bool {
+		name := cmd.NamePrime()
+		return ops.Check(name) && !seen.AddCheck(name)
+	})
 
 	// if we didn't find all that we were looking for?
 	if ops.Len() != len(out) {
@@ -67,7 +58,7 @@ func getcmds(cmds []subexec.Command, args []string) ([]subexec.Command, error) {
 			len(out), ops.Len(),
 			// TODO we should be able to get slices from sets without panic
 			strings.Join(fun.NewGenerator(ops.Stream().Slice).Force().Resolve(), ", "),
-			strings.Join(fun.NewGenerator(collected.Stream().Slice).Force().Resolve(), ", "),
+			strings.Join(fun.NewGenerator(seen.Stream().Slice).Force().Resolve(), ", "),
 		)
 	}
 
@@ -104,46 +95,37 @@ func listCommands() *cmdr.Commander {
 				homedir := util.GetHomedir()
 
 				table := tabby.New()
-				table.AddHeader("Group", "Name", "Command", "Directory")
+				table.AddHeader("Name", "Command", "Directory")
+				for _, cmd := range conf.Operations.ExportAllCommands() {
+					if cmd.Directory == homedir {
+						cmd.Directory = ""
+					}
 
-				for _, group := range conf.Operations.Commands {
-					for _, cmd := range group.Commands {
-						if cmd.Directory == homedir {
-							cmd.Directory = ""
+					cmds := append([]string{cmd.Command}, cmd.Commands...)
+					for idx := range cmds {
+						if maxLen := 48; len(cmds[idx]) > maxLen {
+							cmds[idx] = fmt.Sprintf("<%s...>", cmds[idx][:maxLen])
 						}
+					}
+					for idx, chunk := range cmds {
+						if idx == 0 {
+							table.AddLine(
+								cmd.Name,                                // name
+								chunk,                                   // command
+								sutil.TryCollapseHomedir(cmd.Directory), // dir
+							)
+						} else {
+							table.AddLine(
+								"",    // group
+								"",    // names
+								chunk, // command
+								"",    // dir
+							)
 
-						grps := append([]string{group.Name}, group.Aliases...)
-						if group.Name == "run" && !slices.Contains(grps, "*") {
-							grps = append(grps, "*")
-						}
-
-						nms := strings.Join(append([]string{cmd.Name}, cmd.Aliases...), ", ")
-						cmds := append([]string{cmd.Command}, cmd.Commands...)
-						for idx := range cmds {
-							if maxLen := 48; len(cmds[idx]) > maxLen {
-								cmds[idx] = fmt.Sprintf("<%s...>", cmds[idx][:maxLen])
-							}
-						}
-						for idx, chunk := range cmds {
-							if idx == 0 {
-								table.AddLine(
-									strings.Join(grps, ","),                 // group
-									nms,                                     // names
-									chunk,                                   // command
-									sutil.TryCollapseHomedir(cmd.Directory), // dir
-								)
-							} else {
-								table.AddLine(
-									"",    // group
-									"",    // names
-									chunk, // command
-									"",    // dir
-								)
-
-							}
 						}
 					}
 				}
+
 				table.Print()
 
 				return nil

@@ -32,10 +32,10 @@ import (
 type Configuration struct {
 	Settings   *Settings             `bson:"settings" json:"settings" yaml:"settings"`
 	Repos      repo.Configuration    `bson:"repositories" json:"repositories" yaml:"repositories"`
+	Operations subexec.Configuration `bson:"operations" json:"operations" yaml:"operations"`
 	Links      []LinkConf            `bson:"links" json:"links" yaml:"links"`
 	Hosts      []HostConf            `bson:"hosts" json:"hosts" yaml:"hosts"`
 	System     SystemConf            `bson:"system" json:"system" yaml:"system"`
-	Operations subexec.Configuration `bson:"operations" json:"operations" yaml:"operations"`
 	Blog       []BlogConf            `bson:"blog" json:"blog" yaml:"blog"`
 	Menus      []MenuConf            `bson:"menu" json:"menu" yaml:"menu"`
 

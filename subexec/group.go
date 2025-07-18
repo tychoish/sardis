@@ -46,10 +46,7 @@ func (cg *Group) NamesAtIndex(idx int) []string {
 	ops := []string{}
 
 	for _, grp := range append([]string{cg.Name}, cg.Aliases...) {
-		cmd := cg.Commands[idx]
-		for _, name := range append([]string{cmd.Name}, cmd.Aliases...) {
-			ops = append(ops, dotJoin(cg.Category, grp, name))
-		}
+		ops = append(ops, dotJoin(cg.Category, grp, cg.Commands[idx].Name))
 	}
 
 	return ops
@@ -73,8 +70,6 @@ func (cg *Group) Validate() error {
 	if cg.unaliasedName == "" {
 		cg.unaliasedName = cg.Name
 	}
-
-	var aliased []Command
 
 	for idx := range cg.Commands {
 		cmd := cg.Commands[idx]
@@ -128,27 +123,12 @@ func (cg *Group) Validate() error {
 		cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", ft.Ref(cg.Host))
 		cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", cg.CmdNamePrefix)
 
-		if len(cmd.Aliases) >= 1 {
-			cmd.Command = strings.ReplaceAll(cmd.Command, "{{alias}}", cmd.Aliases[0])
-		}
-		for idx, alias := range cmd.Aliases {
-			cmd.Command = strings.ReplaceAll(cmd.Command, fmt.Sprintf("{{alias[%d]}}", idx), alias)
-		}
-
 		for idx := range cmd.Commands {
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{host}}", ft.Ref(cg.Host))
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", cg.Name)
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{prefix}}", cg.Name)
-
-			if len(cmd.Aliases) >= 1 {
-				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{alias}}", cmd.Aliases[0])
-			}
-
-			for idx, alias := range cmd.Aliases {
-				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], fmt.Sprintf("{{alias[%d]}}", idx), alias)
-			}
 		}
 
 		cmd.Notify = ft.Default(cmd.Notify, cg.Notify)
@@ -156,25 +136,12 @@ func (cg *Group) Validate() error {
 		cmd.Directory, err = homedir.Expand(cmd.Directory)
 		ec.Add(ers.Wrapf(err, "command group(%s)  %q at %d", cmd.GroupName, cmd.Name, idx))
 
-		for _, alias := range cmd.Aliases {
-			acmd := cmd
-			if cg.CmdNamePrefix != "" {
-				acmd.Name = fmt.Sprintf("%s.%s", cg.CmdNamePrefix, alias)
-			} else {
-				acmd.Name = alias
-			}
-			acmd.Aliases = nil
-			acmd.unaliasedName = cmd.Name
-			aliased = append(aliased, acmd)
-		}
-
 		if cg.CmdNamePrefix != "" {
 			cmd.Name = fmt.Sprintf("%s.%s", cg.CmdNamePrefix, cmd.Name)
 		}
-		cmd.Aliases = nil
+
 		cg.Commands[idx] = cmd
 	}
-	cg.Commands = append(cg.Commands, aliased...)
 
 	return ec.Resolve()
 }

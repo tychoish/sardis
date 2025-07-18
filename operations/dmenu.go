@@ -117,15 +117,7 @@ func listMenus() *cmdr.Commander {
 				for name, group := range conf.Operations.ExportCommandGroups() {
 					cmds := []string{}
 					for _, cmd := range group.Commands {
-						if cmd.Name == "" && len(cmd.Aliases) == 0 {
-							cmds = append(cmds, cmd.Command)
-							for _, cg := range cmd.Commands {
-								cmds = append(cmds, cg)
-							}
-							continue
-						}
 						cmds = append(cmds, cmd.Name)
-						cmds = append(cmds, cmd.Aliases...)
 					}
 					if len(cmds) == 0 {
 						grip.Debugf("skipping empty command group %q", name)
@@ -143,6 +135,8 @@ func listMenus() *cmdr.Commander {
 					table.AddLine("", "")
 				}
 
+				// TODO() move menus into commands and
+				// ignore them in rendering
 				for _, m := range conf.Menus {
 					if len(m.Selections) == 0 {
 						grip.Debugf("skipping empty menu %q", m.Name)

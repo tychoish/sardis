@@ -66,7 +66,7 @@ func dmenuCommand(kind dmenuCommandType) *cmdr.Commander {
 func dmenuForGroups(ctx context.Context, conf *sardis.Configuration) error {
 	name, err := godmenu.Run(ctx,
 		godmenu.ExtendSelections(conf.Operations.ExportGroupNames()),
-		godmenu.WithFlags(ft.Ptr(conf.Settings.DMenu)),
+		godmenu.WithFlags(ft.Ptr(conf.Settings.DMenuFlags)),
 		godmenu.Sorted(),
 		godmenu.Prompt("groups ==>>"),
 	)
@@ -88,7 +88,7 @@ func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, group sub
 
 	cmd, err := godmenu.Run(ctx,
 		godmenu.ExtendSelections(group.Selectors()),
-		godmenu.WithFlags(ft.Ptr(conf.Settings.DMenu)),
+		godmenu.WithFlags(ft.Ptr(conf.Settings.DMenuFlags)),
 		godmenu.Sorted(),
 		godmenu.Prompt(fmt.Sprint(group.Name, " ==>>")),
 	)

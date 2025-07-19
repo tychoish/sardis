@@ -43,10 +43,9 @@ func (conf *Command) Worker() fun.Worker {
 		return conf.WorkerDefinition
 	}
 
-	// TODO: replace this sender with something that doesn't suck!
-	nonce := strings.ToLower(rand.Text())[:7]
-	jobID := fmt.Sprintf("CMD(%s).HOST(%s).NUM(%d)", conf.Name, util.GetHostname(), 1+len(conf.Commands))
 	hn := util.GetHostname()
+	nonce := strings.ToLower(rand.Text())[:7]
+	jobID := fmt.Sprintf("CMD(%s).HOST(%s).NUM(%d)", conf.Name, hn, 1+len(conf.Commands))
 	ec := &erc.Collector{}
 
 	return func(ctx context.Context) error {

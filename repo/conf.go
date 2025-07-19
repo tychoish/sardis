@@ -11,7 +11,7 @@ import (
 )
 
 type Configuration struct {
-	GitRepos []GitRepository `bson:"git" json:"git" yaml:"git"`
+	GitRepos dt.Slice[GitRepository] `bson:"git" json:"git" yaml:"git"`
 
 	lookupProcessed bool
 	caches          struct {

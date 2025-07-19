@@ -8,13 +8,12 @@ import (
 	"github.com/cheynewallace/tabby"
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
-	"github.com/tychoish/sardis/units"
+	"github.com/tychoish/sardis/repo"
+	"github.com/tychoish/sardis/sysmgmt"
 )
 
 func Admin() *cmdr.Commander {
@@ -42,8 +41,6 @@ func hacking() *cmdr.Commander {
 				"ssh_agent":                  conf.Operations.SSHAgentSocket(),
 				"ops.include_local":          conf.Operations.Settings.IncludeLocalSHH,
 				"runtime.include_local":      conf.Settings.Runtime.IncludeLocalSHH,
-				"ops.hostname":               conf.Operations.Settings.Hostname,
-				"runtime.hostname":           conf.Settings.Runtime.Hostname,
 				sardis.EnvVarAlacrittySocket: os.Getenv(sardis.EnvVarAlacrittySocket),
 				sardis.EnvVarSSHAgentSocket:  os.Getenv(sardis.EnvVarSSHAgentSocket),
 			})
@@ -71,16 +68,14 @@ func setupLinks() *cmdr.Commander {
 		SetUsage("setup all configured links").
 		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				ec := &erc.Collector{}
-				wg := &fun.WaitGroup{}
+				links := fun.SliceStream(conf.System.Links.Links)
+				jobs := fun.MakeConverter(func(c sysmgmt.LinkDefinition) fun.Worker { return c.CreateJob() }).Stream(links)
 
-				for _, link := range conf.Links {
-					wg.Launch(ctx, units.NewSymlinkCreateJob(link).Operation(ec.Push))
-				}
-
-				wg.Worker().Operation(ec.Push).Run(ctx)
-
-				return ec.Resolve()
+				return jobs.Parallel(
+					func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+					fun.WorkerGroupConfContinueOnError(),
+					fun.WorkerGroupConfWorkerPerCPU(),
+				).Run(ctx)
 			}).Add)
 }
 
@@ -106,25 +101,14 @@ func nightly() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			queue := pubsub.NewUnlimitedQueue[fun.Worker]()
-			dist := queue.Distributor()
-			ec := &erc.Collector{}
-
-			wait := fun.MAKE.WorkerPool(dist.Stream()).Launch(ctx)
-
-			for idx := range conf.Links {
-				ec.Push(dist.Send(ctx, units.NewSymlinkCreateJob(conf.Links[idx])))
-			}
-
-			for idx := range conf.Repos.GitRepos {
-				ec.Push(dist.Send(ctx, units.NewRepoCleanupJob(conf.Repos.GitRepos[idx])))
-			}
-
-			for idx := range conf.System.Services {
-				ec.Push(dist.Send(ctx, units.NewSystemServiceSetupJob(conf.System.Services[idx])))
-			}
-			queue.Close()
-
-			return wait(ctx)
+			return fun.JoinStreams(
+				fun.MakeConverter(func(c sysmgmt.LinkDefinition) fun.Worker { return c.CreateJob() }).Stream(fun.SliceStream(conf.System.Links.Links)),
+				fun.MakeConverter(func(c repo.GitRepository) fun.Worker { return c.CleanupJob() }).Stream(fun.SliceStream(conf.Repos.GitRepos)),
+				fun.MakeConverter(func(c sysmgmt.SystemdService) fun.Worker { return c.Worker() }).Stream(fun.SliceStream(conf.System.SystemD.Services)),
+			).Parallel(
+				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+				fun.WorkerGroupConfContinueOnError(),
+				fun.WorkerGroupConfWorkerPerCPU(),
+			).Run(ctx)
 		}).Add)
 }

@@ -1,31 +1,28 @@
 package sardis
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 
 	"github.com/mitchellh/go-homedir"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/godmenu"
-	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
-	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/x/telegram"
 	"github.com/tychoish/grip/x/xmpp"
 	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/repo"
 	"github.com/tychoish/sardis/subexec"
+	"github.com/tychoish/sardis/sysmgmt"
 	sutil "github.com/tychoish/sardis/util"
 )
 
@@ -33,14 +30,13 @@ type Configuration struct {
 	Settings   *Settings             `bson:"settings" json:"settings" yaml:"settings"`
 	Repos      repo.Configuration    `bson:"repositories" json:"repositories" yaml:"repositories"`
 	Operations subexec.Configuration `bson:"operations" json:"operations" yaml:"operations"`
-	Links      []LinkConf            `bson:"links" json:"links" yaml:"links"`
 	Hosts      []HostConf            `bson:"hosts" json:"hosts" yaml:"hosts"`
 	System     SystemConf            `bson:"system" json:"system" yaml:"system"`
 	Blog       []BlogConf            `bson:"blog" json:"blog" yaml:"blog"`
 
-	MenusLEGACY    []MenuConf           `bson:"menu" json:"menu" yaml:"menu"`
-	CommandsCOMPAT []subexec.Group      `bson:"commands" json:"commands" yaml:"commands"`
-	RepoCOMPAT     []repo.GitRepository `bson:"repo" json:"repo" yaml:"repo"`
+	CommandsCOMPAT []subexec.Group          `bson:"commands" json:"commands" yaml:"commands"`
+	RepoCOMPAT     []repo.GitRepository     `bson:"repo" json:"repo" yaml:"repo"`
+	LinksCOMPAT    []sysmgmt.LinkDefinition `bson:"links" json:"links" yaml:"links"`
 
 	generatedLocalOps bool
 	linkedFilesRead   bool
@@ -68,29 +64,10 @@ type SystemConf struct {
 		Update  bool   `bson:"update" json:"update" yaml:"update"`
 		Version string `bson:"version" json:"version" yaml:"version"`
 	} `bson:"golang" json:"golang" yaml:"golang"`
-	Arch     ArchLinuxConf        `bson:"arch" json:"arch" yaml:"arch"`
-	Services []SystemdServiceConf `bson:"services" json:"services" yaml:"services"`
-}
-
-type SystemdServiceConf struct {
-	Name     string `bson:"name" json:"name" yaml:"name"`
-	Unit     string `bson:"unit" json:"unit" yaml:"unit"`
-	User     bool   `bson:"user" json:"user" yaml:"user"`
-	System   bool   `bson:"system" json:"system" yaml:"system"`
-	Enabled  bool   `bson:"enabled" json:"enabled" yaml:"enabled"`
-	Disabled bool   `bson:"disabled" json:"disabled" yaml:"disabled"`
-	Start    bool   `bson:"start" json:"start" yaml:"start"`
-}
-
-func (c *SystemdServiceConf) Validate() error {
-	catcher := &erc.Collector{}
-	catcher.When(c.Name == "", ers.Error("must specify service name"))
-	catcher.Whenf(c.Unit == "", "cannot specify empty unit for %q", c.Name)
-	catcher.Whenf((c.User && c.System) || (!c.User && !c.System),
-		"must specify either user or service for %q", c.Name)
-	catcher.Whenf((c.Disabled && c.Enabled) || (!c.Disabled && !c.Enabled),
-		"must specify either disabled or enabled for %q", c.Name)
-	return catcher.Resolve()
+	Arch           ArchLinuxConf                `bson:"arch" json:"arch" yaml:"arch"`
+	SystemD        sysmgmt.SystemdConfiguration `bson:"systemd" json:"systemd" yaml:"systemd"`
+	Links          sysmgmt.LinkConfiguration    `bson:"links" json:"links" yaml:"links"`
+	ServicesLEGACY []sysmgmt.SystemdService     `bson:"services" json:"services" yaml:"services"`
 }
 
 type NotifyConf struct {
@@ -102,15 +79,6 @@ type NotifyConf struct {
 	Disabled bool   `bson:"disabled" json:"disabled" yaml:"disabled"`
 }
 
-type LinkConf struct {
-	Name              string `bson:"name" json:"name" yaml:"name"`
-	Path              string `bson:"path" json:"path" yaml:"path"`
-	Target            string `bson:"target" json:"target" yaml:"target"`
-	Update            bool   `bson:"update" json:"update" yaml:"update"`
-	DirectoryContents bool   `bson:"directory_contents" json:"directory_contents" yaml:"directory_contents"`
-	RequireSudo       bool   `bson:"sudo" json:"sudo" yaml:"sudo"`
-}
-
 type Settings struct {
 	Notification        NotifyConf       `bson:"notify" json:"notify" yaml:"notify"`
 	Telegram            telegram.Options `bson:"telegram" json:"telegram" yaml:"telegram"`
@@ -119,7 +87,7 @@ type Settings struct {
 	AlacrittySocketPath string           `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
 	Logging             LoggingConf      `bson:"logging" json:"logging" yaml:"logging"`
 	ConfigPaths         []string         `bson:"config_files" json:"config_files" yaml:"config_files"`
-	DMenu               godmenu.Flags    `bson:"dmenu" json:"dmenu" yaml:"dmenu"`
+	DMenuFlags          godmenu.Flags    `bson:"dmenu" json:"dmenu" yaml:"dmenu"`
 
 	Runtime struct {
 		Hostname        string `bson:"-" json:"-" yaml:"-"`
@@ -172,14 +140,6 @@ type BlogConf struct {
 	DeployCommands []string `bson:"deploy_commands" json:"deploy_commands" yaml:"deploy_commands"`
 }
 
-type MenuConf struct {
-	Name       string   `bson:"name" json:"name" yaml:"name"`
-	Command    string   `bson:"command" json:"command" yaml:"command"`
-	Selections []string `bson:"selections" json:"selections" yaml:"selections"`
-	Notify     bool     `bson:"notify" json:"notify" yaml:"notify"`
-	Background bool     `bson:"background" json:"background" yaml:"background"`
-}
-
 func LoadConfiguration(fn string) (*Configuration, error) {
 	out, err := readConfiguration(fn)
 	if err != nil {
@@ -203,154 +163,30 @@ func readConfiguration(fn string) (*Configuration, error) {
 	return out, nil
 }
 
-func (conf *MenuConf) Validate() error {
-	ec := &erc.Collector{}
-
-	if conf.Command != "" {
-		base := strings.Split(conf.Command, " ")[0]
-		_, err := exec.LookPath(base)
-		ec.Add(ers.Wrapf(err, "%s [%s] does not exist", base, conf.Command))
-	}
-
-	ec.Whenf(conf.Notify == "", "name is not defined for menu")
-	ec.Whenf(len(conf.Selections) == 0, "must specify options for %q", conf.Name)
-
-	return ec.Resolve()
-}
-
 func (conf *Configuration) Validate() error { return conf.caches.validation.Call(conf.doValidate) }
 func (conf *Configuration) doValidate() error {
 	ec := &erc.Collector{}
-	conf.Settings = ft.DefaultNew(conf.Settings)
+	ec.Push(conf.expandLinkedFiles()) // this is where merging files (and migrating legacy files)
 
+	conf.Settings = ft.DefaultNew(conf.Settings)
+	conf.Operations.Commands = append(conf.Operations.Commands, conf.Repos.ConcreteTaskGroups()...)
+	conf.Operations.Commands = append(conf.Operations.Commands, conf.Repos.SyntheticTaskGroups()...)
+	conf.Operations.Commands = append(conf.Operations.Commands, conf.System.SystemD.TaskGroups()...)
+
+	ec.Push(conf.Settings.Notification.Validate())
+	ec.Push(conf.Settings.Credentials.Validate())
 	ec.Push(conf.Settings.Validate())
 	ec.Push(conf.System.Arch.Validate())
-	ec.Push(conf.expandLinkedFiles())
-	ec.Push(conf.handleLegacyMenus()) // converts menus to commands
-
-	for idx := range conf.System.Services {
-		ec.Wrapf(conf.System.Services[idx].Validate(), "%d of %T is not valid", idx, len(conf.System.Services), conf.System.Services[idx])
-	}
-
-	ec.Push(conf.Repos.Validate()) // contains repomapping; needs to happen before commands are expanded with native ops
-
-	conf.Links = conf.expandLinks(ec)
-	for idx := range conf.Links {
-		ec.Wrapf(conf.Links[idx].Validate(), "%d/%d of %T is not valid", idx, len(conf.Links), conf.Links[idx])
-		conf.Links[idx].Target = strings.ReplaceAll(conf.Links[idx].Target, "{{hostname}}", conf.Operations.Settings.Hostname)
-	}
+	ec.Push(conf.System.SystemD.Validate())
+	ec.Push(conf.System.Links.Validate())
+	ec.Push(conf.Repos.Validate())
+	ec.Push(conf.Operations.Validate())
 
 	for idx := range conf.Hosts {
 		ec.Wrapf(conf.Hosts[idx].Validate(), "%d of %T is not valid", idx, conf.Hosts[idx])
 	}
 
-	conf.Operations.Commands = append(conf.Operations.Commands, conf.Repos.ConcreteTaskGroups()...)
-	conf.Operations.Commands = append(conf.Operations.Commands, conf.Repos.SyntheticTaskGroups()...)
-	conf.expandLocalNativeOps() // this adds fake commands into the conf.Operations, so must happen late
-	ec.Push(conf.Operations.Validate())
-
 	ec.Wrap(conf.validateBlogs(), "blog build/push configuration is invalid")
-
-	return ec.Resolve()
-}
-
-func (conf *Configuration) expandLocalNativeOps() {
-	if conf.generatedLocalOps {
-		return
-	}
-	defer func() { conf.generatedLocalOps = true }()
-
-	grps := make([]subexec.Group, 0, len(conf.System.Services))
-
-	for _, service := range conf.System.Services {
-		var command string
-		var opString string
-		if service.User {
-			opString = "user."
-			command = "systemctl --user"
-		} else {
-			opString = ""
-			command = "sudo systemctl"
-		}
-
-		var defaultState string
-		if service.Enabled && !service.Disabled {
-			defaultState = "enable"
-		} else {
-			defaultState = "disable"
-		}
-
-		// TODO these have a fun.Worker function already
-		// implemented in units for setup.
-		grps = append(grps, subexec.Group{
-			Name:          "systemd",
-			Directory:     conf.Operations.Settings.Hostname,
-			Notify:        ft.Ptr(true),
-			CmdNamePrefix: fmt.Sprint(opString, "service"),
-			Command:       fmt.Sprintf("%s {{command}} %s", command, service.Unit),
-			Commands: []subexec.Command{
-				{
-					Name:    fmt.Sprint("restart.", service.Unit),
-					Command: "restart",
-				},
-				{
-					Name:    fmt.Sprint("stop.", service.Unit),
-					Command: "stop",
-				},
-				{
-					Name:    fmt.Sprint("start.", service.Unit),
-					Command: "start",
-				},
-				{
-					Name:    fmt.Sprint("enable.", service.Unit),
-					Command: "enable",
-				},
-				{
-					Name:    fmt.Sprint("disable.", service.Unit),
-					Command: "disable",
-				},
-				{
-					Name:    fmt.Sprint("setup.", service.Unit),
-					Command: defaultState,
-				},
-				{
-					Name:            "logs",
-					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command journalctl --follow --pager-end --unit %s", service.Unit),
-					OverrideDefault: true,
-				},
-				{
-					Name:            "status",
-					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command %s {{name}} %s", command, service.Unit),
-					OverrideDefault: true,
-				},
-			},
-		})
-	}
-	conf.Operations.Commands = append(conf.Operations.Commands, grps...)
-}
-
-func (conf *Configuration) handleLegacyMenus() error {
-	ec := &erc.Collector{}
-	groups := make([]subexec.Command, 0, len)
-	for idx := range conf.MenusLEGACY {
-		if err := conf.MenusLEGACY[idx].Validate(); err != nil {
-			ec.Wrapf(err, "invalid legacy menu at index %d", idx)
-			continue
-		}
-		menus := conf.MenusLEGACY[idx]
-
-		cmdGroup := subexec.Group{
-			Name:       menus.Name,
-			Command:    fmt.Sprintf("%s {{command}}", menus.Command),
-			Notify:     ft.Ptr(menus.Notify),
-			Background: ft.Ptr(menus.Background),
-		}
-		for _, operation := range menus.Selections {
-			cmdGroup.Commands = append(cmdGroup.Commands, subexec.Command{Name: operation, Command: operation})
-		}
-		groups = append(groups, cmdGroup)
-	}
-	conf.Operations.Commands = append(conf.Operations.Commands, grps...)
 
 	return ec.Resolve()
 }
@@ -361,53 +197,41 @@ func (conf *Configuration) expandLinkedFiles() error {
 	}
 	defer func() { conf.linkedFilesRead = true }()
 
-	ec := &erc.Collector{}
-	pipe := make(chan *Configuration, len(conf.Settings.ConfigPaths))
-
-	wg := &sync.WaitGroup{}
-	for idx, fileName := range conf.Settings.ConfigPaths {
-		if _, err := os.Stat(fileName); os.IsNotExist(err) {
-			grip.Warning(message.Fields{
-				"file": fileName,
-				"msg":  "config file does not exist",
-			})
-			continue
+	confStream := fun.MakeConverterErr(func(fn string) (*Configuration, error) {
+		if _, err := os.Stat(fn); os.IsNotExist(err) {
+			return nil, fmt.Errorf("%s does not exist [%s]", fn, err)
 		}
 
-		wg.Add(1)
-		go func(idx int, fn string) {
-			defer wg.Done()
-			conf, err := readConfiguration(fn)
-			if err != nil {
-				ec.Push(fmt.Errorf("problem reading linked config file %q: %w", fn, err))
-				return
-			}
-			if conf == nil {
-				ec.Add(fmt.Errorf("nil configuration for %q", fn))
-				return
-			}
+		conf, err := readConfiguration(fn)
+		if err != nil {
+			return nil, fmt.Errorf("problem reading linked config file %q: %w", fn, err)
+		}
+		if conf == nil {
+			return nil, fmt.Errorf("nil configuration for %q", fn)
+		}
+		if conf.Settings != nil {
+			return nil, fmt.Errorf("nested file %q specified system configuration", fn)
 
-			ec.Whenf(conf.Settings != nil, "nested file %q specified system configuration", fn)
+		}
+		return conf, nil
+	}).Parallel(fun.SliceStream(conf.Settings.ConfigPaths),
+		fun.WorkerGroupConfContinueOnError(),
+		fun.WorkerGroupConfWorkerPerCPU(),
+	)
 
-			pipe <- conf
-		}(idx, fileName)
+	confs, err := fun.NewGenerator(confStream.Slice).Wait()
+	if err != nil {
+		return err
 	}
 
-	wg.Wait()
-	close(pipe)
-
-	confs := make([]*Configuration, 0, len(conf.Settings.ConfigPaths))
-	for c := range pipe {
-		confs = append(confs, c)
+	if err = conf.Merge(confs...); err != nil {
+		return err
 	}
 
-	ec.Push(conf.Merge(confs...))
-	return ec.Resolve()
+	return nil
 }
 
 func (conf *Configuration) Merge(mcfs ...*Configuration) error {
-	mcfs = append([]*Configuration{}, mcfs...)
-	reposAdded := 0
 	ec := &erc.Collector{}
 
 	for idx := range mcfs {
@@ -416,119 +240,71 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) error {
 			continue
 		}
 
-		reposAdded += len(mcf.RepoCOMPAT)
-		reposAdded += len(mcf.Repos.GitRepos)
+		conf.LinksCOMPAT = append(conf.LinksCOMPAT, mcf.LinksCOMPAT...)
+		conf.CommandsCOMPAT = append(conf.CommandsCOMPAT, mcf.CommandsCOMPAT...)
+		conf.RepoCOMPAT = append(conf.RepoCOMPAT, mcf.RepoCOMPAT...)
+		conf.LinksCOMPAT = append(conf.LinksCOMPAT, mcf.LinksCOMPAT...)
+		conf.System.ServicesLEGACY = append(conf.System.ServicesLEGACY, mcf.System.ServicesLEGACY...)
 
 		conf.Blog = append(conf.Blog, mcf.Blog...)
 		conf.Hosts = append(conf.Hosts, mcf.Hosts...)
-		conf.Links = append(conf.Links, mcf.Links...)
-		conf.MenusLEGACY = append(conf.MenusLEGACY, mcf.MenusLEGACY...)
-
-		conf.CommandsCOMPAT = append(conf.CommandsCOMPAT, mcf.CommandsCOMPAT...)
 		conf.Operations.Commands = append(conf.Operations.Commands, mcf.Operations.Commands...)
-		conf.RepoCOMPAT = append(conf.RepoCOMPAT, mcf.RepoCOMPAT...)
 		conf.Repos.GitRepos = append(conf.Repos.GitRepos, mcf.Repos.GitRepos...)
 
 		conf.System.Arch.AurPackages = append(conf.System.Arch.AurPackages, mcf.System.Arch.AurPackages...)
 		conf.System.Arch.Packages = append(conf.System.Arch.Packages, mcf.System.Arch.Packages...)
+		conf.System.SystemD.Services = append(conf.System.SystemD.Services, mcf.System.SystemD.Services...)
 		conf.System.GoPackages = append(conf.System.GoPackages, mcf.System.GoPackages...)
-		conf.System.Services = append(conf.System.Services, mcf.System.Services...)
+		conf.System.Links.Links = append(conf.System.Links.Links, mcf.System.Links.Links...)
 
 		ec.Whenf(ft.NotZero(mcf.Operations.Settings), "config file at %q has defined operational settings that are not mergable", mcf.originalPath)
 		ec.Whenf(mcf.Settings != nil, "config file at %q has defined global settings that are not mergable", mcf.originalPath)
 	}
 
+	conf.System.SystemD.Services = append(conf.System.SystemD.Services, conf.System.ServicesLEGACY...)
+	conf.System.ServicesLEGACY = nil
+
 	conf.Operations.Commands = append(conf.Operations.Commands, conf.CommandsCOMPAT...)
 	conf.CommandsCOMPAT = nil
+
 	conf.Repos.GitRepos = append(conf.Repos.GitRepos, conf.RepoCOMPAT...)
 	conf.RepoCOMPAT = nil
+
+	conf.System.Links.Links = append(conf.System.Links.Links, conf.LinksCOMPAT...)
+	conf.LinksCOMPAT = nil
 
 	return ec.Resolve()
 }
 
-func (conf *Configuration) expandLinks(catcher *erc.Collector) []LinkConf {
-	var err error
-	links := make([]LinkConf, 0, len(conf.Links))
-	for idx := range conf.Links {
-		lnk := conf.Links[idx]
-		lnk.Target, err = homedir.Expand(lnk.Target)
-		if err != nil {
-			catcher.Add(err)
-			continue
-		}
-
-		lnk.Path, err = homedir.Expand(lnk.Path)
-		if err != nil {
-			catcher.Add(err)
-			continue
-		}
-
-		if lnk.DirectoryContents {
-			files, err := os.ReadDir(lnk.Target)
-			if err != nil {
-				catcher.Add(err)
-				continue
-			}
-			for _, info := range files {
-				name := info.Name()
-				links = append(links, LinkConf{
-					Name:   fmt.Sprintf("%s:%s", lnk.Name, name),
-					Path:   filepath.Join(lnk.Path, name),
-					Target: filepath.Join(lnk.Target, name),
-					Update: lnk.Update,
-				})
-			}
-		} else {
-			links = append(links, lnk)
-		}
-	}
-
-	return links
-}
-
 func (conf *Settings) Validate() error {
-	catcher := &erc.Collector{}
-	for _, c := range []interface{ Validate() error }{
-		&conf.Notification,
-		&conf.Credentials,
-		&conf.Telegram,
-	} {
-		if z, ok := c.(interface{ IsZero() bool }); ok && z.IsZero() {
-			continue
+	conf.Runtime.Hostname = ft.DefaultFuture(conf.Runtime.Hostname, util.GetHostname)
+	conf.DMenuFlags = ft.DefaultFuture(conf.DMenuFlags, func() godmenu.Flags {
+		return godmenu.Flags{
+			// Path:            godmenu.DefaultDMenuPath,
+			// BackgroundColor: godmenu.DefaultBackgroundColor,
+			// TextColor:       godmenu.DefaultTextColor,
+			// Font:            "Source Code Pro-13",
+			Lines:  16,
+			Prompt: "=>>",
 		}
+	})
 
-		catcher.Wrapf(c.Validate(), "%T is not valid", c)
+	if ft.Not(conf.Telegram.IsZero()) {
+		return conf.Telegram.Validate()
 	}
 
-	conf.DMenu = ft.DefaultFuture(conf.DMenu, defaultDMenuConf)
-	conf.Runtime.Hostname = makeErrorHandler[string](catcher.Push)(os.Hostname())
-
-	return catcher.Resolve()
+	return nil
 }
 
-func makeErrorHandler[T any](eh func(error)) func(T, error) T {
-	return func(v T, err error) T { eh(err); return v }
-}
-
-func defaultDMenuConf() godmenu.Flags {
-	return godmenu.Flags{
-		Path:            godmenu.DefaultDMenuPath,
-		BackgroundColor: godmenu.DefaultBackgroundColor,
-		TextColor:       godmenu.DefaultTextColor,
-		Font:            "Source Code Pro-13",
-		Lines:           16,
-		Prompt:          "=>>",
-	}
-}
-
-func (conf *NotifyConf) IsZero() bool {
-	if conf == nil || (conf.Target == "" && os.Getenv("SARDIS_NOTIFY_TARGET") == "") {
-		return true
-	}
-	return false
+func (conf *Settings) DMenu() godmenu.Arg {
+	return godmenu.WithFlags(&conf.DMenuFlags)
 }
 
 func (conf *NotifyConf) Validate() error {
+	if conf == nil || (conf.Target == "" && os.Getenv("SARDIS_NOTIFY_TARGET") == "") {
+		return nil
+	}
+
 	if conf.Name == "" {
 		conf.Name = "sardis"
 	}
@@ -639,37 +415,6 @@ func (conf *Configuration) GetBlog(name string) *BlogConf {
 			return &conf.Blog[idx]
 		}
 	}
-	return nil
-}
-
-func (conf *LinkConf) Validate() error {
-	if conf.Target == "" {
-		return errors.New("must specify a link target")
-	}
-
-	if conf.Name == "" {
-		fn := filepath.Dir(conf.Path)
-
-		if fn != "" {
-			conf.Name = fn
-		} else {
-			return errors.New("must specify a name for the link")
-		}
-
-		return errors.New("must specify a name")
-	}
-
-	if conf.Path == "" {
-		base := filepath.Base(conf.Name)
-		fn := filepath.Dir(conf.Name)
-		if base != "" && fn != "" {
-			conf.Path = base
-			conf.Name = fn
-		} else {
-			return errors.New("must specify a location for the link")
-		}
-	}
-
 	return nil
 }
 

@@ -25,6 +25,7 @@ func Apply[T any](fn func(T) T, in []T) []T {
 }
 
 func TryExpandHomeDirs(in []string) []string { return Apply(jutil.TryExpandHomedir, in) }
+func TryExpandHomeDir(in string) string      { return jutil.TryExpandHomedir(in) }
 
 func GetDirectoryContents(path string) (*fun.Stream[string], error) {
 	dir, err := os.Open(path)

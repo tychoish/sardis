@@ -2,7 +2,6 @@ package subexec
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
@@ -19,8 +18,7 @@ type Configuration struct {
 		SSHAgentSocketPath  string `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
 		AlacrittySocketPath string `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
 		IncludeLocalSHH     bool   `bson:"include_local_ssh" json:"include_local_ssh" yaml:"include_local_ssh"`
-		Hostname            string `bson:"-" json:"-" yaml:"-"`
-	}
+	} `bson:"settings" json:"settings" yaml:"settings"`
 
 	caches struct {
 		commandGroups       adt.Once[map[string]Group]
@@ -44,8 +42,6 @@ func (conf *Configuration) doValidate() error {
 	}
 
 	ec.Push(conf.resolveAliasesAndMergeGroups())
-
-	conf.Settings.Hostname = makeErrorHandler[string](ec.Push)(os.Hostname())
 
 	conf.caches.alacrittySocketPath.Set(func() string {
 		if conf.Settings.AlacrittySocketPath != "" {
@@ -73,12 +69,13 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	if len(conf.Commands) == 0 {
 		return nil
 	}
+	hostname := util.GetHostname()
 	withAliases := make([]Group, 0, len(conf.Commands)+len(conf.Commands)/2+1)
 	for idx := range conf.Commands {
 		cg := conf.Commands[idx]
 		if cg.Host != nil && !conf.Settings.IncludeLocalSHH {
 			chost := ft.Ref(cg.Host)
-			if chost != "" && chost == conf.Settings.Hostname {
+			if chost != "" && chost == hostname {
 				continue
 			}
 		}
@@ -153,10 +150,11 @@ func (conf *Configuration) ExportAllCommands() []Command {
 }
 func (conf *Configuration) doExportAllCommands() []Command {
 	out := dt.NewSlice([]Command{})
+	host := util.GetHostname()
 
 	for _, grp := range conf.Commands {
 		hn, ok := ft.RefOk(grp.Host)
-		if ok && hn != "" && hn == conf.Settings.Hostname && !conf.Settings.IncludeLocalSHH {
+		if ok && hn != "" && hn == host && !conf.Settings.IncludeLocalSHH {
 			continue
 		}
 
@@ -184,10 +182,11 @@ func (conf *Configuration) doExportGroupNames() []string {
 
 func (conf *Configuration) doExportCommandGroups() map[string]Group {
 	out := make(map[string]Group, len(conf.Commands))
+	hostname := util.GetHostname()
 	for idx := range conf.Commands {
 		group := conf.Commands[idx]
 		hn, ok := ft.RefOk(group.Host)
-		if ok && hn != "" && hn == conf.Settings.Hostname && !conf.Settings.IncludeLocalSHH {
+		if ok && hn != "" && hn == hostname && !conf.Settings.IncludeLocalSHH {
 			continue
 		}
 

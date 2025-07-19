@@ -39,22 +39,13 @@ func (conf *GitRepository) FetchJob() fun.Worker {
 
 		id := fmt.Sprintf("fetch.REPO(%s).REMOTE(%s).OPERATOR(%s)", conf.Name, conf.RemoteName, util.GetHostname())
 
-		start := time.Now()
+		startAt := time.Now()
 		hostname := util.GetHostname()
-		defer func() {
-			grip.Notice(message.BuildPair().
-				Pair("op", opName).
-				Pair("repo", conf.Name).
-				Pair("err", err != nil).
-				Pair("dur", time.Since(start)).
-				Pair("path", conf.Path).
-				Pair("host", hostname),
-			)
-		}()
 
 		if !util.FileExists(conf.Path) {
 			grip.Info(message.BuildPair().
 				Pair("op", opName).
+				Pair("id", id).
 				Pair("repo", conf.Name).
 				Pair("path", conf.Path).
 				Pair("msg", "repo doesn't exist; cloning").
@@ -82,19 +73,32 @@ func (conf *GitRepository) FetchJob() fun.Worker {
 			AppendArgs("git", "pull", "--keep", "--rebase", "--autostash", conf.RemoteName, conf.Branch).
 			Append(conf.Post...).
 			Worker().
+			PreHook(func(context.Context) {
+				grip.Notice(message.BuildPair().
+					Pair("op", opName).
+					Pair("state", "STARTED").
+					Pair("repo", conf.Name).
+					Pair("path", conf.Path).
+					Pair("host", hostname),
+				)
+			}).
 			WithErrorFilter(func(err error) error {
+				msg := message.BuildPair().
+					Pair("op", opName).
+					Pair("state", "COMPLETED").
+					Pair("err", err != nil).
+					Pair("dur", time.Since(startAt)).
+					Pair("repo", conf.Name).
+					Pair("path", conf.Path)
+
 				if err != nil {
-					grip.Error(procbuf.String())
-					grip.Critical(message.BuildPair().
-						Pair("op", opName).
-						Pair("id", id).
-						Pair("repo", conf.Name).
-						Pair("path", conf.Path).
-						Pair("err", err),
-					)
 					proclog.Infoln(ruler, id, ruler)
+					grip.Error(procbuf.String())
+					grip.Critical(msg.Pair("err", err))
+					return err
 				}
-				return err
+				grip.Notice(msg)
+				return nil
 			}).PostHook(fn.MakeFuture(procbuf.Close).Ignore()).Run(ctx)
 	}
 }

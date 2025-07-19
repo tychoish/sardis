@@ -14,6 +14,11 @@ import (
 	jutil "github.com/tychoish/jasper/util"
 )
 
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}
+
 func Apply[T any](fn func(T) T, in []T) []T {
 	out := make([]T, len(in))
 

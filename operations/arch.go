@@ -2,9 +2,6 @@ package operations
 
 import (
 	"context"
-	"errors"
-
-	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
@@ -12,7 +9,6 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
-	"github.com/tychoish/sardis/units"
 )
 
 const nameFlagName = "name"
@@ -30,91 +26,65 @@ func ArchLinux() *cmdr.Commander {
 }
 
 func fetchAur() *cmdr.Commander {
-	return cmdr.MakeCommander().
+	return addOpCommand(cmdr.MakeCommander().
 		SetName("fetch").
 		SetUsage("download source to build directory").
 		Flags(cmdr.FlagBuilder([]string{}).
 			SetName(nameFlagName, "n").
-			SetUsage("specify the name of a package").
-			Flag()).
-		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) ([]string, error) {
-			packages := append(cc.StringSlice(nameFlagName), cc.Args().Slice()...)
-			if len(packages) == 0 {
-				return nil, errors.New("must specify one package to fetch")
-			}
-
-			return packages, nil
-		}).SetAction(func(ctx context.Context, packages []string) error {
-			wg := &fun.WaitGroup{}
-			ec := &erc.Collector{}
-
-			for _, name := range packages {
-				wg.Launch(ctx, units.NewArchFetchAurJob(name, true).Operation(ec.Push))
-			}
-
-			wg.Wait(ctx)
-
-			return ec.Resolve()
-		}).Add)
+			SetUsage("specify a package or packages to download from the AUR").
+			Flag()),
+		"name", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+			conf := args.conf.System.Arch
+			return fun.MakeConverter(func(name string) fun.Worker {
+				return conf.FetchPackageFromAUR(name, true)
+			}).Stream(fun.SliceStream(args.ops)).Parallel(
+				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+				fun.WorkerGroupConfContinueOnError(),
+				fun.WorkerGroupConfWorkerPerCPU(),
+			).Run(ctx)
+		})
 }
 
 func buildPkg() *cmdr.Commander {
-	return cmdr.MakeCommander().
+	return addOpCommand(cmdr.MakeCommander().
 		SetName("build").
-		SetUsage("download and build package").
+		SetUsage("build a package").
 		Flags(cmdr.FlagBuilder([]string{}).
 			SetName(nameFlagName, "n").
-			SetUsage("specify the name of a package").
-			Flag()).
-		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) ([]string, error) {
-			packages := append(cc.StringSlice(nameFlagName), cc.Args().Slice()...)
-			if len(packages) == 0 {
-				return nil, errors.New("must specify one package to fetch")
-			}
+			SetUsage("specify a package or packages from the AUR").
+			Flag()),
+		"name", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+			conf := args.conf.System.Arch
 
-			return packages, nil
-		}).SetAction(func(ctx context.Context, packages []string) error {
-			wg := &fun.WaitGroup{}
-			ec := &erc.Collector{}
-			for _, name := range packages {
-				wg.Launch(ctx, units.NewArchAbsBuildJob(name).Operation(ec.Push))
-			}
-
-			wg.Wait(ctx)
-
-			return ec.Resolve()
-		}).Add)
+			return fun.MakeConverter(func(name string) fun.Worker {
+				return conf.BuildPackageInABS(name)
+			}).Stream(fun.SliceStream(args.ops)).Parallel(
+				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+				fun.WorkerGroupConfContinueOnError(),
+				fun.WorkerGroupConfWorkerPerCPU(),
+			).Run(ctx)
+		})
 }
 
 func installAur() *cmdr.Commander {
-	return cmdr.MakeCommander().
+	return addOpCommand(cmdr.MakeCommander().
 		SetName("install").
-		SetUsage("combination build download and install").
+		SetUsage("fetch AUR package to the ABS directory, and install it").
 		Flags(cmdr.FlagBuilder([]string{}).
 			SetName(nameFlagName, "n").
-			SetUsage("specify the name of a package").
-			Flag()).
-		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) ([]string, error) {
-			packages := append(cc.StringSlice(nameFlagName), cc.Args().Slice()...)
-			if len(packages) == 0 {
-				return nil, errors.New("must specify one package to fetch")
-			}
-			return packages, nil
-		}).SetAction(func(ctx context.Context, packages []string) error {
-			catcher := &erc.Collector{}
+			SetUsage("specify a package or packages from the AUR").
+			Flag()),
+		"name", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+			conf := args.conf.System.Arch
 
-			for _, name := range packages {
-				job := units.NewArchFetchAurJob(name, true)
-				if err := job(ctx); err != nil {
-					catcher.Add(err)
-					continue
-				}
-
-				catcher.Add(units.NewArchAbsBuildJob(name)(ctx))
-			}
-
-			return catcher.Resolve()
-		}).Add)
+			return fun.MakeConverter(func(name string) fun.Worker {
+				return conf.FetchPackageFromAUR(name, true).Join(conf.BuildPackageInABS(name))
+			}).Stream(fun.SliceStream(args.ops)).Parallel(
+				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+				fun.WorkerGroupConfContinueOnError(),
+				fun.WorkerGroupConfWorkerPerCPU(),
+			).Run(ctx)
+		})
 }
 
 func setupArchLinux() *cmdr.Commander {
@@ -124,35 +94,30 @@ func setupArchLinux() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			catcher := &erc.Collector{}
+			ec := &erc.Collector{}
 
-			pkgs := []string{}
-			for _, pkg := range conf.System.Arch.Packages {
-				pkgs = append(pkgs, pkg.Name)
-			}
+			arch := &conf.System.Arch
 
 			grip.Info(message.Fields{
-				"path":     conf.System.Arch.BuildPath,
-				"packages": len(pkgs),
-				"aur":      len(conf.System.Arch.AurPackages),
+				"path":     arch.BuildPath,
+				"packages": len(arch.Packages),
+				"aur":      len(arch.AurPackages),
 			})
 
-			catcher.Add(units.NewArchInstallPackageJob(pkgs)(ctx))
+			arch.InstallPackages().Operation(ec.Push).Run(ctx)
 
-			for _, pkg := range conf.System.Arch.AurPackages {
+			for _, pkg := range arch.AurPackages {
 				grip.Info(message.Fields{
 					"name":   pkg.Name,
 					"update": pkg.Update,
 				})
 
-				if err := units.NewArchFetchAurJob(pkg.Name, pkg.Update)(ctx); err != nil {
-					catcher.Add(err)
-					continue
-				}
-
-				catcher.Add(units.NewArchAbsBuildJob(pkg.Name)(ctx))
+				arch.FetchPackageFromAUR(pkg.Name, pkg.Update).
+					Join(arch.BuildPackageInABS(pkg.Name)).
+					Operation(ec.Push).
+					Run(ctx)
 			}
 
-			return catcher.Resolve()
+			return ec.Resolve()
 		}).Add)
 }

@@ -3,9 +3,7 @@ package sardis
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
-	"strings"
 
 	"github.com/mitchellh/go-homedir"
 
@@ -47,24 +45,13 @@ type Configuration struct {
 	}
 }
 
-type ArchLinuxConf struct {
-	BuildPath   string `bson:"build_path" json:"build_path" yaml:"build_path"`
-	AurPackages []struct {
-		Name   string `bson:"name" json:"name" yaml:"name"`
-		Update bool   `bson:"update" json:"update" yaml:"update"`
-	} `bson:"aur_packages" json:"aur_packages" yaml:"aur_packages"`
-	Packages []struct {
-		Name string `bson:"name" json:"name" yaml:"name"`
-	} `bson:"packages" json:"packages" yaml:"packages"`
-}
-
 type SystemConf struct {
 	GoPackages []struct {
 		Name    string `bson:"name" json:"name" yaml:"name"`
 		Update  bool   `bson:"update" json:"update" yaml:"update"`
 		Version string `bson:"version" json:"version" yaml:"version"`
 	} `bson:"golang" json:"golang" yaml:"golang"`
-	Arch           ArchLinuxConf                `bson:"arch" json:"arch" yaml:"arch"`
+	Arch           sysmgmt.ArchLinux            `bson:"arch" json:"arch" yaml:"arch"`
 	SystemD        sysmgmt.SystemdConfiguration `bson:"systemd" json:"systemd" yaml:"systemd"`
 	Links          sysmgmt.LinkConfiguration    `bson:"links" json:"links" yaml:"links"`
 	ServicesLEGACY []sysmgmt.SystemdService     `bson:"services" json:"services" yaml:"services"`
@@ -332,51 +319,6 @@ func (conf *NotifyConf) Validate() error {
 		catcher.Whenf(v == "", "missing value for '%s'", k)
 	}
 
-	return catcher.Resolve()
-}
-
-func (conf *ArchLinuxConf) Validate() error {
-	if _, err := os.Stat("/etc/arch-release"); os.IsNotExist(err) {
-		return nil
-	}
-
-	if conf.BuildPath == "" {
-		conf.BuildPath = filepath.Join(util.GetHomedir(), "abs")
-	} else {
-		var err error
-
-		conf.BuildPath, err = homedir.Expand(conf.BuildPath)
-		if err != nil {
-			return err
-		}
-	}
-
-	catcher := &erc.Collector{}
-	if stat, err := os.Stat(conf.BuildPath); os.IsNotExist(err) {
-		if err := os.MkdirAll(conf.BuildPath, 0755); err != nil {
-			catcher.Add(fmt.Errorf("making %q: %w", conf.BuildPath, err))
-		}
-	} else if !stat.IsDir() {
-		catcher.Add(fmt.Errorf("arch build path '%s' is a file not a directory", conf.BuildPath))
-	}
-
-	for idx, pkg := range conf.AurPackages {
-		if pkg.Name == "" {
-			catcher.Add(fmt.Errorf("aur package at index=%d does not have name", idx))
-		}
-		if strings.Contains(pkg.Name, ".+=") {
-			catcher.Add(fmt.Errorf("aur package '%s' at index=%d has invalid character", pkg.Name, idx))
-		}
-	}
-
-	for idx, pkg := range conf.Packages {
-		if pkg.Name == "" {
-			catcher.Add(fmt.Errorf("package at index=%d does not have name", idx))
-		}
-		if strings.Contains(pkg.Name, ".+=") {
-			catcher.Add(fmt.Errorf("package '%s' at index=%d has invalid character", pkg.Name, idx))
-		}
-	}
 	return catcher.Resolve()
 }
 

@@ -29,7 +29,7 @@ func WithConfiguration(ctx context.Context, conf *Configuration) context.Context
 	if HasAppConfiguration(ctx) {
 		return ctx
 	}
-	return context.WithValue(ctx, confCtxKey, *conf)
+	return context.WithValue(ctx, confCtxKey, conf)
 }
 
 func WithJasper(ctx context.Context, conf *Configuration) context.Context {

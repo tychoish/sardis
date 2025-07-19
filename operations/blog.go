@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
-	"github.com/tychoish/sardis/units"
 )
 
 func Blog() *cmdr.Commander {
@@ -84,14 +83,15 @@ func blogPublish() *cmdr.Commander {
 				)
 			}()
 
-			err = units.NewRepoSyncJob(conf.Settings.Runtime.Hostname, *repo).WithErrorFilter(func(err error) error {
+			err = repo.SyncRemoteJob(conf.Settings.Runtime.Hostname).WithErrorFilter(func(err error) error {
 				return ers.Wrapf(err, "problem syncing blog %q repo", name)
-			}).Join(jasper.Context(ctx).CreateCommand(ctx).
-				Append(blog.DeployCommands...).
-				Directory(repo.Path).
-				AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
-				SetOutputSender(level.Info, grip.Sender()).
-				SetErrorSender(level.Error, grip.Sender()).Worker(),
+			}).Join(
+				jasper.Context(ctx).CreateCommand(ctx).
+					Append(blog.DeployCommands...).
+					Directory(repo.Path).
+					AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
+					SetOutputSender(level.Info, grip.Sender()).
+					SetErrorSender(level.Error, grip.Sender()).Worker(),
 			).Run(ctx)
 
 			if err != nil {

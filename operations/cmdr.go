@@ -15,8 +15,8 @@ import (
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
-	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/util"
 )
 
 /* Project Planning and TODO
@@ -83,7 +83,7 @@ func Commander() *cmdr.Commander {
 			cmdr.FlagBuilder(false).SetName("colorJsonLog").SetUsage("colorized json logs").Flag(),
 			cmdr.FlagBuilder(false).SetName("quietStdOut").SetUsage("don't log to standard out").Flag(),
 			cmdr.FlagBuilder(false).SetName("quietSyslog", "qs").SetUsage("don't log to syslog").Flag(),
-			cmdr.FlagBuilder(filepath.Join(util.GetHomedir(), ".sardis.yaml")).
+			cmdr.FlagBuilder(filepath.Join(util.GetHomeDir(), ".sardis.yaml")).
 				SetName("conf", "c").
 				SetUsage("configuration file path").
 				SetValidate(func(in string) error {

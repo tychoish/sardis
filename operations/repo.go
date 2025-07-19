@@ -22,9 +22,9 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
-	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/repo"
+	"github.com/tychoish/sardis/util"
 )
 
 func Repo() *cmdr.Commander {
@@ -91,7 +91,7 @@ func repoList() *cmdr.Commander {
 				},
 			)),
 		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-			homedir := util.GetHomedir()
+			homedir := util.GetHomeDir()
 
 			table := tabby.New()
 			table.AddHeader("Name", "Path", "Local", "Enabled", "Tags")

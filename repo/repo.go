@@ -6,8 +6,7 @@ import (
 	"os"
 
 	git "github.com/go-git/go-git/v5"
-	jutil "github.com/tychoish/jasper/util"
-	sutil "github.com/tychoish/sardis/util"
+	"github.com/tychoish/sardis/util"
 )
 
 type GitRepository struct {
@@ -43,9 +42,9 @@ func (conf *GitRepository) Validate() error {
 		return errors.New("cannot specify sync and fetch")
 	}
 
-	conf.Path = jutil.TryExpandHomedir(conf.Path)
-	conf.Post = sutil.TryExpandHomeDirs(conf.Post)
-	conf.Pre = sutil.TryExpandHomeDirs(conf.Pre)
+	conf.Path = util.TryExpandHomeDir(conf.Path)
+	conf.Post = util.TryExpandHomeDirs(conf.Post)
+	conf.Pre = util.TryExpandHomeDirs(conf.Pre)
 
 	return nil
 }

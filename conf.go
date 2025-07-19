@@ -17,10 +17,10 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/x/telegram"
 	"github.com/tychoish/grip/x/xmpp"
-	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/repo"
 	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/sysmgmt"
+	"github.com/tychoish/sardis/util"
 	sutil "github.com/tychoish/sardis/util"
 )
 

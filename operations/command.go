@@ -17,10 +17,9 @@ import (
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/jasper"
-	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/subexec"
-	sutil "github.com/tychoish/sardis/util"
+	"github.com/tychoish/sardis/util"
 )
 
 const commandFlagName string = "command"
@@ -92,7 +91,7 @@ func listCommands() *cmdr.Commander {
 		SetUsage("return a list of defined commands").
 		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				homedir := util.GetHomedir()
+				homedir := util.GetHomeDir()
 
 				table := tabby.New()
 				table.AddHeader("Name", "Command", "Directory")
@@ -110,9 +109,9 @@ func listCommands() *cmdr.Commander {
 					for idx, chunk := range cmds {
 						if idx == 0 {
 							table.AddLine(
-								cmd.Name,                                // name
-								chunk,                                   // command
-								sutil.TryCollapseHomedir(cmd.Directory), // dir
+								cmd.Name,                               // name
+								chunk,                                  // command
+								util.TryCollapseHomeDir(cmd.Directory), // dir
 							)
 						} else {
 							table.AddLine(

@@ -11,8 +11,8 @@ import (
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/jasper/util"
-	"github.com/tychoish/sardis/gadget"
+	"github.com/tychoish/sardis/tools/gadget"
+	"github.com/tychoish/sardis/util"
 	"github.com/urfave/cli/v2"
 )
 
@@ -35,7 +35,7 @@ func Gadget() *cmdr.Commander {
 							"set go test path with '--path'")
 						return fmt.Errorf("module path %q should not have ... suffix", path)
 					}
-					if util.FileExists(util.TryExpandHomedir(path)) {
+					if util.FileExists(util.TryExpandHomeDir(path)) {
 						return nil
 					}
 					grip.Warning(fmt.Errorf("%q does not exist", path))

@@ -24,8 +24,8 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/jasper"
-	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/subexec"
+	"github.com/tychoish/sardis/util"
 )
 
 func (conf *GitRepository) FetchJob() fun.Worker {

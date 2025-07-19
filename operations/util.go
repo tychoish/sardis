@@ -9,8 +9,8 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/sardis/dupe"
-	"github.com/tychoish/sardis/munger"
+	"github.com/tychoish/sardis/tools/dupe"
+	"github.com/tychoish/sardis/tools/munger"
 )
 
 func Utilities() *cmdr.Commander {

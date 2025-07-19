@@ -17,9 +17,9 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
-	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/repo"
 	"github.com/tychoish/sardis/subexec"
+	"github.com/tychoish/sardis/util"
 )
 
 type ArchLinux struct {
@@ -49,7 +49,7 @@ func (conf *ArchLinux) Validate() error {
 	}
 
 	if conf.BuildPath == "" {
-		conf.BuildPath = filepath.Join(util.GetHomedir(), "abs")
+		conf.BuildPath = filepath.Join(util.GetHomeDir(), "abs")
 	} else {
 		var err error
 

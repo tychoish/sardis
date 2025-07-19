@@ -14,10 +14,7 @@ import (
 	jutil "github.com/tychoish/jasper/util"
 )
 
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
-}
+func FileExists(path string) bool { return ft.Not(os.IsNotExist(ft.IgnoreFirst(os.Stat(path)))) }
 
 func Apply[T any](fn func(T) T, in []T) []T {
 	out := make([]T, len(in))
@@ -31,6 +28,7 @@ func Apply[T any](fn func(T) T, in []T) []T {
 
 func TryExpandHomeDirs(in []string) []string { return Apply(jutil.TryExpandHomedir, in) }
 func TryExpandHomeDir(in string) string      { return jutil.TryExpandHomedir(in) }
+func GetHomeDir() string                     { return jutil.GetHomedir() }
 
 func GetDirectoryContents(path string) (*fun.Stream[string], error) {
 	dir, err := os.Open(path)
@@ -49,7 +47,7 @@ func GetDirectoryContents(path string) (*fun.Stream[string], error) {
 	}).Stream(), nil
 }
 
-func TryCollapseHomedir(in string) string {
+func TryCollapseHomeDir(in string) string {
 	hd := jutil.GetHomedir()
 	if strings.HasPrefix(in, hd) {
 		return strings.Replace(in, hd, "~", 1)

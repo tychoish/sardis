@@ -16,8 +16,8 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
-	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/subexec"
+	"github.com/tychoish/sardis/util"
 )
 
 type SystemdConfiguration struct {

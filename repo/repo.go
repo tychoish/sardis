@@ -34,6 +34,10 @@ func (conf *GitRepository) Validate() error {
 		conf.RemoteName = "origin"
 	}
 
+	conf.Path = util.TryExpandHomeDir(conf.Path)
+	conf.Post = util.TryExpandHomeDirs(conf.Post)
+	conf.Pre = util.TryExpandHomeDirs(conf.Pre)
+
 	if conf.Remote == "" {
 		return fmt.Errorf("'%s' does not specify a remote", conf.Name)
 	}
@@ -41,10 +45,6 @@ func (conf *GitRepository) Validate() error {
 	if conf.Fetch && conf.LocalSync {
 		return errors.New("cannot specify sync and fetch")
 	}
-
-	conf.Path = util.TryExpandHomeDir(conf.Path)
-	conf.Post = util.TryExpandHomeDirs(conf.Post)
-	conf.Pre = util.TryExpandHomeDirs(conf.Pre)
 
 	return nil
 }

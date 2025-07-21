@@ -22,7 +22,7 @@ import (
 /* Project Planning and TODO
 - [ ] TODO <cmdr> cut releases of commander
 - [ ] TODO <libfun> a log-based Map persistence (sets only, BSON encoding wrapping GOB)
-- [ ] TODO <sardis> move more (all?) of the operations logic into units, and have a generators produce workers scheme.
+- [X] TODO <sardis> move more (all?) of the operations logic into units, and have a generators produce workers scheme.
 - [ ] TODO <fun/libfun> worker pool but be able to pause to let things coalese
 - [ ] TODO <cmdr> move to v3 of the cli lib
 - [ ] TODO <cmdr> do something with argflags.

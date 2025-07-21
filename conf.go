@@ -3,15 +3,12 @@ package sardis
 import (
 	"fmt"
 	"os"
-	"slices"
 
 	"github.com/mitchellh/go-homedir"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip/level"
@@ -25,20 +22,21 @@ import (
 )
 
 type Configuration struct {
-	Settings   *Settings             `bson:"settings" json:"settings" yaml:"settings"`
-	Repos      repo.Configuration    `bson:"repositories" json:"repositories" yaml:"repositories"`
-	Operations subexec.Configuration `bson:"operations" json:"operations" yaml:"operations"`
-	Hosts      []HostConf            `bson:"hosts" json:"hosts" yaml:"hosts"`
-	System     SystemConf            `bson:"system" json:"system" yaml:"system"`
-	Blog       []BlogConf            `bson:"blog" json:"blog" yaml:"blog"`
+	Settings   *Settings                 `bson:"settings" json:"settings" yaml:"settings"`
+	Repos      repo.Configuration        `bson:"repositories" json:"repositories" yaml:"repositories"`
+	Operations subexec.Configuration     `bson:"operations" json:"operations" yaml:"operations"`
+	System     SystemConf                `bson:"system" json:"system" yaml:"system"`
+	Network    NetworkConf               `bson:"network" json:"network" yaml:"network"`
+	Projects   repo.ProjectConfiguration `bson:"projects" json:"projects" yaml:"projects"`
 
+	HostsCOMPAT    []HostDefinition         `bson:"hosts" json:"hosts" yaml:"hosts"`
+	BlogCOMPAT     []repo.Project           `bson:"blog" json:"blog" yaml:"blog"`
 	CommandsCOMPAT []subexec.Group          `bson:"commands" json:"commands" yaml:"commands"`
 	RepoCOMPAT     []repo.GitRepository     `bson:"repo" json:"repo" yaml:"repo"`
 	LinksCOMPAT    []sysmgmt.LinkDefinition `bson:"links" json:"links" yaml:"links"`
 
-	generatedLocalOps bool
-	linkedFilesRead   bool
-	originalPath      string
+	linkedFilesRead bool
+	originalPath    string
 
 	caches struct {
 		validation adt.Once[error]
@@ -109,22 +107,12 @@ type CredentialsConf struct {
 		Password string `bson:"password" json:"password" yaml:"password"`
 		Token    string `bson:"token" json:"token" yaml:"token"`
 	} `bson:"github" json:"github" yaml:"github"`
-	AWS []CredentialsAWS `bson:"aws" json:"aws" yaml:"aws"`
-}
-
-type CredentialsAWS struct {
-	Profile string `bson:"profile" json:"profile" yaml:"profile"`
-	Key     string `bson:"key" json:"key" yaml:"key"`
-	Secret  string `bson:"secret" json:"secret" yaml:"secret"`
-	Token   string `bson:"token" json:"token" yaml:"token"`
-}
-
-type BlogConf struct {
-	Name           string   `bson:"name" json:"name" yaml:"name"`
-	RepoName       string   `bson:"repo" json:"repo" yaml:"repo"`
-	Notify         bool     `bson:"notify" json:"notify" yaml:"notify"`
-	Enabled        bool     `bson:"enabled" json:"enabled" yaml:"enabled"`
-	DeployCommands []string `bson:"deploy_commands" json:"deploy_commands" yaml:"deploy_commands"`
+	AWS []struct {
+		Profile string `bson:"profile" json:"profile" yaml:"profile"`
+		Key     string `bson:"key" json:"key" yaml:"key"`
+		Secret  string `bson:"secret" json:"secret" yaml:"secret"`
+		Token   string `bson:"token" json:"token" yaml:"token"`
+	} `bson:"aws" json:"aws" yaml:"aws"`
 }
 
 func LoadConfiguration(fn string) (*Configuration, error) {
@@ -168,12 +156,7 @@ func (conf *Configuration) doValidate() error {
 	ec.Push(conf.System.Links.Validate())
 	ec.Push(conf.Repos.Validate())
 	ec.Push(conf.Operations.Validate())
-
-	for idx := range conf.Hosts {
-		ec.Wrapf(conf.Hosts[idx].Validate(), "%d of %T is not valid", idx, conf.Hosts[idx])
-	}
-
-	ec.Wrap(conf.validateBlogs(), "blog build/push configuration is invalid")
+	ec.Push(conf.Projects.Validate())
 
 	return ec.Resolve()
 }
@@ -232,11 +215,13 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) error {
 		conf.RepoCOMPAT = append(conf.RepoCOMPAT, mcf.RepoCOMPAT...)
 		conf.LinksCOMPAT = append(conf.LinksCOMPAT, mcf.LinksCOMPAT...)
 		conf.System.ServicesLEGACY = append(conf.System.ServicesLEGACY, mcf.System.ServicesLEGACY...)
+		conf.BlogCOMPAT = append(conf.BlogCOMPAT, mcf.BlogCOMPAT...)
+		conf.HostsCOMPAT = append(conf.HostsCOMPAT, mcf.HostsCOMPAT...)
 
-		conf.Blog = append(conf.Blog, mcf.Blog...)
-		conf.Hosts = append(conf.Hosts, mcf.Hosts...)
 		conf.Operations.Commands = append(conf.Operations.Commands, mcf.Operations.Commands...)
 		conf.Repos.GitRepos = append(conf.Repos.GitRepos, mcf.Repos.GitRepos...)
+		conf.Projects.Projects = append(conf.Projects.Projects, mcf.Projects.Projects...)
+		conf.Network.Hosts = append(conf.Network.Hosts, mcf.Network.Hosts...)
 
 		conf.System.Arch.AurPackages = append(conf.System.Arch.AurPackages, mcf.System.Arch.AurPackages...)
 		conf.System.Arch.Packages = append(conf.System.Arch.Packages, mcf.System.Arch.Packages...)
@@ -247,6 +232,13 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) error {
 		ec.Whenf(ft.NotZero(mcf.Operations.Settings), "config file at %q has defined operational settings that are not mergable", mcf.originalPath)
 		ec.Whenf(mcf.Settings != nil, "config file at %q has defined global settings that are not mergable", mcf.originalPath)
 	}
+
+	for idx := range conf.BlogCOMPAT {
+		conf.BlogCOMPAT[idx].Type = "blog"
+	}
+
+	conf.Projects.Projects = append(conf.Projects.Projects, conf.BlogCOMPAT...)
+	conf.BlogCOMPAT = nil
 
 	conf.System.SystemD.Services = append(conf.System.SystemD.Services, conf.System.ServicesLEGACY...)
 	conf.System.ServicesLEGACY = nil
@@ -259,6 +251,9 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) error {
 
 	conf.System.Links.Links = append(conf.System.Links.Links, conf.LinksCOMPAT...)
 	conf.LinksCOMPAT = nil
+
+	conf.Network.Hosts = append(conf.Network.Hosts, conf.HostsCOMPAT...)
+	conf.HostsCOMPAT = nil
 
 	return ec.Resolve()
 }
@@ -283,9 +278,7 @@ func (conf *Settings) Validate() error {
 	return nil
 }
 
-func (conf *Settings) DMenu() godmenu.Arg {
-	return godmenu.WithFlags(&conf.DMenuFlags)
-}
+func (conf *Settings) DMenu() godmenu.Arg { return godmenu.WithFlags(&conf.DMenuFlags) }
 
 func (conf *NotifyConf) Validate() error {
 	if conf == nil || (conf.Target == "" && os.Getenv("SARDIS_NOTIFY_TARGET") == "") {
@@ -322,44 +315,6 @@ func (conf *NotifyConf) Validate() error {
 	return catcher.Resolve()
 }
 
-func (conf *Configuration) validateBlogs() error {
-	set := &dt.Set[string]{}
-	ec := &erc.Collector{}
-
-	for idx := range conf.Blog {
-		bc := conf.Blog[idx]
-		if bc.Name == "" && bc.RepoName == "" {
-			ec.Add(fmt.Errorf("blog at index %d is missing a name and a repo name", idx))
-			continue
-		}
-
-		bc.Name = ft.Default(bc.Name, bc.RepoName)
-		bc.RepoName = ft.Default(bc.RepoName, bc.Name)
-
-		ec.Whenf(set.Check(bc.Name), "blog named %q(%d) has a duplicate blog configured", bc.Name, idx)
-		ec.Whenf(set.Check(bc.RepoName), "blog with repo %s (named %s(%d)) has a duplicate name", bc.RepoName, bc.Name, idx)
-
-		set.Add(bc.Name)
-		set.Add(bc.RepoName)
-
-	}
-
-	return ec.Resolve()
-}
-
-func (conf *Configuration) GetBlog(name string) *BlogConf {
-	for idx := range conf.Blog {
-		if conf.Blog[idx].Name == name {
-			return &conf.Blog[idx]
-		}
-
-		if conf.Blog[idx].RepoName == name {
-			return &conf.Blog[idx]
-		}
-	}
-	return nil
-}
-
 func (conf *CredentialsConf) Validate() error {
 	if conf.Path == "" {
 		return nil
@@ -372,29 +327,4 @@ func (conf *CredentialsConf) Validate() error {
 	}
 
 	return sutil.UnmarshalFile(conf.Path, &conf)
-}
-
-func (h *HostConf) Validate() error {
-	catcher := &erc.Collector{}
-
-	catcher.When(h.Name == "", ers.Error("cannot have an empty name for a host"))
-	catcher.When(h.Hostname == "", ers.Error("cannot have an empty host name"))
-	catcher.When(h.Port == 0, ers.Error("must specify a non-zero port number for a host"))
-	catcher.When(!slices.Contains([]string{"ssh", "jasper"}, h.Protocol), ers.Error("host protocol must be ssh or jasper"))
-
-	if h.Protocol == "ssh" {
-		catcher.When(h.User == "", ers.Error("must specify user for ssh hosts"))
-	}
-
-	return catcher.Resolve()
-}
-
-func (conf *Configuration) GetHost(name string) (*HostConf, error) {
-	for _, h := range conf.Hosts {
-		if h.Name == name {
-			return &h, nil
-		}
-	}
-
-	return nil, fmt.Errorf("could not find a host named '%s'", name)
 }

@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/grip"
 	"github.com/tychoish/jasper/util"
 )
 
@@ -26,16 +26,14 @@ type Group struct {
 	Host           *string                `bson:"host" json:"host" yaml:"host"`
 	Commands       []Command              `bson:"commands" json:"commands" yaml:"commands"`
 	MenuSelections []string               `bson:"menu" json:"menu" yaml:"menu"`
-
-	unaliasedName string
-	// TODO populate the export cache.
-	exportCache *adt.Once[map[string]Command]
 }
 
-func dotJoin(elems ...string) string             { return dotJoinParts(elems) }
-func dotJoinParts(elems dt.Slice[string]) string { return strings.Join(elems, ".") }
-func dotSpit(in string) []string                 { return strings.Split(in, ".") }
-func dotSplitN(in string, n int) []string        { return strings.SplitN(in, ".", n) }
+func dotJoin(elems ...string) string {
+	return dotJoinParts(slices.DeleteFunc(elems, func(s string) bool { return s == "" }))
+}
+func dotJoinParts(elems []string) string  { return strings.Join(elems, ".") }
+func dotSpit(in string) []string          { return strings.Split(in, ".") }
+func dotSplitN(in string, n int) []string { return strings.SplitN(in, ".", n) }
 
 func (cg *Group) ID() string       { return dotJoinParts(cg.IDPath()) }
 func (cg *Group) IDPath() []string { return []string{cg.Category, cg.Name, cg.CmdNamePrefix} }
@@ -64,14 +62,27 @@ func (cg *Group) Validate() error {
 	home := util.GetHomedir()
 	ec := &erc.Collector{}
 
-	ec.When(cg.Name == "", ers.Error("command group must have name"))
-	if cg.unaliasedName == "" {
-		cg.unaliasedName = cg.Name
-	}
-
 	for _, selection := range cg.MenuSelections {
 		cg.Commands = append(cg.Commands, Command{Name: selection, Command: selection})
 	}
+
+	if cg.Category == "" && cg.CmdNamePrefix != "" {
+		cg.Category = cg.Name
+		cg.Name = cg.CmdNamePrefix
+		cg.CmdNamePrefix = ""
+	}
+
+	if cg.Name == "" && cg.CmdNamePrefix != "" {
+		grip.Warningf("command group cat=%q prefix=%q is missing name, rotating name", cg.Category, cg.CmdNamePrefix)
+		cg.Name = cg.CmdNamePrefix
+		cg.CmdNamePrefix = ""
+	}
+
+	ec.When(cg.Name == "", ers.Error("command group must have name"))
+
+	ec.Whenf(cg.Category != "" && cg.CmdNamePrefix != "",
+		"command group cat=%q name=%q, prefix=%q cannot have both category and prefixes",
+		cg.Category, cg.Name, cg.CmdNamePrefix)
 
 	for idx := range cg.Commands {
 		cmd := cg.Commands[idx]
@@ -101,6 +112,7 @@ func (cg *Group) Validate() error {
 
 		cmd.Command = ft.Default(strings.ReplaceAll(cg.Command, "{{command}}", cmd.Command), cmd.Command)
 		cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
+		cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.category}}", cg.Category)
 		cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", cg.Name)
 		cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", ft.Ref(cg.Host))
 		cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", cg.CmdNamePrefix)
@@ -110,6 +122,7 @@ func (cg *Group) Validate() error {
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{host}}", ft.Ref(cg.Host))
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", cg.Name)
+			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.category}}", cg.Category)
 			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{prefix}}", cg.Name)
 		}
 
@@ -124,7 +137,11 @@ func (cg *Group) Validate() error {
 }
 
 func (cg *Group) doMerge(rhv Group) bool {
-	if cg.Name != rhv.Name {
+	if (cg.Category == "" || rhv.Category == "") && cg.Name != rhv.Name {
+		return false
+	}
+
+	if cg.Category != rhv.Category {
 		return false
 	}
 

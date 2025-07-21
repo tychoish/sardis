@@ -68,6 +68,8 @@ func toWorkers(st *fun.Stream[subexec.Command]) *fun.Stream[fun.Worker] {
 	return fun.MakeConverter(func(conf subexec.Command) fun.Worker { return conf.Worker() }).Stream(st)
 }
 
+func runWorkers(ctx context.Context, wf fun.Worker) error { return wf.Run(ctx) }
+
 func runConfiguredCommand(ctx context.Context, cmds dt.Slice[subexec.Command]) error {
 	size := cmds.Len()
 	switch {

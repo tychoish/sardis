@@ -184,6 +184,10 @@ func (conf *GitRepository) UpdateJob() fun.Worker {
 
 		id := fmt.Sprintf("%s[%d]", strings.ToLower(string(rand.Text()[:8])), count.Add(1))
 
+		if err := conf.Validate(); err != nil {
+			return ers.Wrap(err, id)
+		}
+
 		grip.Info(message.BuildPair().
 			Pair("op", opName).
 			Pair("state", "STARTED").
@@ -231,6 +235,7 @@ func (conf *GitRepository) UpdateJob() fun.Worker {
 					"op": opName, "id": id, "operator": host,
 					"msg": "problem detecting changes in the repository, may be routine, recoverable",
 				}))
+
 				conf.SyncRemoteJob(host).Operation(ec.Push).Run(ctx)
 				return ec.Resolve()
 			}
@@ -278,7 +283,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 		}
 
 		if host != hn && !slices.Contains(conf.Mirrors, host) {
-			return ers.Wrap(fmt.Errorf("remote %q is not a configured", host), bullet)
+			return fmt.Errorf("%s: remote %q is not a configured", bullet, host)
 		}
 
 		if stat, err := os.Stat(conf.Path); os.IsNotExist(err) {

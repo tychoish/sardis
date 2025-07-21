@@ -1,8 +1,6 @@
 package subexec
 
 import (
-	"fmt"
-
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
@@ -95,7 +93,7 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	index := make(map[string]int, len(conf.Commands))
 	haveMerged := false
 	for idx := range conf.Commands {
-		lhn := conf.Commands[idx].Name
+		lhn := ft.Default(conf.Commands[idx].Category, conf.Commands[idx].Name)
 
 		if _, ok := index[lhn]; !ok {
 			index[lhn] = idx
@@ -160,7 +158,7 @@ func (conf *Configuration) doExportAllCommands() []Command {
 
 		for cidx := range grp.Commands {
 			cmd := grp.Commands[cidx]
-			cmd.Name = fmt.Sprintf("%s.%s", grp.Name, cmd.Name)
+			cmd.Name = dotJoin(grp.Category, grp.Name, cmd.Name)
 			out = append(out, cmd)
 		}
 	}
@@ -190,7 +188,12 @@ func (conf *Configuration) doExportCommandGroups() map[string]Group {
 			continue
 		}
 
-		out[group.Name] = group
+		if group.Category != "" {
+			out[group.Category] = group
+		} else {
+			out[group.Name] = group
+		}
+
 		for _, alias := range group.Aliases {
 			ag := conf.Commands[idx]
 			out[alias] = ag

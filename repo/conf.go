@@ -25,7 +25,8 @@ func (conf *Configuration) Validate() error { return conf.caches.validation.Call
 func (conf *Configuration) doValidate() error {
 	ec := &erc.Collector{}
 	for idx := range conf.GitRepos {
-		ec.Wrapf(conf.GitRepos[idx].Validate(), "%d/%d of %T is not valid", idx, len(conf.GitRepos), conf.GitRepos[idx])
+		repo := &conf.GitRepos[idx]
+		ec.Wrapf(repo.Validate(), "%d/%d of %T is not valid", idx, len(conf.GitRepos), conf.GitRepos[idx])
 	}
 
 	conf.rebuildIndexes()

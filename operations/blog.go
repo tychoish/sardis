@@ -33,11 +33,11 @@ func blogPublish() *cmdr.Commander {
 			name := args.ops
 			startAt := time.Now()
 
-			if conf == nil || len(conf.Blog) == 0 {
+			if conf == nil || len(conf.BlogCOMPAT) == 0 {
 				return errors.New("no blog configured")
 			}
 
-			blog := conf.GetBlog(name)
+			blog := conf.Projects.ByName(name)
 			if blog == nil {
 				return fmt.Errorf("blog %q is not defined", name)
 			}

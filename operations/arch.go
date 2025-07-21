@@ -33,11 +33,11 @@ func fetchAur() *cmdr.Commander {
 			SetName(nameFlagName, "n").
 			SetUsage("specify a package or packages to download from the AUR").
 			Flag()),
-		"name", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+		"name", func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf.System.Arch
 			return fun.MakeConverter(func(name string) fun.Worker {
 				return conf.FetchPackageFromAUR(name, true)
-			}).Stream(fun.SliceStream(args.ops)).Parallel(
+			}).Stream(fun.SliceStream(args.arg)).Parallel(
 				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfWorkerPerCPU(),
@@ -53,12 +53,12 @@ func buildPkg() *cmdr.Commander {
 			SetName(nameFlagName, "n").
 			SetUsage("specify a package or packages from the AUR").
 			Flag()),
-		"name", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+		"name", func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf.System.Arch
 
 			return fun.MakeConverter(func(name string) fun.Worker {
 				return conf.BuildPackageInABS(name)
-			}).Stream(fun.SliceStream(args.ops)).Parallel(
+			}).Stream(fun.SliceStream(args.arg)).Parallel(
 				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfWorkerPerCPU(),
@@ -74,12 +74,12 @@ func installAur() *cmdr.Commander {
 			SetName(nameFlagName, "n").
 			SetUsage("specify a package or packages from the AUR").
 			Flag()),
-		"name", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+		"name", func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf.System.Arch
 
 			return fun.MakeConverter(func(name string) fun.Worker {
 				return conf.FetchPackageFromAUR(name, true).Join(conf.BuildPackageInABS(name))
-			}).Stream(fun.SliceStream(args.ops)).Parallel(
+			}).Stream(fun.SliceStream(args.arg)).Parallel(
 				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfWorkerPerCPU(),

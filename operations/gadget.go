@@ -17,10 +17,12 @@ import (
 )
 
 func Gadget() *cmdr.Commander {
-	return cmdr.MakeCommander().
+	return addCommandWithConf(cmdr.MakeCommander().
 		SetName("gadget").
-		SetUsage(fmt.Sprintln("runs go test (+lint +coverage) on a workspace",
-			"all non-flag arguments are passed directly to go test")).
+		SetUsage(fmt.Sprintln(
+			"runs go test (+lint +coverage) on a workspace",
+			"all non-flag arguments are passed directly to go test",
+		)).
 		Flags(
 			cmdr.FlagBuilder("./").
 				SetName("module-path", "m").
@@ -69,8 +71,8 @@ func Gadget() *cmdr.Commander {
 				SetName("workers", "jobs", "j").
 				SetUsage("number of parallel workers").
 				Flag(),
-		).
-		With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (*gadget.Options, error) {
+		),
+		func(cc *cli.Context) (*gadget.Options, error) {
 			opts := &gadget.Options{
 				Timeout:        cc.Duration("timeout"),
 				Recursive:      cc.Bool("recursive"),
@@ -89,8 +91,8 @@ func Gadget() *cmdr.Commander {
 			}
 
 			return opts, nil
-		}).SetAction(func(ctx context.Context, opts *gadget.Options) error {
-			return gadget.RunTests(ctx, *opts)
-		}).Add)
-
+		},
+		func(ctx context.Context, opts *withConf[*gadget.Options]) error {
+			return gadget.RunTests(ctx, *opts.arg)
+		})
 }

@@ -28,9 +28,9 @@ func blogPublish() *cmdr.Commander {
 	return addOpCommand(
 		cmdr.MakeCommander().SetName("publish").
 			SetUsage("run the publication operation"),
-		"name", func(ctx context.Context, args *opsCmdArgs[string]) error {
+		"name", func(ctx context.Context, args *withConf[string]) error {
 			conf := args.conf
-			name := args.ops
+			name := args.arg
 			startAt := time.Now()
 
 			if conf == nil || len(conf.BlogCOMPAT) == 0 {

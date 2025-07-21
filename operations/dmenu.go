@@ -10,6 +10,7 @@ import (
 	"github.com/cheynewallace/tabby"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/godmenu"
@@ -34,8 +35,8 @@ func DMenu() *cmdr.Commander {
 			dmenuCommand(dmenuCommandGroups).SetName("groups").SetUsage("use nested menu, starting with command groups"),
 			listMenus(),
 		),
-		commandFlagName, func(ctx context.Context, args *opsCmdArgs[string]) error {
-			name := args.ops
+		commandFlagName, func(ctx context.Context, args *withConf[string]) error {
+			name := args.arg
 			if group, ok := args.conf.Operations.ExportCommandGroups()[name]; ok {
 				return dmenuForCommands(ctx, args.conf, group)
 			}
@@ -106,36 +107,47 @@ func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, group sub
 }
 
 func listMenus() *cmdr.Commander {
-	return cmdr.MakeCommander().
-		SetName("list").
-		SetUsage("prints all commands, group, and aliases.").
-		With(StandardSardisOperationSpec().
-			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				table := tabby.New()
-				table.AddHeader("Name", "Selections")
+	return addOpCommand(
+		cmdr.MakeCommander().
+			SetName("list").
+			SetUsage("prints all commands, group, and aliases."),
+		"group", func(ctx context.Context, args *withConf[[]string]) error {
+			conf := args.conf
+			set := dt.NewSetFromSlice(args.arg)
 
-				for name, group := range conf.Operations.ExportCommandGroups() {
-					cmds := []string{}
-					for _, cmd := range group.Commands {
-						cmds = append(cmds, cmd.Name)
-					}
-					if len(cmds) == 0 {
-						grip.Debugf("skipping empty command group %q", name)
-						continue
-					}
-					idx := -1
-					for chunk := range slices.Chunk(cmds, 3) {
-						idx++
-						if idx == 0 {
-							table.AddLine(name, strings.Join(chunk, "; "))
-						} else {
-							table.AddLine("", strings.Join(chunk, "; "))
-						}
-					}
-					table.AddLine("", "")
+			groups := conf.Operations.ExportCommandGroups()
+			groupSet := &dt.Set[string]{}
+			groupSet.AppendStream(groups.Keys())
+
+			table := tabby.New()
+			table.AddHeader("Name", "Selections")
+
+			for name, group := range groups {
+				if set.Len() > 0 && !set.Check(name) {
+					continue
 				}
 
-				table.Print()
-				return nil
-			}).Add)
+				cmds := []string{}
+				for _, cmd := range group.Commands {
+					cmds = append(cmds, cmd.Name)
+				}
+				if len(cmds) == 0 {
+					grip.Debugf("skipping empty command group %q", name)
+					continue
+				}
+				idx := -1
+				for chunk := range slices.Chunk(cmds, 3) {
+					idx++
+					if idx == 0 {
+						table.AddLine(name, strings.Join(chunk, "; "))
+					} else {
+						table.AddLine("", strings.Join(chunk, "; "))
+					}
+				}
+				table.AddLine("", "")
+			}
+
+			table.Print()
+			return nil
+		})
 }

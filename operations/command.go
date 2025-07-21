@@ -32,8 +32,8 @@ func RunCommand() *cmdr.Commander {
 			dmenuCommand(dmenuCommandAll).SetName("dmenu").SetUsage("use dmennu to select from all configured commands"),
 			qrCode(),
 		),
-		commandFlagName, func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-			cmds, err := getcmds(args.conf.Operations.ExportAllCommands(), args.ops)
+		commandFlagName, func(ctx context.Context, args *withConf[[]string]) error {
+			cmds, err := getcmds(args.conf.Operations.ExportAllCommands(), args.arg)
 			if err != nil {
 				return err
 			}
@@ -103,11 +103,13 @@ func listCommands() *cmdr.Commander {
 					}
 
 					cmds := append([]string{cmd.Command}, cmd.Commands...)
+
 					for idx := range cmds {
 						if maxLen := 48; len(cmds[idx]) > maxLen {
 							cmds[idx] = fmt.Sprintf("<%s...>", cmds[idx][:maxLen])
 						}
 					}
+
 					for idx, chunk := range cmds {
 						if idx == 0 {
 							table.AddLine(
@@ -122,7 +124,6 @@ func listCommands() *cmdr.Commander {
 								chunk, // command
 								"",    // dir
 							)
-
 						}
 					}
 				}

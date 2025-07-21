@@ -52,11 +52,11 @@ func repoList() *cmdr.Commander {
 				cmdr.MakeCommander().
 					SetName("tags").
 					SetUsage("list repos by tag groups"),
-				"tag", func(ctx context.Context, arg *opsCmdArgs[[]string]) error {
+				"tag", func(ctx context.Context, arg *withConf[[]string]) error {
 					table := tabby.New()
 					tags := arg.conf.Repos.Tags()
 
-					matcher := dt.NewSetFromSlice(arg.ops)
+					matcher := dt.NewSetFromSlice(arg.arg)
 					table.AddHeader("Tag", "Count", "Repositories")
 					err := tags.Stream().Filter(func(tp dt.Pair[string, dt.Slice[*repo.GitRepository]]) bool {
 
@@ -90,7 +90,7 @@ func repoList() *cmdr.Commander {
 					return nil
 				},
 			)),
-		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+		"repo", func(ctx context.Context, args *withConf[[]string]) error {
 			homedir := util.GetHomeDir()
 
 			table := tabby.New()
@@ -98,10 +98,10 @@ func repoList() *cmdr.Commander {
 
 			var repos []repo.GitRepository
 
-			if len(args.ops) == 0 {
+			if len(args.arg) == 0 {
 				repos = args.conf.Repos.GitRepos
 			} else {
-				repos = args.conf.Repos.FindAll(args.ops...)
+				repos = args.conf.Repos.FindAll(args.arg...)
 			}
 
 			sort.Slice(repos, func(i, j int) bool { return repos[i].Name < repos[j].Name })
@@ -129,16 +129,16 @@ func repoUpdate() *cmdr.Commander {
 		cmdr.MakeCommander().
 			SetName("update").
 			Aliases("sync"),
-		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+		"repo", func(ctx context.Context, args *withConf[[]string]) error {
 			started := time.Now()
 
-			repos := args.conf.Repos.FindAll(args.ops...)
+			repos := args.conf.Repos.FindAll(args.arg...)
 			if len(repos) == 0 {
-				return fmt.Errorf("no tagged repository named '%v' configured", args.ops)
+				return fmt.Errorf("no tagged repository named '%v' configured", args.arg)
 			}
 
 			shouldNotify := false
-			repoNames := make([]string, 0, len(args.ops))
+			repoNames := make([]string, 0, len(args.arg))
 			filterd := repos.Stream().Filter(func(conf repo.GitRepository) bool {
 				shouldNotify = shouldNotify || conf.Disabled && conf.Notify
 				if ft.Not(conf.Disabled) {
@@ -154,7 +154,7 @@ func repoUpdate() *cmdr.Commander {
 			grip.Info(message.BuildPair().
 				Pair("op", opName).
 				Pair("state", "STARTED").
-				Pair("ops", args.ops).
+				Pair("ops", args.arg).
 				Pair("host", args.conf.Settings.Runtime.Hostname),
 			)
 			defer func() {
@@ -164,7 +164,7 @@ func repoUpdate() *cmdr.Commander {
 					Pair("err", ers.IsError(err)).
 					Pair("state", "COMPLETED").
 					Pair("host", args.conf.Settings.Runtime.Hostname).
-					Pair("args", args.ops).
+					Pair("args", args.arg).
 					Pair("repos", repoNames).
 					Pair("dur", time.Since(started)),
 				)
@@ -178,7 +178,7 @@ func repoUpdate() *cmdr.Commander {
 
 			if err != nil {
 				sardis.RemoteNotify(ctx).NoticeWhen(shouldNotify, message.Fields{
-					"arg":   args.ops,
+					"arg":   args.arg,
 					"repos": repoNames,
 					"op":    opName,
 					"dur":   time.Since(started).Seconds(),
@@ -197,8 +197,8 @@ func repoCleanup() *cmdr.Commander {
 			SetName("gc").
 			Aliases("cleanup").
 			SetUsage("run repository cleanup"),
-		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-			repos := args.conf.Repos.FindAll(args.ops...).Stream()
+		"repo", func(ctx context.Context, args *withConf[[]string]) error {
+			repos := args.conf.Repos.FindAll(args.arg...).Stream()
 
 			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.CleanupJob() }).Stream(repos)
 
@@ -216,8 +216,8 @@ func repoClone() *cmdr.Commander {
 		cmdr.MakeCommander().
 			SetName("clone").
 			SetUsage("clone a repository or all matching repositories"),
-		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-			repos := args.conf.Repos.FindAll(args.ops...).Stream()
+		"repo", func(ctx context.Context, args *withConf[[]string]) error {
+			repos := args.conf.Repos.FindAll(args.arg...).Stream()
 
 			missingRepos := repos.Filter(func(rc repo.GitRepository) bool {
 				if _, err := os.Stat(rc.Path); os.IsNotExist(err) {
@@ -296,10 +296,10 @@ func repoStatus() *cmdr.Commander {
 		cmdr.MakeCommander().
 			SetName("status").
 			SetUsage("report on the status of repos"),
-		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
+		"repo", func(ctx context.Context, args *withConf[[]string]) error {
 			ec := &erc.Collector{}
 
-			repos := args.conf.Repos.FindAll(args.ops...).Stream()
+			repos := args.conf.Repos.FindAll(args.arg...).Stream()
 
 			fun.MakeConverter(
 				func(rc repo.GitRepository) fun.Operation {
@@ -318,8 +318,8 @@ func repoFetch() *cmdr.Commander {
 		cmdr.MakeCommander().
 			SetName("fetch").
 			SetUsage("fetch one or more repos"),
-		"repo", func(ctx context.Context, args *opsCmdArgs[[]string]) error {
-			repos := args.conf.Repos.FindAll(args.ops...).Stream().Filter(func(repo repo.GitRepository) bool { return repo.Fetch })
+		"repo", func(ctx context.Context, args *withConf[[]string]) error {
+			repos := args.conf.Repos.FindAll(args.arg...).Stream().Filter(func(repo repo.GitRepository) bool { return repo.Fetch })
 
 			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.FetchJob() }).Stream(repos)
 

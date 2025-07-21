@@ -32,8 +32,8 @@ func bulkCreateTickets() *cmdr.Commander {
 		cmdr.MakeCommander().
 			SetName("create").
 			SetUsage("create tickets as specified in a file"),
-		pathFlagName, func(ctx context.Context, op *opsCmdArgs[string]) error {
-			path := ft.DefaultFuture(op.ops, func() string { return ft.Must(os.Getwd()) })
+		pathFlagName, func(ctx context.Context, op *withConf[string]) error {
+			path := ft.DefaultFuture(op.arg, func() string { return ft.Must(os.Getwd()) })
 
 			if !util.FileExists(path) {
 				return fmt.Errorf("ticket spec file file %s does not exist", path)

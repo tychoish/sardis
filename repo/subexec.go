@@ -74,11 +74,13 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 		Notify:        ft.Ptr(true),
 	}
 
-	repoTags := conf.Tags()
-	for tag, repos := range repoTags {
-		anyActive := false
-		for _, r := range repos {
-			if r.Disabled || (r.Fetch == false && r.LocalSync == false) {
+	conf.rebuildIndexes()
+
+	for tag, repos := range conf.caches.tags {
+		var anyActive bool
+		for _, rn := range repos {
+			r, ok := conf.caches.lookup[rn]
+			if !ok || r.Disabled || (r.Fetch == false && r.LocalSync == false) {
 				continue
 			}
 			anyActive = true
@@ -88,14 +90,23 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 			continue
 		}
 
-		tag := tag
+		batch := dt.Slice[GitRepository]{}
+
+		for _, name := range repos {
+			repo, ok := conf.caches.lookup[name]
+			if !ok {
+				continue
+			}
+
+			batch.Add(repo)
+		}
 
 		pull.Commands = append(pull.Commands, subexec.Command{
 			Name: tag,
 			WorkerDefinition: func(ctx context.Context) error {
-				return fun.MakeConverter(func(r *GitRepository) fun.Worker {
+				return fun.MakeConverter(func(r GitRepository) fun.Worker {
 					return r.FetchJob()
-				}).Stream(repoTags.Get(tag).Stream()).Parallel(
+				}).Stream(batch.Stream()).Parallel(
 					func(ctx context.Context, op fun.Worker) error { return op(ctx) },
 					fun.WorkerGroupConfContinueOnError(),
 					fun.WorkerGroupConfWorkerPerCPU(),
@@ -106,9 +117,9 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 		update.Commands = append(update.Commands, subexec.Command{
 			Name: tag,
 			WorkerDefinition: func(ctx context.Context) error {
-				return fun.MakeConverter(func(r *GitRepository) fun.Worker {
+				return fun.MakeConverter(func(r GitRepository) fun.Worker {
 					return r.UpdateJob()
-				}).Stream(repoTags.Get(tag).Stream()).Parallel(
+				}).Stream(batch.Stream()).Parallel(
 					func(ctx context.Context, op fun.Worker) error { return op(ctx) },
 					fun.WorkerGroupConfContinueOnError(),
 					fun.WorkerGroupConfWorkerPerCPU(),
@@ -116,5 +127,6 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 			},
 		})
 	}
+
 	return []subexec.Group{pull, update}
 }

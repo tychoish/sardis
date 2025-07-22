@@ -7,7 +7,6 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ft"
 )
 
 type Configuration struct {
@@ -15,8 +14,8 @@ type Configuration struct {
 
 	lookupProcessed bool
 	caches          struct {
-		tags       dt.Map[string, dt.Slice[*GitRepository]]
-		lookup     dt.Map[string, dt.Slice[*GitRepository]]
+		tags       dt.Map[string, dt.Slice[string]] // tag names to repo names
+		lookup     dt.Map[string, GitRepository]    // repo names to repositories
 		validation adt.Once[error]
 	}
 }
@@ -34,25 +33,25 @@ func (conf *Configuration) doValidate() error {
 }
 
 func (conf *Configuration) FindOne(name string) (*GitRepository, error) {
-	repos, ok := conf.LookupTable().Load(name)
-	if !ok {
-		return nil, fmt.Errorf("repo %q is not defined", name)
+	if rp, ok := conf.caches.lookup.Load(name); ok {
+		return &rp, nil
 	}
 
-	if l := repos.Len(); l != 1 {
-		return nil, fmt.Errorf("ambiguity: found %d repos matching %q", l, name)
+	if tagged, ok := conf.caches.tags.Load(name); ok {
+		if l := tagged.Len(); l == 1 {
+			return conf.FindOne(tagged.Index(0))
+		} else if l > 1 {
+			return nil, fmt.Errorf("found %d repos tagged %q", l, name)
+		}
 	}
-	return repos.Index(0), nil
+
+	return nil, fmt.Errorf("no repository named %q", name)
 }
 
-func (conf *Configuration) Tags() dt.Map[string, dt.Slice[*GitRepository]] {
+func (conf *Configuration) Tags() dt.Slice[string] {
 	conf.rebuildIndexes()
-	return conf.caches.tags
-}
 
-func (conf *Configuration) LookupTable() dt.Map[string, dt.Slice[*GitRepository]] {
-	conf.rebuildIndexes()
-	return conf.caches.lookup
+	return fun.NewGenerator(conf.caches.tags.Keys().Slice).Capture().Resolve()
 }
 
 func (conf *Configuration) rebuildIndexes() {
@@ -61,18 +60,20 @@ func (conf *Configuration) rebuildIndexes() {
 	}
 	defer func() { conf.lookupProcessed = true }()
 
-	conf.caches.tags = make(map[string]dt.Slice[*GitRepository])
-	conf.caches.lookup = make(map[string]dt.Slice[*GitRepository])
+	conf.caches.tags = make(map[string]dt.Slice[string])
+	conf.caches.lookup = make(map[string]GitRepository)
 	for idx := range conf.GitRepos {
 		rp := conf.GitRepos[idx]
-		for idx := range conf.GitRepos[idx].Tags {
-			tag := conf.GitRepos[idx].Tags[idx]
-			conf.caches.tags[tag] = append(conf.caches.tags[tag], ft.Ptr(rp))
-			conf.caches.lookup[tag] = append(conf.caches.lookup[tag], ft.Ptr(rp))
-		}
 
-		name := conf.GitRepos[idx].Name
-		conf.caches.lookup[name] = append(conf.caches.lookup[name], ft.Ptr(rp))
+		fun.Invariant.IsFalse(conf.caches.lookup.Check(rp.Name), "duplicate repositoriy named", rp.Name)
+
+		conf.caches.lookup.Add(rp.Name, rp)
+
+		for _, tg := range rp.Tags {
+			rps := conf.caches.tags[tg]
+			rps.Add(rp.Name)
+			conf.caches.tags[tg] = rps
+		}
 	}
 }
 
@@ -81,25 +82,23 @@ func (conf *Configuration) FindAll(ids ...string) dt.Slice[GitRepository] {
 		return nil
 	}
 
-	matching := dt.Map[string, GitRepository]{}
-
-	lookup := conf.LookupTable()
-	if lookup.Len() == 0 {
-		return nil
-	}
+	matching := dt.Slice[GitRepository]{}
+	seen := dt.Set[string]{}
 
 	for _, id := range ids {
-		tagged, ok := lookup.Load(id)
-		if !ok || tagged.Len() == 0 {
+		if rp, ok := conf.caches.lookup[id]; ok {
+			if !seen.AddCheck(rp.Name) {
+				matching.Add(rp)
+			}
 			continue
 		}
 
-		tagged.ReadAll(func(pt *GitRepository) {
-			if pt != nil {
-				matching[pt.Name] = ft.Ref(pt)
+		for _, rtn := range conf.caches.tags[id] {
+			if !seen.AddCheck(rtn) && conf.caches.lookup.Check(rtn) {
+				matching.Add(conf.caches.lookup.Get(rtn))
 			}
-		})
+		}
 	}
 
-	return fun.NewGenerator(matching.Values().Slice).Force().Resolve()
+	return matching
 }

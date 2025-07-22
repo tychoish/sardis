@@ -1,6 +1,10 @@
 package subexec
 
 import (
+	stdcmp "cmp"
+	"slices"
+	"sort"
+
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
@@ -139,6 +143,40 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 		return err
 	}
 
+	resolved.ReadAll(func(grp Group) {
+		slices.SortStableFunc(grp.Commands, func(lhv, rhv Command) int {
+			return stdcmp.Compare(lhv.SortHint, rhv.SortHint)
+		})
+	})
+
+	sort.SliceStable(resolved, func(i, j int) bool {
+		lhv, rhv := conf.Commands[i], conf.Commands[j]
+		if lhv.Host != rhv.Host && (lhv.Host != nil || rhv.Host != nil) {
+			return ft.Ref(lhv.Host) < ft.Ref(rhv.Host)
+		}
+		if lhv.Synthetic != rhv.Synthetic {
+			return !lhv.Synthetic
+		}
+		if lhv.SortHint != rhv.SortHint {
+			return lhv.SortHint < rhv.SortHint
+}
+		if lhv.Category != rhv.Category {
+			return lhv.Category < rhv.Category
+		}
+		if lhv.Name != rhv.Name {
+			return lhv.Name < rhv.Name
+		}
+		if lhv.CmdNamePrefix != rhv.CmdNamePrefix {
+			return lhv.CmdNamePrefix < rhv.CmdNamePrefix
+		}
+
+		if len(lhv.Commands) != len(rhv.Commands) {
+			return len(lhv.Commands) < len(rhv.Commands)
+		}
+
+		return true
+	})
+
 	conf.Commands = resolved
 	return nil
 }
@@ -146,6 +184,7 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 func (conf *Configuration) ExportAllCommands() []Command {
 	return conf.caches.allCommdands.Call(conf.doExportAllCommands)
 }
+
 func (conf *Configuration) doExportAllCommands() []Command {
 	out := dt.NewSlice([]Command{})
 	host := util.GetHostname()

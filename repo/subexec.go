@@ -10,15 +10,17 @@ import (
 )
 
 func (conf *Configuration) ConcreteTaskGroups() dt.Slice[subexec.Group] {
-
 	pull := subexec.Group{
-		Category: "repo",
-		Name:     "pull",
+		Category:  "repo",
+		Name:      "pull",
+		Synthetic: true,
 	}
 
 	update := subexec.Group{
-		Category: "repo",
-		Name:     "update",
+		Category:  "repo",
+		Name:      "update",
+		Synthetic: true,
+		SortHint:  10,
 	}
 
 	for idx := range conf.GitRepos {
@@ -56,7 +58,7 @@ func (conf *Configuration) ConcreteTaskGroups() dt.Slice[subexec.Group] {
 		// },
 	}
 
-	return []subexec.Group{pull, update}
+	return []subexec.Group{update, pull}
 }
 
 func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
@@ -65,6 +67,7 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 		Name:          "pull",
 		CmdNamePrefix: "tag",
 		Notify:        ft.Ptr(true),
+		Synthetic:     true,
 	}
 
 	update := subexec.Group{
@@ -72,6 +75,8 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 		Name:          "update",
 		CmdNamePrefix: "tag",
 		Notify:        ft.Ptr(true),
+		Synthetic:     true,
+		SortHint:      10,
 	}
 
 	conf.rebuildIndexes()
@@ -128,5 +133,5 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 		})
 	}
 
-	return []subexec.Group{pull, update}
+	return []subexec.Group{update, pull}
 }

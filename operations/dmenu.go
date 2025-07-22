@@ -63,11 +63,12 @@ func dmenuCommand(kind dmenuCommandType) *cmdr.Commander {
 }
 
 func dmenuForGroups(ctx context.Context, conf *sardis.Configuration) error {
+	items := conf.Operations.ExportGroupNames()
 	name, err := godmenu.Run(ctx,
-		godmenu.ExtendSelections(conf.Operations.ExportGroupNames()),
+		godmenu.Items(items...),
 		godmenu.WithFlags(ft.Ptr(conf.Settings.DMenuFlags)),
-		godmenu.Sorted(),
 		godmenu.Prompt("groups ==>>"),
+		godmenu.MenuLines(min(len(items), 16)),
 	)
 	if err != nil {
 		return erc.NewFilter().Without(godmenu.ErrSelectionMissing).Apply(err)
@@ -85,11 +86,12 @@ func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, group sub
 		return errors.New("no selection")
 	}
 
+	items := group.Selectors()
 	cmd, err := godmenu.Run(ctx,
-		godmenu.ExtendSelections(group.Selectors()),
+		godmenu.Items(items...),
 		godmenu.WithFlags(ft.Ptr(conf.Settings.DMenuFlags)),
-		godmenu.Sorted(),
 		godmenu.Prompt(fmt.Sprint(group.Name, " ==>>")),
+		godmenu.MenuLines(min(len(items), 16)),
 	)
 
 	if err != nil {

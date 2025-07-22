@@ -26,17 +26,25 @@ type Group struct {
 	Host           *string                `bson:"host" json:"host" yaml:"host"`
 	Commands       []Command              `bson:"commands" json:"commands" yaml:"commands"`
 	MenuSelections []string               `bson:"menu" json:"menu" yaml:"menu"`
+	SortHint       int                    `bson:"sort_hint" json:"sort_hint" yaml:"sort_hint"`
+	Synthetic      bool                   `bson:"-" json:"-" yaml:"-"`
 }
 
-func dotJoin(elems ...string) string {
-	return dotJoinParts(slices.DeleteFunc(elems, func(s string) bool { return s == "" }))
-}
-func dotJoinParts(elems []string) string  { return strings.Join(elems, ".") }
-func dotSpit(in string) []string          { return strings.Split(in, ".") }
-func dotSplitN(in string, n int) []string { return strings.SplitN(in, ".", n) }
+func dotJoin(elems ...string) string       { return dotJoinParts(elems) }
+func dotJoinParts(elems []string) string   { return strings.Join(removeZeros(elems), ".") }
+func dotSpit(in string) []string           { return strings.Split(in, ".") }
+func dotSplitN(in string, n int) []string  { return strings.SplitN(in, ".", n) }
+func removeZeros[T comparable](in []T) []T { return slices.DeleteFunc(in, isZero) }
+func isZero[T comparable](i T) bool        { var z T; return i == z }
 
 func (cg *Group) ID() string       { return dotJoinParts(cg.IDPath()) }
 func (cg *Group) IDPath() []string { return []string{cg.Category, cg.Name, cg.CmdNamePrefix} }
+func (cg *Group) SortScore() int {
+	if !cg.Synthetic {
+		return cg.SortHint + 10
+	}
+	return cg.SortHint
+}
 
 func (cg *Group) NamesAtIndex(idx int) []string {
 	fun.Invariant.Ok(idx >= 0 && idx < len(cg.Commands), "command out of bounds", cg.Name)
@@ -51,6 +59,8 @@ func (cg *Group) NamesAtIndex(idx int) []string {
 
 func (cg *Group) Selectors() []string {
 	set := &dt.Set[string]{}
+	set.Order()
+
 	for cmd := range slices.Values(cg.Commands) {
 		set.Add(cmd.Name)
 	}
@@ -86,11 +96,12 @@ func (cg *Group) Validate() error {
 		cmd.Notify = ft.Default(cmd.Notify, cg.Notify)
 		cmd.Background = ft.Default(cmd.Background, cg.Background)
 		cmd.Directory = util.TryExpandHomedir(ft.Default(cmd.Directory, home))
+		cmd.SortHint += cg.SortScore()
 
 		ec.Whenf(cmd.Name == "", "command in group [%s](%d) must have a name", cg.Name, idx)
 		ec.Whenf(cmd.Command == "" && cmd.OverrideDefault, "cannot override default without an override, in group [%s] command [%s] at index (%d)", cg.Name, cmd.Name, idx)
-		// ec.Whenf(cmd.Command != "" && cmd.WorkerDefinition != nil, "invalid definition in group [%s] for [%s] at index (%d) [%q]", cg.Name, cmd.Name, idx, cmd.Command)
 
+		// ec.Whenf(cmd.Command != "" && cmd.WorkerDefinition != nil, "invalid definition in group [%s] for [%s] at index (%d) [%q]", cg.Name, cmd.Name, idx, cmd.Command)
 		if cg.Environment != nil || cmd.Environment != nil {
 			env := dt.Map[string, string]{}
 			if cg.Environment != nil {
@@ -127,12 +138,12 @@ func (cg *Group) Validate() error {
 			}
 		}
 
-		if cg.CmdNamePrefix != "" {
-			cmd.Name = dotJoin(cg.CmdNamePrefix, cmd.Name)
-		}
+		cmd.Name = dotJoin(cg.CmdNamePrefix, cmd.Name)
 
 		cg.Commands[idx] = cmd
 	}
+	cg.Command = ""
+	cg.Environment = nil
 
 	return ec.Resolve()
 }
@@ -147,8 +158,6 @@ func (cg *Group) doMerge(rhv Group) bool {
 	}
 
 	cg.Commands = append(cg.Commands, rhv.Commands...)
-	cg.Command = ""
 	cg.Aliases = nil
-	cg.Environment = nil
 	return true
 }

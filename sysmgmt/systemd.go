@@ -143,6 +143,7 @@ func (conf *SystemdConfiguration) TaskGroups() dt.Slice[subexec.Group] {
 			Category:      "systemd",
 			Name:          service.Name,
 			Notify:        ft.Ptr(true),
+			Synthetic:     true,
 			CmdNamePrefix: opString,
 			Command:       fmt.Sprintln(command, " {{command}} ", service.Unit),
 			Commands: []subexec.Command{

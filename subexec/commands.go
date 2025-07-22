@@ -29,6 +29,7 @@ type Command struct {
 	OverrideDefault bool                   `bson:"override_default" json:"override_default" yaml:"override_default"`
 	Notify          *bool                  `bson:"notify" json:"notify" yaml:"notify"`
 	Background      *bool                  `bson:"bson" json:"bson" yaml:"bson"`
+	SortHint        int                    `bson:"sort_hint" json:"sort_hint" yaml:"sort_hint"`
 
 	// if possible call the operation rather
 	// than execing the commands

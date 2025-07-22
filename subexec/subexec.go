@@ -145,7 +145,10 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 
 	resolved.ReadAll(func(grp Group) {
 		slices.SortStableFunc(grp.Commands, func(lhv, rhv Command) int {
-			return stdcmp.Compare(lhv.SortHint, rhv.SortHint)
+			if c := stdcmp.Compare(lhv.SortHint, rhv.SortHint); c != 0 {
+				return c
+			}
+			return stdcmp.Compare(lhv.Name, rhv.Name)
 		})
 	})
 
@@ -158,8 +161,8 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 			return !lhv.Synthetic
 		}
 		if lhv.SortHint != rhv.SortHint {
-			return lhv.SortHint < rhv.SortHint
-}
+			return lhv.SortHint > rhv.SortHint
+		}
 		if lhv.Category != rhv.Category {
 			return lhv.Category < rhv.Category
 		}

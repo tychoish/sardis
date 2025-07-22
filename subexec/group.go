@@ -9,6 +9,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/jasper/util"
 )
@@ -96,7 +97,6 @@ func (cg *Group) Validate() error {
 		cmd.Notify = ft.Default(cmd.Notify, cg.Notify)
 		cmd.Background = ft.Default(cmd.Background, cg.Background)
 		cmd.Directory = util.TryExpandHomedir(ft.Default(cmd.Directory, home))
-		cmd.SortHint += cg.SortScore()
 
 		ec.Whenf(cmd.Name == "", "command in group [%s](%d) must have a name", cg.Name, idx)
 		ec.Whenf(cmd.Command == "" && cmd.OverrideDefault, "cannot override default without an override, in group [%s] command [%s] at index (%d)", cg.Name, cmd.Name, idx)
@@ -159,5 +159,7 @@ func (cg *Group) doMerge(rhv Group) bool {
 
 	cg.Commands = append(cg.Commands, rhv.Commands...)
 	cg.Aliases = nil
+	cg.SortHint = intish.AbsMax(cg.SortHint, rhv.SortHint)
+
 	return true
 }

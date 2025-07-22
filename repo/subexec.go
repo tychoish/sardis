@@ -14,13 +14,14 @@ func (conf *Configuration) ConcreteTaskGroups() dt.Slice[subexec.Group] {
 		Category:  "repo",
 		Name:      "pull",
 		Synthetic: true,
+		SortHint:  -8,
 	}
 
 	update := subexec.Group{
 		Category:  "repo",
 		Name:      "update",
 		Synthetic: true,
-		SortHint:  10,
+		SortHint:  16,
 	}
 
 	for idx := range conf.GitRepos {
@@ -36,6 +37,7 @@ func (conf *Configuration) ConcreteTaskGroups() dt.Slice[subexec.Group] {
 			Name:             repo.Name,
 			WorkerDefinition: repo.FetchJob(),
 			Notify:           ft.Ptr(repo.Notify),
+			SortHint:         -4,
 		})
 
 		if repo.LocalSync {
@@ -43,6 +45,7 @@ func (conf *Configuration) ConcreteTaskGroups() dt.Slice[subexec.Group] {
 				Name:             repo.Name,
 				WorkerDefinition: repo.UpdateJob(),
 				Notify:           ft.Ptr(repo.Notify),
+				SortHint:         16,
 			})
 		}
 
@@ -68,6 +71,7 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 		CmdNamePrefix: "tag",
 		Notify:        ft.Ptr(true),
 		Synthetic:     true,
+		SortHint:      -4,
 	}
 
 	update := subexec.Group{
@@ -76,7 +80,7 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 		CmdNamePrefix: "tag",
 		Notify:        ft.Ptr(true),
 		Synthetic:     true,
-		SortHint:      10,
+		SortHint:      16,
 	}
 
 	conf.rebuildIndexes()
@@ -107,7 +111,8 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 		}
 
 		pull.Commands = append(pull.Commands, subexec.Command{
-			Name: tag,
+			Name:     tag,
+			SortHint: -4,
 			WorkerDefinition: func(ctx context.Context) error {
 				return fun.MakeConverter(func(r GitRepository) fun.Worker {
 					return r.FetchJob()
@@ -120,7 +125,8 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 		})
 
 		update.Commands = append(update.Commands, subexec.Command{
-			Name: tag,
+			Name:     tag,
+			SortHint: 8,
 			WorkerDefinition: func(ctx context.Context) error {
 				return fun.MakeConverter(func(r GitRepository) fun.Worker {
 					return r.UpdateJob()

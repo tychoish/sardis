@@ -137,8 +137,6 @@ func (conf *SystemdConfiguration) TaskGroups() dt.Slice[subexec.Group] {
 			command = "sudo systemctl"
 		}
 
-		// TODO these have a fun.Worker function already
-		// implemented in units for setup.
 		groups.Add(subexec.Group{
 			Category:      "systemd",
 			Name:          service.Name,
@@ -146,25 +144,29 @@ func (conf *SystemdConfiguration) TaskGroups() dt.Slice[subexec.Group] {
 			Synthetic:     true,
 			CmdNamePrefix: opString,
 			Command:       fmt.Sprintln(command, " {{command}} ", service.Unit),
+			SortHint:      -64,
 			Commands: []subexec.Command{
-				{Name: "restart"},
-				{Name: "stop"},
-				{Name: "start"},
-				{Name: "enable"},
-				{Name: "disable"},
+				{Name: "restart", SortHint: 32},
+				{Name: "stop", SortHint: 16},
+				{Name: "start", SortHint: 8},
+				{Name: "enable", SortHint: 4},
+				{Name: "disable", SortHint: -2},
 				{
 					Name:             "setup",
 					WorkerDefinition: conf.Services[idx].Worker(),
+					SortHint:         -4,
 				},
 				{
 					Name:            "logs",
 					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command journalctl --follow --pager-end --unit %s", service.Unit),
 					OverrideDefault: true,
+					SortHint:        -2,
 				},
 				{
 					Name:            "status",
 					Command:         fmt.Sprintf("alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command %s {{name}} %s", command, service.Unit),
 					OverrideDefault: true,
+					SortHint:        -3,
 				},
 			},
 		})

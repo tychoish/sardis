@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/cheynewallace/tabby"
@@ -14,7 +13,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/godmenu"
-	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/subexec"
 )
@@ -120,31 +118,22 @@ func listMenus() *cmdr.Commander {
 			groupSet.AppendStream(groups.Keys())
 
 			table := tabby.New()
-			table.AddHeader("Name", "Selections")
+			table.AddHeader("Category", "Group", "Prefix", "Name")
 
 			for name, group := range groups {
 				if set.Len() > 0 && !set.Check(name) {
 					continue
 				}
 
-				cmds := []string{}
-				for _, cmd := range group.Commands {
-					cmds = append(cmds, cmd.Name)
-				}
-				if len(cmds) == 0 {
-					grip.Debugf("skipping empty command group %q", name)
-					continue
-				}
-				idx := -1
-				for chunk := range slices.Chunk(cmds, 3) {
-					idx++
+				for idx, cc := range group.Commands {
 					if idx == 0 {
-						table.AddLine(name, strings.Join(chunk, "; "))
+						table.AddLine(group.Category, group.Name, group.CmdNamePrefix, cc.Name)
 					} else {
-						table.AddLine("", strings.Join(chunk, "; "))
+						table.AddLine("", "", "", cc.Name)
 					}
+
 				}
-				table.AddLine("", "")
+				table.AddLine("", "", "", "")
 			}
 
 			table.Print()

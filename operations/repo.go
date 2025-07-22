@@ -99,7 +99,7 @@ func repoList() *cmdr.Commander {
 			var repos []repo.GitRepository
 
 			if len(args.arg) == 0 {
-				repos = args.conf.Repos.GitRepos
+				repos = args.conf.Repos.GitRepos.Copy()
 			} else {
 				repos = args.conf.Repos.FindAll(args.arg...)
 			}

@@ -2,7 +2,6 @@ package repo
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
@@ -11,7 +10,16 @@ import (
 )
 
 func (conf *Configuration) ConcreteTaskGroups() dt.Slice[subexec.Group] {
-	grps := make([]subexec.Group, 0, len(conf.GitRepos))
+
+	pull := subexec.Group{
+		Category: "repo",
+		Name:     "pull",
+	}
+
+	update := subexec.Group{
+		Category: "repo",
+		Name:     "update",
+	}
 
 	for idx := range conf.GitRepos {
 		repo := conf.GitRepos[idx]
@@ -22,42 +30,49 @@ func (conf *Configuration) ConcreteTaskGroups() dt.Slice[subexec.Group] {
 			continue
 		}
 
-		cg := subexec.Group{
-			Name:   "repo",
-			Notify: ft.Ptr(repo.Notify),
-			Commands: []subexec.Command{
-				subexec.Command{
-					Name:             fmt.Sprint("pull.", repo.Name),
-					WorkerDefinition: repo.FetchJob(),
-				},
-				// TODO figure out why this err doesn't really work
-				//      - implementation problem with the underlying operation
-				//      - also need to wrap it in a pager at some level.
-				//      - and disable syslogging
-				// {
-				// 	Name:            "status",
-				// 	Directory:       repo.Path,
-				// 	OverrideDefault: true,
-				// 	Command:         "alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command sardis repo status {{prefix}}",
-				// },
-			},
-		}
+		pull.Commands = append(pull.Commands, subexec.Command{
+			Name:             repo.Name,
+			WorkerDefinition: repo.FetchJob(),
+			Notify:           ft.Ptr(repo.Notify),
+		})
 
 		if repo.LocalSync {
-			cg.Commands = append(cg.Commands, subexec.Command{
-				Name:             fmt.Sprint("update.", repo.Name),
+			update.Commands = append(pull.Commands, subexec.Command{
+				Name:             repo.Name,
 				WorkerDefinition: repo.UpdateJob(),
+				Notify:           ft.Ptr(repo.Notify),
 			})
 		}
 
-		grps = append(grps, cg)
+		// TODO figure out why this err doesn't really work
+		//      - implementation problem with the underlying operation
+		//      - also need to wrap it in a pager at some level.
+		//      - and disable syslogging
+		// subexec.Command{
+		// 	Name:            "status",
+		// 	Directory:       repo.Path,
+		// 	OverrideDefault: true,
+		// 	Command:         "alacritty msg create-window --title {{group.name}}.{{prefix}}.{{name}} --command sardis repo status {{prefix}}",
+		// },
 	}
 
-	return grps
+	return []subexec.Group{pull, update}
 }
 
 func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
-	grps := make([]subexec.Group, 0, len(conf.GitRepos))
+	pull := subexec.Group{
+		Category:      "repo",
+		Name:          "pull",
+		CmdNamePrefix: "tag",
+		Notify:        ft.Ptr(true),
+	}
+
+	update := subexec.Group{
+		Category:      "repo",
+		Name:          "update",
+		CmdNamePrefix: "tag",
+		Notify:        ft.Ptr(true),
+	}
 
 	repoTags := conf.Tags()
 	for tag, repos := range repoTags {
@@ -73,42 +88,33 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 			continue
 		}
 
-		tagName := tag
-		opName := fmt.Sprint("tagged.", tagName)
-		grps = append(grps, subexec.Group{
-			Name:   "repo",
-			Notify: ft.Ptr(true),
-			Commands: []subexec.Command{
-				{
-					Name: fmt.Sprint("pull.", opName),
-					WorkerDefinition: func(ctx context.Context) error {
-						repos := fun.MakeConverter(func(r *GitRepository) fun.Worker {
-							return r.FetchJob()
-						}).Stream(repoTags.Get(tagName).Stream())
+		tag := tag
 
-						return repos.Parallel(
-							func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-							fun.WorkerGroupConfContinueOnError(),
-							fun.WorkerGroupConfWorkerPerCPU(),
-						).Run(ctx)
-					},
-				},
-				{
-					Name: fmt.Sprint("update.", opName),
-					WorkerDefinition: func(ctx context.Context) error {
-						repos := fun.MakeConverter(func(r *GitRepository) fun.Worker {
-							return r.UpdateJob()
-						}).Stream(repoTags.Get(tagName).Stream())
+		pull.Commands = append(pull.Commands, subexec.Command{
+			Name: tag,
+			WorkerDefinition: func(ctx context.Context) error {
+				return fun.MakeConverter(func(r *GitRepository) fun.Worker {
+					return r.FetchJob()
+				}).Stream(repoTags.Get(tag).Stream()).Parallel(
+					func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+					fun.WorkerGroupConfContinueOnError(),
+					fun.WorkerGroupConfWorkerPerCPU(),
+				).Run(ctx)
+			},
+		})
 
-						return repos.Parallel(
-							func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-							fun.WorkerGroupConfContinueOnError(),
-							fun.WorkerGroupConfWorkerPerCPU(),
-						).Run(ctx)
-					},
-				},
+		update.Commands = append(update.Commands, subexec.Command{
+			Name: tag,
+			WorkerDefinition: func(ctx context.Context) error {
+				return fun.MakeConverter(func(r *GitRepository) fun.Worker {
+					return r.UpdateJob()
+				}).Stream(repoTags.Get(tag).Stream()).Parallel(
+					func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+					fun.WorkerGroupConfContinueOnError(),
+					fun.WorkerGroupConfWorkerPerCPU(),
+				).Run(ctx)
 			},
 		})
 	}
-	return grps
+	return []subexec.Group{pull, update}
 }

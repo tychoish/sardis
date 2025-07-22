@@ -126,49 +126,33 @@ func (conf *SystemdService) Worker() fun.Worker {
 
 func (conf *SystemdConfiguration) TaskGroups() dt.Slice[subexec.Group] {
 	groups := make(dt.Slice[subexec.Group], 0, len(conf.Services))
-	hostname := util.GetHostname()
 	for idx, service := range conf.Services {
 		var command string
 		var opString string
 		if service.User {
-			opString = "user."
+			opString = "user"
 			command = "systemctl --user"
 		} else {
-			opString = ""
+			opString = "system"
 			command = "sudo systemctl"
 		}
 
 		// TODO these have a fun.Worker function already
 		// implemented in units for setup.
 		groups.Add(subexec.Group{
-			Name:          "systemd",
-			Directory:     hostname,
+			Category:      "systemd",
+			Name:          service.Name,
 			Notify:        ft.Ptr(true),
-			CmdNamePrefix: fmt.Sprint(opString, "service"),
-			Command:       fmt.Sprintf("%s {{command}} %s", command, service.Unit),
+			CmdNamePrefix: opString,
+			Command:       fmt.Sprintln(command, " {{command}} ", service.Unit),
 			Commands: []subexec.Command{
+				{Name: "restart"},
+				{Name: "stop"},
+				{Name: "start"},
+				{Name: "enable"},
+				{Name: "disable"},
 				{
-					Name:    fmt.Sprint("restart.", service.Unit),
-					Command: "restart",
-				},
-				{
-					Name:    fmt.Sprint("stop.", service.Unit),
-					Command: "stop",
-				},
-				{
-					Name:    fmt.Sprint("start.", service.Unit),
-					Command: "start",
-				},
-				{
-					Name:    fmt.Sprint("enable.", service.Unit),
-					Command: "enable",
-				},
-				{
-					Name:    fmt.Sprint("disable.", service.Unit),
-					Command: "disable",
-				},
-				{
-					Name:             fmt.Sprint("setup.", service.Unit),
+					Name:             "setup",
 					WorkerDefinition: conf.Services[idx].Worker(),
 				},
 				{

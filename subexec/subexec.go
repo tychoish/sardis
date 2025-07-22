@@ -93,7 +93,7 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	index := make(map[string]int, len(conf.Commands))
 	haveMerged := false
 	for idx := range conf.Commands {
-		lhn := ft.Default(conf.Commands[idx].Category, conf.Commands[idx].Name)
+		lhn := dotJoin(conf.Commands[idx].Category, conf.Commands[idx].Name)
 
 		if _, ok := index[lhn]; !ok {
 			index[lhn] = idx
@@ -188,11 +188,7 @@ func (conf *Configuration) doExportCommandGroups() map[string]Group {
 			continue
 		}
 
-		if group.Category != "" {
-			out[group.Category] = group
-		} else {
-			out[group.Name] = group
-		}
+		out[dotJoin(group.Category, group.Name)] = group
 
 		for _, alias := range group.Aliases {
 			ag := conf.Commands[idx]

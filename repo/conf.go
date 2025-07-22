@@ -65,7 +65,8 @@ func (conf *Configuration) rebuildIndexes() {
 	conf.caches.lookup = make(map[string]dt.Slice[*GitRepository])
 	for idx := range conf.GitRepos {
 		rp := conf.GitRepos[idx]
-		for _, tag := range conf.GitRepos[idx].Tags {
+		for idx := range conf.GitRepos[idx].Tags {
+			tag := conf.GitRepos[idx].Tags[idx]
 			conf.caches.tags[tag] = append(conf.caches.tags[tag], ft.Ptr(rp))
 			conf.caches.lookup[tag] = append(conf.caches.lookup[tag], ft.Ptr(rp))
 		}

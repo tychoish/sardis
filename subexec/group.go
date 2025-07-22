@@ -80,10 +80,6 @@ func (cg *Group) Validate() error {
 
 	ec.When(cg.Name == "", ers.Error("command group must have name"))
 
-	ec.Whenf(cg.Category != "" && cg.CmdNamePrefix != "",
-		"command group cat=%q name=%q, prefix=%q cannot have both category and prefixes",
-		cg.Category, cg.Name, cg.CmdNamePrefix)
-
 	for idx := range cg.Commands {
 		cmd := cg.Commands[idx]
 		cmd.GroupName = cg.Name
@@ -93,13 +89,14 @@ func (cg *Group) Validate() error {
 
 		ec.Whenf(cmd.Name == "", "command in group [%s](%d) must have a name", cg.Name, idx)
 		ec.Whenf(cmd.Command == "" && cmd.OverrideDefault, "cannot override default without an override, in group [%s] command [%s] at index (%d)", cg.Name, cmd.Name, idx)
-		ec.Whenf(cmd.Command != "" && cmd.WorkerDefinition != nil, "invalid definition in group [%s] for [%s] at index (%d)", cg.Name, cmd.Name, idx)
+		// ec.Whenf(cmd.Command != "" && cmd.WorkerDefinition != nil, "invalid definition in group [%s] for [%s] at index (%d) [%q]", cg.Name, cmd.Name, idx, cmd.Command)
 
 		if cg.Environment != nil || cmd.Environment != nil {
 			env := dt.Map[string, string]{}
 			if cg.Environment != nil {
 				env.ExtendWithStream(cg.Environment.Stream()).Ignore().Wait()
 			}
+
 			if cmd.Environment != nil {
 				env.ExtendWithStream(cmd.Environment.Stream()).Ignore().Wait()
 			}
@@ -107,23 +104,27 @@ func (cg *Group) Validate() error {
 			cmd.Environment = env
 		}
 
-		cmd.Command = ft.Default(cmd.Command, cg.Name)
 		cmd.Command = ft.Default(cmd.Command, cg.Command)
-
+		cmd.Command = ft.Default(cmd.Command, cmd.Name)
 		cmd.Command = ft.Default(strings.ReplaceAll(cg.Command, "{{command}}", cmd.Command), cmd.Command)
-		cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
-		cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.category}}", cg.Category)
-		cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", cg.Name)
-		cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", ft.Ref(cg.Host))
-		cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", cg.CmdNamePrefix)
+
+		if cc := cmd.Command; strings.Contains(cc, "{{") && strings.Contains(cc, "}}") {
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.category}}", cg.Category)
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", cg.Name)
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", ft.Ref(cg.Host))
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", cg.CmdNamePrefix)
+		}
 
 		for idx := range cmd.Commands {
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{host}}", ft.Ref(cg.Host))
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", cg.Name)
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.category}}", cg.Category)
-			cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{prefix}}", cg.Name)
+			if cc := cmd.Commands[idx]; strings.Contains(cc, "{{") && strings.Contains(cc, "}}") {
+				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
+				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
+				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{host}}", ft.Ref(cg.Host))
+				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", cg.Name)
+				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.category}}", cg.Category)
+				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{prefix}}", cg.Name)
+			}
 		}
 
 		if cg.CmdNamePrefix != "" {

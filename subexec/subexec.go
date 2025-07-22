@@ -3,7 +3,6 @@ package subexec
 import (
 	stdcmp "cmp"
 	"slices"
-	"sort"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
@@ -145,39 +144,41 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 
 	resolved.ReadAll(func(grp Group) {
 		slices.SortStableFunc(grp.Commands, func(lhv, rhv Command) int {
-			if c := stdcmp.Compare(lhv.SortHint, rhv.SortHint); c != 0 {
+			if c := stdcmp.Compare(rhv.SortHint, lhv.SortHint); c != 0 {
 				return c
 			}
 			return stdcmp.Compare(lhv.Name, rhv.Name)
 		})
 	})
 
-	sort.SliceStable(resolved, func(i, j int) bool {
-		lhv, rhv := conf.Commands[i], conf.Commands[j]
+	slices.SortStableFunc(resolved, func(lhv, rhv Group) int {
 		if lhv.Host != rhv.Host && (lhv.Host != nil || rhv.Host != nil) {
-			return ft.Ref(lhv.Host) < ft.Ref(rhv.Host)
+			return stdcmp.Compare(ft.Ref(lhv.Host), ft.Ref(rhv.Host))
 		}
 		if lhv.Synthetic != rhv.Synthetic {
-			return !lhv.Synthetic
+			if lhv.Synthetic {
+				return 1
+			}
+
+			return -1
 		}
 		if lhv.SortHint != rhv.SortHint {
-			return lhv.SortHint > rhv.SortHint
+			return stdcmp.Compare(rhv.SortHint, lhv.SortHint)
 		}
 		if lhv.Category != rhv.Category {
-			return lhv.Category < rhv.Category
+			return stdcmp.Compare(lhv.Category, rhv.Category)
 		}
 		if lhv.Name != rhv.Name {
-			return lhv.Name < rhv.Name
+			return stdcmp.Compare(lhv.Name, rhv.Name)
 		}
 		if lhv.CmdNamePrefix != rhv.CmdNamePrefix {
-			return lhv.CmdNamePrefix < rhv.CmdNamePrefix
+			return stdcmp.Compare(lhv.CmdNamePrefix, rhv.CmdNamePrefix)
 		}
-
 		if len(lhv.Commands) != len(rhv.Commands) {
-			return len(lhv.Commands) < len(rhv.Commands)
+			return stdcmp.Compare(len(lhv.Commands), len(rhv.Commands))
 		}
 
-		return true
+		return 0
 	})
 
 	conf.Commands = resolved

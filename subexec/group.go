@@ -38,14 +38,14 @@ func dotSplitN(in string, n int) []string  { return strings.SplitN(in, ".", n) }
 func removeZeros[T comparable](in []T) []T { return slices.DeleteFunc(in, isZero) }
 func isZero[T comparable](i T) bool        { var z T; return i == z }
 
+func (cg *Group) ResolvedCategory() string {
+	if cg.Category != "" {
+		return cg.Category
+	}
+	return cg.Name
+}
 func (cg *Group) ID() string       { return dotJoinParts(cg.IDPath()) }
 func (cg *Group) IDPath() []string { return []string{cg.Category, cg.Name, cg.CmdNamePrefix} }
-func (cg *Group) SortScore() int {
-	if !cg.Synthetic {
-		return cg.SortHint + 10
-	}
-	return cg.SortHint
-}
 
 func (cg *Group) NamesAtIndex(idx int) []string {
 	fun.Invariant.Ok(idx >= 0 && idx < len(cg.Commands), "command out of bounds", cg.Name)
@@ -151,14 +151,17 @@ func (cg *Group) Validate() error {
 func (cg *Group) doMerge(rhv Group) bool {
 	if (cg.Category == "" || rhv.Category == "") && cg.Name != rhv.Name {
 		return false
-	}
-
-	if cg.Category != rhv.Category {
+	} else if cg.Category != rhv.Category {
 		return false
 	}
 
-	cg.Commands = append(cg.Commands, rhv.Commands...)
 	cg.Aliases = nil
+	if cg.SortHint >= rhv.SortHint {
+		cg.Commands = append(cg.Commands, rhv.Commands...)
+	} else {
+		cg.Commands = append(rhv.Commands, cg.Commands...)
+
+	}
 	cg.SortHint = intish.AbsMax(cg.SortHint, rhv.SortHint)
 
 	return true

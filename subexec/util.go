@@ -2,6 +2,7 @@ package subexec
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 
 	"github.com/tychoish/fun"
@@ -12,6 +13,30 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
 )
+
+type Logging string
+
+const (
+	LoggingErrorsOnly Logging = "errors-only"
+	LoggingSuppress   Logging = "none"
+	LoggingFull       Logging = "full"
+)
+
+func (ll Logging) Default() Logging { return LoggingErrorsOnly }
+func (ll Logging) Validate() error {
+	switch ll {
+	case "": // default to errors-only
+		return nil
+	case LoggingErrorsOnly, LoggingSuppress, LoggingFull:
+		return nil
+	default:
+		return fmt.Errorf("%q is not a valid Logging configuration", ll)
+	}
+}
+
+func (ll Logging) Full() bool       { return ll == LoggingFull }
+func (ll Logging) ErrorsOnly() bool { return ll == LoggingErrorsOnly }
+func (ll Logging) Suppress() bool   { return ll == LoggingSuppress }
 
 var bufpool = adt.MakeBytesBufferPool(0)
 
@@ -32,7 +57,7 @@ func (b *OutputBuf) Reader() io.Reader { return b.buffer }
 func (b *OutputBuf) Writer() io.Writer { return b.buffer }
 func (b *OutputBuf) String() string    { return b.buffer.String() }
 
-func (b *OutputBuf) Close() error {
+func (b *OutputBuf) bClose() error {
 	if b.buffer == nil {
 		// make it safe to run more than once
 		return nil

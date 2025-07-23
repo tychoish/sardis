@@ -143,7 +143,7 @@ func (conf *SystemdConfiguration) TaskGroups() dt.Slice[subexec.Group] {
 			Notify:        ft.Ptr(true),
 			Synthetic:     true,
 			CmdNamePrefix: opString,
-			Command:       fmt.Sprintln(command, " {{command}} ", service.Unit),
+			Command:       fmt.Sprintln(command, " {{name}} ", service.Unit),
 			SortHint:      -64,
 			Commands: []subexec.Command{
 				{Name: "restart", SortHint: 32},

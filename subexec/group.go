@@ -115,9 +115,11 @@ func (cg *Group) Validate() error {
 			cmd.Environment = env
 		}
 
-		cmd.Command = ft.Default(cmd.Command, cg.Command)
-		cmd.Command = ft.Default(cmd.Command, cmd.Name)
-		cmd.Command = ft.Default(strings.ReplaceAll(cg.Command, "{{command}}", cmd.Command), cmd.Command)
+		if ft.Not(cmd.OverrideDefault) {
+			cmd.Command = ft.Default(cmd.Command, cg.Command)
+			cmd.Command = ft.Default(cmd.Command, cmd.Name)
+			cmd.Command = ft.Default(strings.ReplaceAll(cg.Command, "{{command}}", cmd.Command), cmd.Command)
+		}
 
 		if cc := cmd.Command; strings.Contains(cc, "{{") && strings.Contains(cc, "}}") {
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)

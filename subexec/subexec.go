@@ -41,7 +41,6 @@ func (conf *Configuration) doValidate() error {
 	for idx := range conf.Commands {
 		ec.Wrapf(conf.Commands[idx].Validate(), "%d of %T is not valid", idx, conf.Commands[idx])
 	}
-
 	ec.Push(conf.resolveAliasesAndMergeGroups())
 
 	conf.caches.alacrittySocketPath.Set(func() string {
@@ -149,6 +148,7 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 			}
 			return stdcmp.Compare(lhv.Name, rhv.Name)
 		})
+
 	})
 
 	slices.SortStableFunc(resolved, func(lhv, rhv Group) int {

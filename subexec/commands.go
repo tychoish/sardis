@@ -30,6 +30,7 @@ type Command struct {
 	Notify          *bool                  `bson:"notify" json:"notify" yaml:"notify"`
 	Background      *bool                  `bson:"bson" json:"bson" yaml:"bson"`
 	SortHint        int                    `bson:"sort_hint" json:"sort_hint" yaml:"sort_hint"`
+	Logs            Logging                `bson:"logs" json:"logs" yaml:"logs"`
 
 	// if possible call the operation rather
 	// than execing the commands
@@ -105,14 +106,16 @@ func (conf *Command) Worker() fun.Worker {
 				defer grip.Notice(msg)
 
 				desktop := grip.ContextLogger(ctx, global.ContextDesktopLogger)
+				proclog.Infoln("<---------------", nonce, "---", jobID, "----")
 				if err != nil {
 					m := message.WrapError(err, conf.Name)
 					desktop.Error(m)
 					grip.Critical(err)
 
-					proclog.Infoln("<---------------", nonce, "---", jobID, "----")
 					grip.Error(buf.String())
 					return err
+				} else if conf.Logs.Full() {
+					grip.Info(buf.String())
 				}
 				desktop.Notice(message.Whenln(ft.Ref(conf.Notify), conf.Name, "completed"))
 				return nil

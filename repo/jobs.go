@@ -83,6 +83,7 @@ func (conf *GitRepository) FetchJob() fun.Worker {
 				)
 			}).
 			WithErrorFilter(func(err error) error {
+				proclog.Infoln(ruler, id, ruler)
 				msg := message.BuildPair().
 					Pair("op", opName).
 					Pair("state", "COMPLETED").
@@ -92,10 +93,11 @@ func (conf *GitRepository) FetchJob() fun.Worker {
 					Pair("path", conf.Path)
 
 				if err != nil {
-					proclog.Infoln(ruler, id, ruler)
 					grip.Error(procbuf.String())
 					grip.Critical(msg.Pair("err", err))
 					return err
+				} else if conf.Logs.Full() {
+					grip.Info(procbuf.String())
 				}
 				grip.Notice(msg)
 				return nil
@@ -325,20 +327,22 @@ func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 			Append(conf.Post...).
 			Worker().
 			WithErrorFilter(func(err error) error {
+				proclog.Noticeln(ruler, bullet, ruler)
 				if err != nil {
-					proclog.Noticeln(ruler, bullet, ruler)
 					grip.Critical(message.BuildPair().
 						Pair("op", opName).
 						Pair("state", "ERRORED").
 						Pair("host", host).
-						Pair("id", buildID).
+						Pair("operator", hn).
 						Pair("repo", conf.Name).
 						Pair("path", conf.Path).
-						Pair("operator", hn).
+						Pair("id", buildID).
 						Pair("dur", time.Since(started)).
 						Pair("err", err),
 					)
 					grip.Error(procbuf.String())
+				} else if conf.Logs.Full() {
+					grip.Info(procbuf.String())
 				}
 				return err
 			}).
@@ -390,8 +394,8 @@ func (conf *GitRepository) CleanupJob() fun.Worker {
 			AppendArgs("git", "prune").
 			Worker().
 			WithErrorFilter(func(err error) error {
+				proclog.Infoln(ruler, id, ruler)
 				if err != nil {
-					proclog.Infoln(ruler, id, ruler)
 					grip.Critical(message.BuildPair().
 						Pair("op", opName).
 						Pair("id", id).
@@ -400,7 +404,10 @@ func (conf *GitRepository) CleanupJob() fun.Worker {
 						Pair("err", err),
 					)
 					grip.Error(procbuf.String())
+				} else if conf.Logs.Full() {
+					grip.Info(procbuf.String())
 				}
+
 				return err
 			}).PostHook(fn.MakeFuture(procbuf.Close).Ignore()).Run(ctx)
 	}

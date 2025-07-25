@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/jasper"
@@ -33,11 +34,7 @@ func RunCommand() *cmdr.Commander {
 			qrCode(),
 		),
 		commandFlagName, func(ctx context.Context, args *withConf[[]string]) error {
-			cmds, err := getcmds(args.conf.Operations.ExportAllCommands(), args.arg)
-			if err != nil {
-				return err
-			}
-			return runConfiguredCommand(ctx, cmds)
+			return runMatchingCommands(ctx, args.conf.Operations.ExportAllCommands(), args.arg)
 		})
 }
 
@@ -64,26 +61,25 @@ func getcmds(cmds dt.Slice[subexec.Command], args []string) ([]subexec.Command, 
 	return out, nil
 }
 
-func toWorkers(st *fun.Stream[subexec.Command]) *fun.Stream[fun.Worker] {
-	return fun.MakeConverter(func(conf subexec.Command) fun.Worker { return conf.Worker() }).Stream(st)
-}
+func runMatchingCommands(ctx context.Context, cmds dt.Slice[subexec.Command], args []string) error {
+	cmds, err := getcmds(cmds, args)
+	if err != nil {
+		return ers.Wrapf(err, "resolving commands %s", args)
+	}
 
-func runWorkers(ctx context.Context, wf fun.Worker) error { return wf.Run(ctx) }
-
-func runConfiguredCommand(ctx context.Context, cmds dt.Slice[subexec.Command]) error {
 	size := cmds.Len()
 	switch {
 	case size == 1:
-		return ft.Ptr(cmds.Index(0)).Worker().Run(ctx)
+		return ers.Wrapf(ft.Ptr(cmds[0]).Worker().Run(ctx), "running command %q", cmds[0])
 	case size < runtime.NumCPU():
-		return fun.MAKE.WorkerPool(toWorkers(cmds.Stream())).Run(ctx)
+		return ers.Wrapf(fun.MAKE.WorkerPool(toWorkers(cmds.Stream())).Run(ctx), "running small %d batch  of commands %s", size, cmds)
 	default:
-		return cmds.Stream().Parallel(func(ctx context.Context, conf subexec.Command) error { return conf.Worker().Run(ctx) },
-			fun.WorkerGroupConfContinueOnError(),
-			fun.WorkerGroupConfWorkerPerCPU(),
-		).Run(ctx)
+		return ers.Wrapf(subexec.TOOLS.CommandPool(cmds.Stream()).Run(ctx), "running  %d batch of commands %s", size, cmds)
 	}
+}
 
+func toWorkers(st *fun.Stream[subexec.Command]) *fun.Stream[fun.Worker] {
+	return fun.MakeConverter(func(conf subexec.Command) fun.Worker { return conf.Worker() }).Stream(st)
 }
 
 func listCommands() *cmdr.Commander {

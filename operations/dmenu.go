@@ -39,12 +39,7 @@ func DMenu() *cmdr.Commander {
 				return dmenuForCommands(ctx, args.conf, group)
 			}
 
-			cmds, err := getcmds(args.conf.Operations.ExportAllCommands(), []string{name})
-			if err != nil {
-				return err
-			}
-
-			return runConfiguredCommand(ctx, cmds)
+			return runMatchingCommands(ctx, args.conf.Operations.ExportAllCommands(), []string{name})
 		})
 }
 
@@ -98,12 +93,7 @@ func dmenuForCommands(ctx context.Context, conf *sardis.Configuration, group sub
 		return erc.NewFilter().Without(godmenu.ErrSelectionMissing).Apply(err)
 	}
 
-	ops, err := getcmds(group.Commands, strings.Fields(strings.TrimSpace(cmd)))
-	if err != nil {
-		return err
-	}
-
-	return runConfiguredCommand(ctx, ops)
+	return runMatchingCommands(ctx, group.Commands, strings.Fields(strings.TrimSpace(cmd)))
 }
 
 func listMenus() *cmdr.Commander {

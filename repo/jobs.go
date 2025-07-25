@@ -38,6 +38,7 @@ func (conf *GitRepository) FetchJob() fun.Worker {
 		}
 
 		id := fmt.Sprintf("fetch.REPO(%s).REMOTE(%s).OPERATOR(%s)", conf.Name, conf.RemoteName, util.GetHostname())
+		runID := strings.ToLower(rand.Text())[:7]
 
 		startAt := time.Now()
 		hostname := util.GetHostname()
@@ -46,6 +47,7 @@ func (conf *GitRepository) FetchJob() fun.Worker {
 			grip.Info(message.BuildPair().
 				Pair("op", opName).
 				Pair("id", id).
+				Pair("run", runID).
 				Pair("repo", conf.Name).
 				Pair("path", conf.Path).
 				Pair("msg", "repo doesn't exist; cloning").
@@ -74,9 +76,10 @@ func (conf *GitRepository) FetchJob() fun.Worker {
 			Append(conf.Post...).
 			Worker().
 			PreHook(func(context.Context) {
-				grip.Notice(message.BuildPair().
+				grip.Info(message.BuildPair().
 					Pair("op", opName).
 					Pair("state", "STARTED").
+					Pair("run", runID).
 					Pair("repo", conf.Name).
 					Pair("path", conf.Path).
 					Pair("host", hostname),
@@ -87,6 +90,7 @@ func (conf *GitRepository) FetchJob() fun.Worker {
 				msg := message.BuildPair().
 					Pair("op", opName).
 					Pair("state", "COMPLETED").
+					Pair("run", runID).
 					Pair("err", err != nil).
 					Pair("dur", time.Since(startAt)).
 					Pair("repo", conf.Name).
@@ -111,15 +115,18 @@ func (conf *GitRepository) CloneJob() fun.Worker {
 	return func(ctx context.Context) error {
 		hostname := util.GetHostname()
 		startAt := time.Now()
+		nonce := strings.ToLower(rand.Text())[:7]
 
 		if _, err := os.Stat(conf.Path); !os.IsNotExist(err) {
-			grip.Info(message.Fields{
-				"op":   opName,
-				"msg":  "repo exists, skipping clone, running update jobs",
-				"path": conf.Path,
-				"repo": conf.Remote,
-				"host": hostname,
-			})
+			grip.Info(message.BuildPair().
+				Pair("op", opName).
+				Pair("run", nonce).
+				Pair("msg", "repo exists, skipping clone, running update jobs").
+				Pair("host", hostname).
+				Pair("repo", conf.Name).
+				Pair("path", conf.Path).
+				Pair("remote", conf.Remote),
+			)
 
 			if conf.LocalSync {
 				rconfCopy := conf
@@ -143,7 +150,7 @@ func (conf *GitRepository) CloneJob() fun.Worker {
 		})
 
 		err := jasper.Context(ctx).CreateCommand(ctx).
-			ID(fmt.Sprintf("%s.%s.clone", hostname, conf.Name)).
+			ID(fmt.Sprintf("%s.%s.%s.%s.clone", opName, nonce, hostname, conf.Name)).
 			Priority(level.Debug).
 			Directory(filepath.Dir(conf.Path)).
 			SetOutputSender(level.Info, sender).
@@ -154,9 +161,10 @@ func (conf *GitRepository) CloneJob() fun.Worker {
 
 		msg := message.BuildPair().
 			Pair("op", opName).
-			Pair("host", hostname).
+			Pair("run", nonce).
 			Pair("dur", time.Since(startAt)).
 			Pair("err", err != nil).
+			Pair("host", hostname).
 			Pair("repo", conf.Name).
 			Pair("path", conf.Path).
 			Pair("remote", conf.Remote)
@@ -202,8 +210,8 @@ func (conf *GitRepository) UpdateJob() fun.Worker {
 			grip.Info(message.BuildPair().
 				Pair("op", opName).
 				Pair("state", "COMPLETED").
-				Pair("dur", time.Since(startAt)).
 				Pair("id", id).
+				Pair("dur", time.Since(startAt)).
 				Pair("path", conf.Path).
 				Pair("operator", host),
 			)
@@ -275,6 +283,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 	}
 
 	bullet := fmt.Sprintf("%s.PATH(%s)", buildID, conf.Path)
+	nonce := strings.ToLower(rand.Text())[:7]
 
 	const opName = "repo-sync"
 	return func(ctx context.Context) error {
@@ -302,6 +311,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 		grip.Info(message.BuildPair().
 			Pair("op", opName).
 			Pair("state", "STARTED").
+			Pair("run", nonce).
 			Pair("id", buildID).
 			Pair("path", conf.Path).
 			Pair("host", host).
@@ -332,12 +342,14 @@ func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 					grip.Critical(message.BuildPair().
 						Pair("op", opName).
 						Pair("state", "ERRORED").
-						Pair("host", host).
-						Pair("operator", hn).
+						Pair("run", nonce).
 						Pair("repo", conf.Name).
 						Pair("path", conf.Path).
-						Pair("id", buildID).
+						Pair("remote", conf.Remote).
+						Pair("host", host).
+						Pair("operator", hn).
 						Pair("dur", time.Since(started)).
+						Pair("id", buildID).
 						Pair("err", err),
 					)
 					grip.Error(procbuf.String())
@@ -351,10 +363,14 @@ func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 		grip.Info(message.BuildPair().
 			Pair("op", opName).
 			Pair("state", "COMPLETED").
-			Pair("err", err != nil).
+			Pair("run", nonce).
+			Pair("repo", conf.Name).
+			Pair("path", conf.Path).
+			Pair("remote", conf.Remote).
 			Pair("host", host).
+			Pair("operator", hn).
 			Pair("id", buildID).
-			Pair("path", conf.Path),
+			Pair("err", err != nil),
 		)
 
 		return nil
@@ -370,11 +386,13 @@ func (conf *GitRepository) CleanupJob() fun.Worker {
 		id := fmt.Sprintf("cleanup.REPO(%s).OPERATOR(%s)", conf.Name, util.GetHostname())
 
 		start := time.Now()
+		nonce := strings.ToLower(rand.Text())[:7]
 
 		defer func() {
 			grip.Critical(message.BuildPair().
 				Pair("op", opName).
 				Pair("id", id).
+				Pair("run", nonce).
 				Pair("repo", conf.Name).
 				Pair("path", conf.Path).
 				Pair("dur", time.Since(start)).
@@ -399,6 +417,7 @@ func (conf *GitRepository) CleanupJob() fun.Worker {
 					grip.Critical(message.BuildPair().
 						Pair("op", opName).
 						Pair("id", id).
+						Pair("run", nonce).
 						Pair("repo", conf.Name).
 						Pair("path", conf.Path).
 						Pair("err", err),

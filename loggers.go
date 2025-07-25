@@ -39,7 +39,7 @@ func SetupLogging(conf *Configuration) send.Sender {
 	if conf.Settings.Logging.EnableJSONFormating || conf.Settings.Logging.EnableJSONColorFormatting {
 		sender = send.MakePlain()
 	} else {
-		sender = grip.Sender()
+		sender = send.MakeStdError()
 	}
 
 	if runtime.GOOS == "linux" && !conf.Settings.Logging.DisableSyslog && journal.Enabled() {

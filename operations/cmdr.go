@@ -130,5 +130,6 @@ func Commander() *cmdr.Commander {
 			Tweet(),
 			Utilities(),
 			Version(),
+			SearchMenu(),
 		)
 }

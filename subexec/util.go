@@ -2,6 +2,7 @@ package subexec
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 
@@ -13,6 +14,26 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
 )
+
+type Utilities struct{}
+
+var TOOLS Utilities = struct{}{}
+
+func (Utilities) Converter() fun.Converter[Command, fun.Worker] { return TOOLS.CommandToWorker }
+func (Utilities) CommandToWorker(_ context.Context, c Command) (fun.Worker, error) {
+	return c.Worker(), nil
+}
+
+func (Utilities) CommandPool(st *fun.Stream[Command]) fun.Worker {
+	return TOOLS.WorkerPool(TOOLS.Converter().Stream(st))
+}
+func (Utilities) WorkerPool(st *fun.Stream[fun.Worker]) fun.Worker {
+	return st.Parallel(
+		func(ctx context.Context, wf fun.Worker) error { return wf.Run(ctx) },
+		fun.WorkerGroupConfContinueOnError(),
+		fun.WorkerGroupConfWorkerPerCPU(),
+	)
+}
 
 type Logging string
 

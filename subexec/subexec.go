@@ -185,7 +185,7 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	return nil
 }
 
-func (conf *Configuration) ExportAllCommands() []Command {
+func (conf *Configuration) ExportAllCommands() dt.Slice[Command] {
 	return conf.caches.allCommdands.Call(conf.doExportAllCommands)
 }
 

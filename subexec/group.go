@@ -33,7 +33,7 @@ type Group struct {
 
 func dotJoin(elems ...string) string       { return dotJoinParts(elems) }
 func dotJoinParts(elems []string) string   { return strings.Join(removeZeros(elems), ".") }
-func dotSpit(in string) []string           { return strings.Split(in, ".") }
+func dotSplit(in string) []string          { return strings.Split(in, ".") }
 func dotSplitN(in string, n int) []string  { return strings.SplitN(in, ".", n) }
 func removeZeros[T comparable](in []T) []T { return slices.DeleteFunc(in, isZero) }
 func isZero[T comparable](i T) bool        { var z T; return i == z }

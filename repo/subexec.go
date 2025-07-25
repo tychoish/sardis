@@ -41,7 +41,7 @@ func (conf *Configuration) ConcreteTaskGroups() dt.Slice[subexec.Group] {
 		})
 
 		if repo.LocalSync {
-			update.Commands = append(pull.Commands, subexec.Command{
+			update.Commands = append(update.Commands, subexec.Command{
 				Name:             repo.Name,
 				WorkerDefinition: repo.UpdateJob(),
 				Notify:           ft.Ptr(repo.Notify),

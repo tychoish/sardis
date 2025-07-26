@@ -10,7 +10,6 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-
 type Node struct {
 	word     string
 	command  *Command
@@ -22,7 +21,6 @@ func NewTree(commands []Command) *Node {
 	tree.add(commands)
 	return tree
 }
-
 
 func (n *Node) MarshalJSON() ([]byte, error) {
 	out := bytes.Buffer{}
@@ -89,7 +87,7 @@ func (n *Node) Resolve() []Command {
 	queue := dt.List[*Node]{}
 	queue.PushBack(n)
 
-	for elem := queue.PopFront(); elem.Ok(); queue = queue.PopFront() {
+	for elem := queue.PopFront(); elem.Ok(); elem = queue.PopFront() {
 		node := elem.Value()
 		if node.command != nil {
 			out = append(out, ft.Ref(node.command))

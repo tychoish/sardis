@@ -2,15 +2,12 @@ package operations
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"os"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/sardis/subexec"
 )
 
@@ -25,64 +22,68 @@ func SearchMenu() *cmdr.Commander {
 		// listMenus(),
 		),
 		"name", func(ctx context.Context, args *withConf[[]string]) error {
-			output, cmds, err := WriteCommandList(ctx, &args.conf.Operations, args.arg)
+			options, cmds, err := WriteCommandList(ctx, &args.conf.Operations, args.arg)
 			if err != nil {
 				return err
 			}
 
-			if len(cmds) > 1 {
-				runCommands(ctx, cmds)
+			if cmds != nil {
+				return runCommands(ctx, cmds)
 			}
 
 			buf := bufio.NewWriter(os.Stdout)
+			for _, opt := range options {
+				_, _ = buf.WriteString(opt)
+				_ = buf.WriteByte('\n')
+			}
 
-			return erc.Join(ft.IgnoreFirst(fmt.Fprint(buf, output)), buf.Flush())
+			return buf.Flush()
 		},
 	)
 }
 
-func WriteCommandList(ctx context.Context, conf *subexec.Configuration, args []string) (string, []subexec.Command, error) {
+func WriteCommandList(ctx context.Context, conf *subexec.Configuration, args []string) ([]string, []subexec.Command, error) {
 	groupMap := conf.ExportCommandGroups()
 	cmds := conf.ExportAllCommands()
-	buf := &bytes.Buffer{}
+	options := []string{}
 
 	switch len(args) {
 	case 0:
 		cmds.ReadAll(func(c subexec.Command) {
-			_, _ = buf.WriteString(c.NamePrime())
-			_ = buf.WriteByte('\n')
+			options = append(options, c.NamePrime())
 		})
-		return buf.String(), nil, nil
+		return options, nil, nil
 	case 1:
 		selection := args[0]
 		switch selection {
 		case "all", "a":
 			cmds.ReadAll(func(c subexec.Command) {
-				_, _ = buf.WriteString(c.NamePrime())
-				_ = buf.WriteByte('\n')
+				options = append(options, c.NamePrime())
 			})
-			return buf.String(), nil, nil
+			return options, nil, nil
 		case "groups", "group", "g":
 			groupMap.Keys().ReadAll(func(name string) {
-				_, _ = buf.WriteString(name)
-				_ = buf.WriteByte('\n')
+				options = append(options, name)
 			})
-			return buf.String(), nil, nil
+			return options, nil, nil
 		default:
 			if gr, ok := groupMap[selection]; ok {
 				gr.Commands.ReadAll(func(c subexec.Command) {
-					_, _ = buf.WriteString(c.NamePrime())
-					_ = buf.WriteByte('\n')
+					options = append(options, c.NamePrime())
 				})
-				return buf.String(), nil, nil
+				return options, nil, nil
 			}
 			cmds, err := getcmds(cmds, args)
-			return "", cmds, err
+			if err != nil {
+				return nil, nil, err
+			}
+
+			return nil, cmds, nil
 		}
 	default:
 		switch args[0] {
 		case "all", "a", "groups", "group", "g":
-			return "", nil, fmt.Errorf("cannot use keyword %q in context of a multi-command selection %s", args[0], args)
+			return nil, nil, fmt.Errorf("cannot use keyword %q in context of a multi-command selection %s", args[0], args)
 		default:
 			var missing []string
 			var groups []string
@@ -94,20 +95,22 @@ func WriteCommandList(ctx context.Context, conf *subexec.Configuration, args []s
 			}
 			switch {
 			case len(missing) > 0 && len(groups) > 0:
-				return "", nil, fmt.Errorf("ambiguous operation, cannot mix groups %s and commands %s", groups, missing)
+				return nil, nil, fmt.Errorf("ambiguous operation, cannot mix groups %s and commands %s", groups, missing)
 			case len(groups) > 0:
 				ops := dt.NewSetFromSlice(args)
 				if err := groupMap.Keys().Filter(ops.Check).ReadAll(func(name string) {
-					_, _ = buf.WriteString(name)
-					_ = buf.WriteByte('\n')
+					options = append(options, name)
 				}).Run(ctx); err != nil {
-					return "", nil, err
+					return nil, nil, err
 				}
 
-				return buf.String(), nil, nil
+				return options, nil, nil
 			case len(missing) > 0:
 				cmds, err := getcmds(cmds, args)
-				return "", cmds, err
+				if err != nil {
+					return nil, nil, err
+				}
+				return nil, cmds, nil
 			default:
 				panic("unreachable")
 			}

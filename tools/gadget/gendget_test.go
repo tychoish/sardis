@@ -2,7 +2,6 @@ package gadget
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 	"time"
 
@@ -36,7 +35,7 @@ func TestGraph(t *testing.T) {
 		for _, pkg := range gtwo.Packages {
 			other := indx.Get(pkg.PackageName)
 			check.NotError(t, ft.IgnoreFirst((Packages{pkg, other}).WriteTo(buf)))
-			testt.Log(t, fmt.Sprintln(), buf.String())
+			testt.Log(t, "-->>", buf.String(), "<<--")
 			buf.Reset()
 			if !indx.Check(pkg.PackageName) {
 				t.Errorf("pkg %q from two not in one", pkg.PackageName)

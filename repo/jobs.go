@@ -62,7 +62,7 @@ func (conf *GitRepository) FetchJob() fun.Worker {
 		}
 
 		proclog, procbuf := subexec.NewOutputBuf(id)
-		defer procbuf.Close()
+		defer util.DropErrorOnDefer(procbuf.Close)
 		proclog.Infoln(ruler, id, ruler)
 
 		return jasper.Context(ctx).
@@ -305,7 +305,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 		started := time.Now()
 
 		proclog, procbuf := subexec.NewOutputBuf(buildID)
-		defer procbuf.Close()
+		defer util.DropErrorOnDefer(procbuf.Close)
 		proclog.Noticeln(ruler, bullet, ruler)
 
 		grip.Info(message.BuildPair().
@@ -401,7 +401,7 @@ func (conf *GitRepository) CleanupJob() fun.Worker {
 		}()
 
 		proclog, procbuf := subexec.NewOutputBuf(id)
-		defer procbuf.Close()
+		defer util.DropErrorOnDefer(procbuf.Close)
 		proclog.Infoln(ruler, id, ruler)
 
 		return jasper.Context(ctx).CreateCommand(ctx).Priority(level.Info).

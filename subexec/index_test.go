@@ -15,7 +15,7 @@ func TestTree(t *testing.T) {
 		{Name: "category.group.nominal.internomincal", GroupName: "grope"},
 	}
 
-	node := makeTree(cmds)
+	node := NewTree(cmds)
 	t.Log(string(ft.Must(json.MarshalIndent(node, "", "     "))))
 
 	notFound := node.FindCommand("category.group.name")

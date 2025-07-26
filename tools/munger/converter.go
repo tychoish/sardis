@@ -64,7 +64,7 @@ func CollectFiles(rootPath string) *fun.Stream[BlogPost] {
 		if err != nil {
 			return nil, ers.Wrap(err, path)
 		}
-		defer file.Close()
+		defer util.DropErrorOnDefer(file.Close)
 
 		rawBody, err := io.ReadAll(file)
 		if err != nil {
@@ -121,9 +121,9 @@ func ConvertSite(ctx context.Context, path string) error {
 		}
 
 		p.Body = stdoutBuf.String()
-		p.Body = strings.Replace(p.Body, `\'`, "'", -1)
-		p.Body = strings.Replace(p.Body, `\"`, `"`, -1)
-		p.Body = strings.Replace(p.Body, `\...`, `...`, -1)
+		p.Body = strings.ReplaceAll(p.Body, `\'`, "'")
+		p.Body = strings.ReplaceAll(p.Body, `\"`, `"`)
+		p.Body = strings.ReplaceAll(p.Body, `\...`, `...`)
 		if p.Metadata != nil {
 			p.Metadata.Markup = "markdown"
 		}

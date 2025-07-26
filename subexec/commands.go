@@ -15,8 +15,8 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
-	"github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/global"
+	"github.com/tychoish/sardis/util"
 )
 
 type Command struct {
@@ -89,7 +89,7 @@ func (conf *Command) Worker() fun.Worker {
 			WithErrorHook(func() error {
 				err := ec.Resolve()
 
-				defer buf.Close()
+				defer util.DropErrorOnDefer(buf.Close)
 				msg := message.BuildPair().
 					Pair("op", conf.Name).
 					Pair("state", "COMPLETED").

@@ -112,10 +112,8 @@ func (l *mdbLockImpl) Lock() fun.Operation {
 	err := l.updateLockView(ctx)
 
 	var res *mongo.SingleResult
-	for {
-		if ers.IsExpiredContext(err) {
-			break
-		}
+	for !ers.IsExpiredContext(err) {
+
 		if err != nil {
 			l.record.Active = true
 			l.record.Owner = l.srv.conf.InstanceID

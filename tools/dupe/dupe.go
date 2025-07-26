@@ -9,6 +9,7 @@ import (
 
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
+	"github.com/tychoish/sardis/util"
 )
 
 type OperationType string
@@ -52,7 +53,7 @@ func readTree(root string) (state, error) {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer util.DropErrorOnDefer(file.Close)
 
 		content, err := io.ReadAll(file)
 		if err != nil {

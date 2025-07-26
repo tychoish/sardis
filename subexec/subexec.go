@@ -60,10 +60,6 @@ func (conf *Configuration) doValidate() error {
 	return ec.Resolve()
 }
 
-func makeErrorHandler[T any](eh func(error)) func(T, error) T {
-	return func(v T, err error) T { eh(err); return v }
-}
-
 func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	// expand aliases
 	if len(conf.Commands) == 0 {

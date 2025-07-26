@@ -18,7 +18,6 @@ import (
 	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/sysmgmt"
 	"github.com/tychoish/sardis/util"
-	sutil "github.com/tychoish/sardis/util"
 )
 
 type Configuration struct {
@@ -131,7 +130,7 @@ func LoadConfiguration(fn string) (*Configuration, error) {
 func readConfiguration(fn string) (*Configuration, error) {
 	out := &Configuration{}
 
-	if err := sutil.UnmarshalFile(fn, out); err != nil {
+	if err := util.UnmarshalFile(fn, out); err != nil {
 		return nil, fmt.Errorf("problem unmarshaling config data: %w", err)
 	}
 	out.originalPath = fn
@@ -326,5 +325,5 @@ func (conf *CredentialsConf) Validate() error {
 		return err
 	}
 
-	return sutil.UnmarshalFile(conf.Path, &conf)
+	return util.UnmarshalFile(conf.Path, &conf)
 }

@@ -78,7 +78,7 @@ func (b *OutputBuf) Reader() io.Reader { return b.buffer }
 func (b *OutputBuf) Writer() io.Writer { return b.buffer }
 func (b *OutputBuf) String() string    { return b.buffer.String() }
 
-func (b *OutputBuf) bClose() error {
+func (b *OutputBuf) Close() error {
 	if b.buffer == nil {
 		// make it safe to run more than once
 		return nil

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -66,7 +65,7 @@ func BuildCommand() *cmdr.Commander {
 	// the Spec model makes it possible to write more easily
 	// testable functions, and limit your exposure to the CLI
 	operation := cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (*ServiceConfig, error) {
-		return &ServiceConfig{Message: fmt.Sprintln(cc.String("message"))}, nil
+		return &ServiceConfig{Message: cc.String("message")}, nil
 	}).SetMiddleware(func(ctx context.Context, conf *ServiceConfig) context.Context {
 		// create a new context with a timeout
 		ctx, cancel := context.WithTimeout(ctx, conf.Timeout)

@@ -89,7 +89,7 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 		var anyActive bool
 		for _, rn := range repos {
 			r, ok := conf.caches.lookup[rn]
-			if !ok || r.Disabled || (r.Fetch == false && r.LocalSync == false) {
+			if !ok || r.Disabled || (!r.Fetch && !r.LocalSync) {
 				continue
 			}
 			anyActive = true

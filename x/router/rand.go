@@ -55,11 +55,11 @@ func GenerateID() MessageID { return MakeID(time.Now(), counter.Add(1)) }
 func MakeID(ts time.Time, count int64) MessageID {
 	builder := &strings.Builder{}
 
-	builder.WriteString(fmt.Sprint(ts.Unix()))
+	fmt.Fprint(builder, ts.Unix())
 	builder.WriteString("-")
 	builder.WriteString(hostID)
 	builder.WriteString("-")
-	builder.WriteString(fmt.Sprint(count))
+	fmt.Fprint(builder, count)
 	builder.WriteString("-")
 
 	for i := 0; i < 16 && builder.Len() < idLenght; i++ {

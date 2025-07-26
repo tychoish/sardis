@@ -40,6 +40,15 @@ func RunCommand() *cmdr.Commander {
 
 func getcmds(cmds dt.Slice[subexec.Command], args []string) ([]subexec.Command, error) {
 	ops := dt.NewSetFromSlice(args)
+	switch {
+	case cmds.Len() == 0:
+		return nil, ers.New("cannot resolve commands without input commands")
+	case len(args) == 0:
+		return nil, ers.New("must specify one or more commands to resolve")
+	case ops.Len() != len(args):
+		return nil, fmt.Errorf("ambiguous input with %d duplicate items %s", ops.Len()-len(args), args)
+	}
+
 	seen := dt.Set[string]{}
 	seen.Order()
 
@@ -50,11 +59,9 @@ func getcmds(cmds dt.Slice[subexec.Command], args []string) ([]subexec.Command, 
 
 	// if we didn't find all that we were looking for?
 	if ops.Len() != len(out) {
-		return nil, fmt.Errorf("found %d ops, of %d, ops [%s]; found [%s] ",
-			len(out), ops.Len(),
-			// TODO we should be able to get slices from sets without panic
-			strings.Join(fun.NewGenerator(ops.Stream().Slice).Force().Resolve(), ", "),
-			strings.Join(fun.NewGenerator(seen.Stream().Slice).Force().Resolve(), ", "),
+		return nil, fmt.Errorf("found %d [%s] ops, of %d [%s] arguments",
+			len(out), strings.Join(fun.NewGenerator(seen.Stream().Slice).Force().Resolve(), ", "),
+			ops.Len(), strings.Join(fun.NewGenerator(ops.Stream().Slice).Force().Resolve(), ", "),
 		)
 	}
 

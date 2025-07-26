@@ -34,11 +34,10 @@ func (n *Node) add(cmds []Command) {
 	var ok bool
 
 	for cmd := range slices.Values(cmds) {
-		parts := dotSplit(cmd.NamePrime())
-
 		var prev *Node
 		next := n
 
+		parts := dotSplit(cmd.NamePrime())
 		for idx, elem := range parts {
 			prev = next
 

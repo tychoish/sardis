@@ -19,8 +19,8 @@ import (
 func Gadget() *cmdr.Commander {
 	return addCommandWithConf(cmdr.MakeCommander().
 		SetName("gadget").
-		SetUsage(fmt.Sprintln(
-			"runs go test (+lint +coverage) on a workspace",
+		SetUsage(fmt.Sprint(
+			"runs go test (+lint +coverage) on a workspace ",
 			"all non-flag arguments are passed directly to go test",
 		)).
 		Flags(
@@ -45,7 +45,7 @@ func Gadget() *cmdr.Commander {
 				}).Flag(),
 			cmdr.FlagBuilder("...").
 				SetName("path", "p").
-				SetUsage(fmt.Sprintln("path to pass to go test without leading slashes.")).
+				SetUsage("path to pass to go test without leading slashes.").
 				Flag(),
 			cmdr.FlagBuilder(false).
 				SetName("recursive", "r").

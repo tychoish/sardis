@@ -25,7 +25,7 @@ type Group struct {
 	Notify         *bool                  `bson:"notify" json:"notify" yaml:"notify"`
 	Background     *bool                  `bson:"background" json:"background" yaml:"background"`
 	Host           *string                `bson:"host" json:"host" yaml:"host"`
-	Commands       []Command              `bson:"commands" json:"commands" yaml:"commands"`
+	Commands       dt.Slice[Command]      `bson:"commands" json:"commands" yaml:"commands"`
 	MenuSelections []string               `bson:"menu" json:"menu" yaml:"menu"`
 	SortHint       int                    `bson:"sort_hint" json:"sort_hint" yaml:"sort_hint"`
 	Synthetic      bool                   `bson:"-" json:"-" yaml:"-"`
@@ -34,7 +34,7 @@ type Group struct {
 func dotJoin(elems ...string) string       { return dotJoinParts(elems) }
 func dotJoinParts(elems []string) string   { return strings.Join(removeZeros(elems), ".") }
 func dotSplit(in string) []string          { return strings.Split(in, ".") }
-func dotSplitN(in string, n int) []string  { return strings.SplitN(in, ".", n) }
+func dotSplitN(in string, n int) []string  { return strings.SplitN(in, ".", n) } // nolint:unused
 func removeZeros[T comparable](in []T) []T { return slices.DeleteFunc(in, isZero) }
 func isZero[T comparable](i T) bool        { var z T; return i == z }
 

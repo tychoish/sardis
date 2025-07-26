@@ -15,6 +15,7 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/libfun"
+	"github.com/tychoish/sardis/util"
 )
 
 var fileCache = &adt.Map[string, []byte]{}
@@ -63,7 +64,7 @@ func PopulateCache(ctx context.Context, root string) error {
 		if err != nil {
 			return err
 		}
-		defer f.Close()
+		defer util.DropErrorOnDefer(f.Close)
 
 		data, err := io.ReadAll(f)
 		if err != nil {

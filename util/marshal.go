@@ -45,7 +45,7 @@ func UnmarshalFile(fn string, out interface{}) error {
 	if err != nil {
 		return fmt.Errorf("problem opening file %s to unmarshal: %w", fn, err)
 	}
-	defer file.Close()
+	defer DropErrorOnDefer(file.Close)
 
 	data, err := io.ReadAll(file)
 	if err != nil {

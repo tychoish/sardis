@@ -74,6 +74,10 @@ func runMatchingCommands(ctx context.Context, cmds dt.Slice[subexec.Command], ar
 		return ers.Wrapf(err, "resolving commands %s", args)
 	}
 
+	return runCommands(ctx, cmds)
+}
+
+func runCommands(ctx context.Context, cmds dt.Slice[subexec.Command]) error {
 	size := cmds.Len()
 	switch {
 	case size == 1:

@@ -8,6 +8,7 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/subexec"
 )
 
@@ -16,24 +17,24 @@ func SearchMenu() *cmdr.Commander {
 		SetName("cmds").
 		SetUsage("list or run a command").
 		Aliases("c", "m").
-		Subcommanders(
-		// dmenuCommand(dmenuCommandAll).SetName("all").SetUsage("select a command from all configured commands"),
-		// dmenuCommand(dmenuCommandGroups).SetName("groups").SetUsage("use nested menu, starting with command groups"),
-		// listMenus(),
-		),
+		Subcommanders(listMenus()),
 		"name", func(ctx context.Context, args *withConf[[]string]) error {
-			options, cmds, err := WriteCommandList(ctx, &args.conf.Operations, args.arg)
+			stage, err := WriteCommandList(ctx, &args.conf.Operations, args.arg)
 			if err != nil {
 				return err
 			}
 
-			if cmds != nil {
-				return runCommands(ctx, cmds)
+			if stage.Commands != nil {
+				return runCommands(ctx, stage.Commands)
 			}
 
 			buf := bufio.NewWriter(os.Stdout)
-			for _, opt := range options {
-				_, _ = buf.WriteString(opt)
+			for _, opt := range stage.Selections {
+				if stage.Prefix != "" {
+					fmt.Fprintf(buf, "%s.%s", stage.Prefix, opt)
+				} else {
+					_, _ = buf.WriteString(opt)
+				}
 				_ = buf.WriteByte('\n')
 			}
 
@@ -42,75 +43,85 @@ func SearchMenu() *cmdr.Commander {
 	)
 }
 
-func WriteCommandList(ctx context.Context, conf *subexec.Configuration, args []string) ([]string, []subexec.Command, error) {
-	groupMap := conf.ExportCommandGroups()
-	cmds := conf.ExportAllCommands()
-	options := []string{}
+type CommandListStage struct {
+	NextLabel  string
+	Prefix     string
+	Selections []string
+	Commands   []subexec.Command
+}
+
+func WriteCommandList(ctx context.Context, conf *subexec.Configuration, args []string) (*CommandListStage, error) {
+	var options []string
 
 	switch len(args) {
 	case 0:
+		cmds := conf.ExportAllCommands()
+		options = make([]string, 0, len(cmds))
 		cmds.ReadAll(func(c subexec.Command) {
 			options = append(options, c.NamePrime())
 		})
-		return options, nil, nil
+		return &CommandListStage{NextLabel: sardis.ApplicationName, Selections: options}, nil
 	case 1:
 		selection := args[0]
 		switch selection {
 		case "all", "a":
-			cmds.ReadAll(func(c subexec.Command) {
-				options = append(options, c.NamePrime())
-			})
-			return options, nil, nil
+			return WriteCommandList(ctx, conf, nil)
 		case "groups", "group", "g":
-			groupMap.Keys().ReadAll(func(name string) {
+			conf.ExportCommandGroups().Keys().ReadAll(func(name string) {
 				options = append(options, name)
-			})
-			return options, nil, nil
+			}).Run(ctx)
+			return &CommandListStage{NextLabel: "groups", Selections: options}, nil
 		default:
+			groupMap := conf.ExportCommandGroups()
+
 			if gr, ok := groupMap[selection]; ok {
 				gr.Commands.ReadAll(func(c subexec.Command) {
 					options = append(options, c.NamePrime())
 				})
-				return options, nil, nil
-			}
-			cmds, err := getcmds(cmds, args)
-			if err != nil {
-				return nil, nil, err
+				return &CommandListStage{NextLabel: selection, Selections: options, Prefix: selection}, nil
 			}
 
-			return nil, cmds, nil
+			cmds, err := getcmds(conf.ExportAllCommands(), args)
+			if err != nil {
+				return nil, err
+			}
+
+			return &CommandListStage{Commands: cmds}, nil
 		}
 	default:
 		switch args[0] {
 		case "all", "a", "groups", "group", "g":
-			return nil, nil, fmt.Errorf("cannot use keyword %q in context of a multi-command selection %s", args[0], args)
+			return nil, fmt.Errorf("cannot use keyword %q in context of a multi-command selection %s", args[0], args)
 		default:
+			groupMap := conf.ExportCommandGroups()
+
 			var missing []string
 			var groups []string
 			for _, item := range args {
 				if _, ok := groupMap[item]; ok {
 					groups = append(groups, item)
+				} else {
+					missing = append(missing, item)
 				}
-				missing = append(missing, item)
 			}
+
 			switch {
 			case len(missing) > 0 && len(groups) > 0:
-				return nil, nil, fmt.Errorf("ambiguous operation, cannot mix groups %s and commands %s", groups, missing)
+				return nil, fmt.Errorf("ambiguous operation, cannot mix groups %s and commands %s", groups, missing)
 			case len(groups) > 0:
 				ops := dt.NewSetFromSlice(args)
 				if err := groupMap.Keys().Filter(ops.Check).ReadAll(func(name string) {
 					options = append(options, name)
 				}).Run(ctx); err != nil {
-					return nil, nil, err
+					return nil, err
 				}
-
-				return options, nil, nil
+				return &CommandListStage{NextLabel: "groups", Selections: options}, nil
 			case len(missing) > 0:
-				cmds, err := getcmds(cmds, args)
+				cmds, err := getcmds(conf.ExportAllCommands(), args)
 				if err != nil {
-					return nil, nil, err
+					return nil, err
 				}
-				return nil, cmds, nil
+				return &CommandListStage{Commands: cmds}, nil
 			default:
 				panic("unreachable")
 			}

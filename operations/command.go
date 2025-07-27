@@ -30,7 +30,7 @@ func RunCommand() *cmdr.Commander {
 		SetUsage("runs a predefined command").
 		Subcommanders(
 			listCommands(),
-			dmenuCommand(dmenuCommandAll).SetName("dmenu").SetUsage("use dmennu to select from all configured commands"),
+			DMenu(),
 			qrCode(),
 		),
 		commandFlagName, func(ctx context.Context, args *withConf[[]string]) error {

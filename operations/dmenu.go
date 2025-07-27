@@ -81,7 +81,6 @@ func listMenus() *cmdr.Commander {
 					} else {
 						table.AddLine("", "", "", cc.Name)
 					}
-
 				}
 				table.AddLine("", "", "", "")
 			}

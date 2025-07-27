@@ -91,7 +91,6 @@ func Commander() *cmdr.Commander {
 						return nil
 					}
 					return fmt.Errorf("config file %q does not exist", in)
-
 				}).Flag(),
 			cmdr.FlagBuilder("info").
 				SetName("level").

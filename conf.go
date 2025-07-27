@@ -180,7 +180,6 @@ func (conf *Configuration) expandLinkedFiles() error {
 		}
 		if conf.Settings != nil {
 			return nil, fmt.Errorf("nested file %q specified system configuration", fn)
-
 		}
 		return conf, nil
 	}).Parallel(fun.SliceStream(conf.Settings.ConfigPaths),

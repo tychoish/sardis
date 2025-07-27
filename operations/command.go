@@ -155,7 +155,6 @@ func qrCode() *cmdr.Commander {
 			err := jasper.Context(ctx).CreateCommand(ctx).
 				AppendArgs("xsel", "--clipboard", "--output").SetOutputWriter(buf).
 				Run(ctx)
-
 			if err != nil {
 				return fmt.Errorf("problem getting clipboard: %w", err)
 			}

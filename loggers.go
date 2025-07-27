@@ -75,6 +75,7 @@ func SetupLogging(conf *Configuration) send.Sender {
 func Twitter(ctx context.Context) grip.Logger {
 	return grip.ContextLogger(ctx, global.ContextTwitterLogger)
 }
+
 func WithTwitterLogger(ctx context.Context, conf *Configuration) context.Context {
 	return grip.WithNewContextLogger(ctx, global.ContextTwitterLogger, func() send.Sender {
 		twitter, err := twitter.MakeSender(ctx, &twitter.Options{
@@ -84,7 +85,6 @@ func WithTwitterLogger(ctx context.Context, conf *Configuration) context.Context
 			AccessSecret:   conf.Settings.Credentials.Twitter.OauthSecret,
 			AccessToken:    conf.Settings.Credentials.Twitter.OauthToken,
 		})
-
 		if err != nil {
 			err = ers.Wrap(err, "problem constructing twitter sender")
 			if srv.HasCleanup(ctx) {
@@ -102,6 +102,7 @@ func WithTwitterLogger(ctx context.Context, conf *Configuration) context.Context
 func DesktopNotify(ctx context.Context) grip.Logger {
 	return grip.ContextLogger(ctx, global.ContextDesktopLogger)
 }
+
 func WithDesktopNotify(ctx context.Context) context.Context {
 	root := grip.Sender()
 	s := desktop.MakeSender()
@@ -114,6 +115,7 @@ func WithDesktopNotify(ctx context.Context) context.Context {
 func RemoteNotify(ctx context.Context) grip.Logger {
 	return grip.ContextLogger(ctx, global.ContextRemoteLogger)
 }
+
 func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Context) {
 	var loggers []send.Sender
 	root := grip.Sender()
@@ -136,7 +138,6 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 				DisableTLS:           true,
 				AllowUnencryptedAuth: true,
 			})
-
 		if err != nil {
 			srv.AddCleanupError(ctx, ers.Wrap(err, "setting up notify send issue logger"))
 			return

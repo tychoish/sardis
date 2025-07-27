@@ -132,7 +132,6 @@ func repoUpdate() *cmdr.Commander {
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfWorkerPerCPU(),
 			).Run(ctx)
-
 			if err != nil {
 				sardis.RemoteNotify(ctx).NoticeWhen(shouldNotify, message.Fields{
 					"arg":   args.arg,

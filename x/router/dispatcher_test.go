@@ -53,5 +53,4 @@ func TestDispater(t *testing.T) {
 		assert.NotError(t, err)
 		assert.Equal(t, resp.ID, "kip")
 	})
-
 }

@@ -67,6 +67,7 @@ func NewRouter(conf RouterConfig) *Router[string] {
 		conf: conf,
 	}
 }
+
 func (r *Router[T]) Start(ctx context.Context) error {
 	r.startDialer(ctx)
 	r.startListener(ctx)

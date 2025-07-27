@@ -93,7 +93,6 @@ func blogPublish() *cmdr.Commander {
 					SetOutputSender(level.Info, grip.Sender()).
 					SetErrorSender(level.Error, grip.Sender()).Worker(),
 			).Run(ctx)
-
 			if err != nil {
 				sardis.RemoteNotify(ctx).Error(message.WrapError(err, message.Fields{
 					"op":   opName,

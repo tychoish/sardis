@@ -132,7 +132,6 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 			),
 		),
 	).Wait()
-
 	if err != nil {
 		return err
 	}
@@ -144,7 +143,6 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 			}
 			return stdcmp.Compare(lhv.Name, rhv.Name)
 		})
-
 	})
 
 	slices.SortStableFunc(resolved, func(lhv, rhv Group) int {

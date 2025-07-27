@@ -17,9 +17,11 @@ var counter = &atomic.Int64{}
 
 func resetCounter() { counter.Store(0) }
 
-const charSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-const numChars = len(charSet)
-const idLenght = 32
+const (
+	charSet  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	numChars = len(charSet)
+	idLenght = 32
+)
 
 var hostID string
 
@@ -78,7 +80,6 @@ func (id MessageID) Parse() (time.Time, string, int64, string, error) {
 	ts, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil {
 		return time.Time{}, "", 0, "", err
-
 	}
 	count, err := strconv.ParseInt(parts[2], 10, 64)
 	if err != nil {

@@ -64,7 +64,6 @@ func readTree(root string) (state, error) {
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

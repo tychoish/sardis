@@ -28,7 +28,6 @@ func StartService(ctx context.Context, conf *ServiceConfig) error {
 	web := &http.Server{
 		Addr: "127.0.0.1:9001",
 		Handler: http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-
 			num := counter.Add(1)
 
 			grip.Infof("got request: %d", num)

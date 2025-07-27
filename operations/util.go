@@ -66,7 +66,6 @@ func diffTrees() *cmdr.Commander {
 				return opts, fmt.Errorf("resolving dupe options: [target=%q, mirror=%q, num_args=%d]",
 					opts.Target, opts.Mirror, len(args))
 			}
-
 		},
 		// entry point/action
 		func(ctx context.Context, opts dupe.Options) error {

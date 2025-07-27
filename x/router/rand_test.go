@@ -86,10 +86,10 @@ func TestMessageIDs(t *testing.T) {
 		})
 	})
 }
+
 func TestRandomInterval(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		t.Run(fmt.Sprint("Case", i), func(t *testing.T) {
-
 		})
 	}
 }

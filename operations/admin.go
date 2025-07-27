@@ -59,7 +59,6 @@ func hacking() *cmdr.Commander {
 			table.Print()
 			return nil
 		}).Add)
-
 }
 
 func setupLinks() *cmdr.Commander {

@@ -162,7 +162,6 @@ func (cg *Group) doMerge(rhv Group) bool {
 		cg.Commands = append(cg.Commands, rhv.Commands...)
 	} else {
 		cg.Commands = append(rhv.Commands, cg.Commands...)
-
 	}
 	cg.SortHint = intish.AbsMax(cg.SortHint, rhv.SortHint)
 

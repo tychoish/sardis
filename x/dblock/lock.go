@@ -47,7 +47,6 @@ type mdbLockService struct {
 
 func NewLockService(_ *Configuration) (LockService, error) {
 	return new(mdbLockService), nil
-
 }
 
 func (ls *mdbLockService) GetLock(_ context.Context, name string) Lock {

@@ -422,7 +422,6 @@ func report(
 	table := tabby.New()
 	replacer := strings.NewReplacer(tr.Package, pfx)
 	err = erc.Join(err, iter.ReadAll(func(in string) {
-
 		cols := strings.Fields(replacer.Replace(in))
 		if cols[0] == "total:" {
 			// we read this out of the go.test line

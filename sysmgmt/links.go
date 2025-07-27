@@ -21,8 +21,7 @@ import (
 type LinkConfiguration struct {
 	Links []LinkDefinition `bson:"links" json:"links" yaml:"links"`
 
-	System struct {
-	} `bson:"system" json:"system" yaml:"system"`
+	System struct{} `bson:"system" json:"system" yaml:"system"`
 }
 
 type LinkDefinition struct {
@@ -188,7 +187,7 @@ func (lnd *LinkDefinition) CreateJob() fun.Worker {
 
 		} else {
 			if _, err := os.Stat(linkDir); os.IsNotExist(err) {
-				ec.Add(os.MkdirAll(linkDir, 0755))
+				ec.Add(os.MkdirAll(linkDir, 0o755))
 			}
 
 			ec.Add(os.Symlink(lnd.Target, lnd.Path))

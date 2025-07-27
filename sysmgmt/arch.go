@@ -61,7 +61,7 @@ func (conf *ArchLinux) Validate() error {
 
 	ec := &erc.Collector{}
 	if stat, err := os.Stat(conf.BuildPath); os.IsNotExist(err) {
-		if err := os.MkdirAll(conf.BuildPath, 0755); err != nil {
+		if err := os.MkdirAll(conf.BuildPath, 0o755); err != nil {
 			ec.Add(fmt.Errorf("making %q: %w", conf.BuildPath, err))
 		}
 	} else if !stat.IsDir() {

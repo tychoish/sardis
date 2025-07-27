@@ -117,7 +117,6 @@ func TestGraph(t *testing.T) {
 				seen.Add(edge)
 			}
 		}
-
 	})
 
 	t.Run("FirstGroupHasNoDependencies", func(t *testing.T) {
@@ -249,5 +248,4 @@ func BenchmarkGadget(b *testing.B) {
 			})
 		})
 	}
-
 }

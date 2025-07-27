@@ -363,7 +363,6 @@ func (r *Dispatcher) registerProcessResponseService() error {
 
 						r.broker.Publish(ctx, rr)
 						return ctx.Err()
-
 					},
 					fun.WorkerGroupConfNumWorkers(r.conf.Workers),
 				).Run(ctx)

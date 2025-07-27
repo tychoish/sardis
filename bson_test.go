@@ -133,7 +133,5 @@ func BenchmarkBSON(b *testing.B) {
 				}
 			}
 		})
-
 	})
-
 }

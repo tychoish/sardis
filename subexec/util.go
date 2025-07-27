@@ -27,6 +27,7 @@ func (Utilities) CommandToWorker(_ context.Context, c Command) (fun.Worker, erro
 func (Utilities) CommandPool(st *fun.Stream[Command]) fun.Worker {
 	return TOOLS.WorkerPool(TOOLS.Converter().Stream(st))
 }
+
 func (Utilities) WorkerPool(st *fun.Stream[fun.Worker]) fun.Worker {
 	return st.Parallel(
 		func(ctx context.Context, wf fun.Worker) error { return wf.Run(ctx) },

@@ -72,12 +72,15 @@ func (e *Envelope) Worker() fun.Worker { return e.cache.Resolve() }
 func (e *Envelope) MarshalText() ([]byte, error) {
 	return e.marshal(SerializationRepresentationText)
 }
+
 func (e *Envelope) MarshalBinary() ([]byte, error) {
 	return e.marshal(SerializationRepresentationBinary)
 }
+
 func (e *Envelope) UnmarshalText(in []byte) error {
 	return e.unmarshal(in, SerializationRepresentationText)
 }
+
 func (e *Envelope) UnmarshalBinary(in []byte) error {
 	return e.unmarshal(in, SerializationRepresentationBinary)
 }

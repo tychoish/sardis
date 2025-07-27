@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/mitchellh/go-homedir"
-
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
@@ -28,10 +27,10 @@ type Configuration struct {
 	Network    NetworkConf               `bson:"network" json:"network" yaml:"network"`
 	Projects   repo.ProjectConfiguration `bson:"projects" json:"projects" yaml:"projects"`
 
-	HostsCOMPAT    []HostDefinition         `bson:"hosts" json:"hosts" yaml:"hosts"`
-	BlogCOMPAT     []repo.Project           `bson:"blog" json:"blog" yaml:"blog"`
-	CommandsCOMPAT []subexec.Group          `bson:"commands" json:"commands" yaml:"commands"`
-	RepoCOMPAT     []repo.GitRepository     `bson:"repo" json:"repo" yaml:"repo"`
+	HostsCOMPAT    []HostDefinition         `bson:"hosts,omitempty" json:"hosts,omitempty" yaml:"hosts,omitempty"`
+	BlogCOMPAT     []repo.Project           `bson:"blog,omitempty" json:"blog,omitempty" yaml:"blog,omitempty"`
+	CommandsCOMPAT []subexec.Group          `bson:"commands,omitempty" json:"commands,omitempty" yaml:"commands,omitempty"`
+	RepoCOMPAT     []repo.GitRepository     `bson:"repo,omitempty" json:"repo,omitempty" yaml:"repo,omitempty"`
 	LinksCOMPAT    []sysmgmt.LinkDefinition `bson:"links" json:"links" yaml:"links"`
 
 	linkedFilesRead bool
@@ -51,7 +50,7 @@ type SystemConf struct {
 	Arch           sysmgmt.ArchLinux            `bson:"arch" json:"arch" yaml:"arch"`
 	SystemD        sysmgmt.SystemdConfiguration `bson:"systemd" json:"systemd" yaml:"systemd"`
 	Links          sysmgmt.LinkConfiguration    `bson:"links" json:"links" yaml:"links"`
-	ServicesLEGACY []sysmgmt.SystemdService     `bson:"services" json:"services" yaml:"services"`
+	ServicesLEGACY []sysmgmt.SystemdService     `bson:"services,omitempty" json:"services,omitempty" yaml:"services,omitempty"`
 }
 
 type NotifyConf struct {
@@ -76,7 +75,7 @@ type Settings struct {
 	Runtime struct {
 		Hostname        string `bson:"-" json:"-" yaml:"-"`
 		IncludeLocalSHH bool   `bson:"include_local_ssh" json:"include_local_ssh" yaml:"include_local_ssh"`
-	}
+	} `bson:"runtime" json:"runtime" yaml:"runtime"`
 }
 
 type LoggingConf struct {
@@ -211,10 +210,9 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) error {
 		conf.LinksCOMPAT = append(conf.LinksCOMPAT, mcf.LinksCOMPAT...)
 		conf.CommandsCOMPAT = append(conf.CommandsCOMPAT, mcf.CommandsCOMPAT...)
 		conf.RepoCOMPAT = append(conf.RepoCOMPAT, mcf.RepoCOMPAT...)
-		conf.LinksCOMPAT = append(conf.LinksCOMPAT, mcf.LinksCOMPAT...)
-		conf.System.ServicesLEGACY = append(conf.System.ServicesLEGACY, mcf.System.ServicesLEGACY...)
 		conf.BlogCOMPAT = append(conf.BlogCOMPAT, mcf.BlogCOMPAT...)
 		conf.HostsCOMPAT = append(conf.HostsCOMPAT, mcf.HostsCOMPAT...)
+		conf.System.ServicesLEGACY = append(conf.System.ServicesLEGACY, mcf.System.ServicesLEGACY...)
 
 		conf.Operations.Commands = append(conf.Operations.Commands, mcf.Operations.Commands...)
 		conf.Repos.GitRepos = append(conf.Repos.GitRepos, mcf.Repos.GitRepos...)

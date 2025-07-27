@@ -19,7 +19,7 @@ require (
 	github.com/tychoish/grip/x/desktop v0.0.0-20250626175245-f5276066a1e9
 	github.com/tychoish/grip/x/jira v0.0.0-20250626173215-d516ec138ab2
 	github.com/tychoish/grip/x/system v0.0.0-20250626175245-f5276066a1e9
-	github.com/tychoish/grip/x/telegram v0.0.0-20250626173215-d516ec138ab2
+	github.com/tychoish/grip/x/telegram v0.0.0-20250727175141-b1156f1fda1f
 	github.com/tychoish/grip/x/twitter v0.0.0-20250626175245-f5276066a1e9
 	github.com/tychoish/grip/x/xmpp v0.0.0-20250626175245-f5276066a1e9
 	github.com/tychoish/jasper v0.1.3-0.20250713002007-d673ada4fd85

@@ -1,18 +1,22 @@
 package operations
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"os"
 	"slices"
 
 	"github.com/cheynewallace/tabby"
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/repo"
+	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/sysmgmt"
 )
 
@@ -68,13 +72,10 @@ func setupLinks() *cmdr.Commander {
 		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 				links := fun.SliceStream(conf.System.Links.Links)
+
 				jobs := fun.MakeConverter(func(c sysmgmt.LinkDefinition) fun.Worker { return c.CreateJob() }).Stream(links)
 
-				return jobs.Parallel(
-					func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-					fun.WorkerGroupConfContinueOnError(),
-					fun.WorkerGroupConfWorkerPerCPU(),
-				).Run(ctx)
+				return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 			}).Add)
 }
 
@@ -84,12 +85,16 @@ func configCheck() *cmdr.Commander {
 		SetUsage("validated configuration").
 		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				// this is redundant, as the resolve
-				// configuration does this correctly.
+				ec := &erc.Collector{}
 
-				err := conf.Validate()
-				grip.InfoWhen(err == nil, "configuration is valid")
-				return err
+				buf := bufio.NewWriter(os.Stdout)
+				enc := json.NewEncoder(buf)
+				enc.SetIndent("", "    ")
+
+				ec.Push(enc.Encode(conf))
+				ec.Push(buf.Flush())
+
+				return ec.Resolve()
 			}).Add)
 }
 
@@ -100,14 +105,12 @@ func nightly() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			return fun.JoinStreams(
+			jobs := fun.JoinStreams(
 				fun.MakeConverter(func(c sysmgmt.LinkDefinition) fun.Worker { return c.CreateJob() }).Stream(fun.SliceStream(conf.System.Links.Links)),
 				fun.MakeConverter(func(c repo.GitRepository) fun.Worker { return c.CleanupJob() }).Stream(fun.SliceStream(conf.Repos.GitRepos)),
 				fun.MakeConverter(func(c sysmgmt.SystemdService) fun.Worker { return c.Worker() }).Stream(fun.SliceStream(conf.System.SystemD.Services)),
-			).Parallel(
-				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-				fun.WorkerGroupConfContinueOnError(),
-				fun.WorkerGroupConfWorkerPerCPU(),
-			).Run(ctx)
+			)
+
+			return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 		}).Add)
 }

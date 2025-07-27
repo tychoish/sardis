@@ -22,6 +22,7 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/repo"
+	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/util"
 )
 
@@ -127,11 +128,7 @@ func repoUpdate() *cmdr.Commander {
 				)
 			}()
 
-			err = jobs.Parallel(
-				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-				fun.WorkerGroupConfContinueOnError(),
-				fun.WorkerGroupConfWorkerPerCPU(),
-			).Run(ctx)
+			err = subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 			if err != nil {
 				sardis.RemoteNotify(ctx).NoticeWhen(shouldNotify, message.Fields{
 					"arg":   args.arg,
@@ -158,11 +155,7 @@ func repoCleanup() *cmdr.Commander {
 
 			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.CleanupJob() }).Stream(repos)
 
-			return jobs.Parallel(
-				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-				fun.WorkerGroupConfContinueOnError(),
-				fun.WorkerGroupConfWorkerPerCPU(),
-			).Run(ctx)
+			return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 		},
 	)
 }
@@ -189,11 +182,7 @@ func repoClone() *cmdr.Commander {
 
 			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.CloneJob() }).Stream(missingRepos)
 
-			return jobs.Parallel(
-				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-				fun.WorkerGroupConfContinueOnError(),
-				fun.WorkerGroupConfWorkerPerCPU(),
-			).Run(ctx)
+			return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 		})
 }
 
@@ -275,14 +264,15 @@ func repoFetch() *cmdr.Commander {
 			SetName("fetch").
 			SetUsage("fetch one or more repos"),
 		"repo", func(ctx context.Context, args *withConf[[]string]) error {
-			repos := args.conf.Repos.FindAll(args.arg...).Stream().Filter(func(repo repo.GitRepository) bool { return repo.Fetch })
+			repos := args.conf.Repos.
+				FindAll(args.arg...).
+				Stream().
+				Filter(func(repo repo.GitRepository) bool {
+					return repo.Fetch
+				})
 
 			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.FetchJob() }).Stream(repos)
 
-			return jobs.Parallel(
-				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
-				fun.WorkerGroupConfContinueOnError(),
-				fun.WorkerGroupConfWorkerPerCPU(),
-			).Run(ctx)
+			return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 		})
 }

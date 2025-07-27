@@ -34,7 +34,7 @@ type Command struct {
 
 	// if possible call the operation rather
 	// than execing the commands
-	WorkerDefinition fun.Worker
+	WorkerDefinition fun.Worker `bson:"-" json:"-" yaml:"-"`
 	unaliasedName    string
 }
 

@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 
+	fuzzyfinder "github.com/ktr0731/go-fuzzyfinder"
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/subexec"
 )
@@ -17,7 +19,10 @@ func SearchMenu() *cmdr.Commander {
 		SetName("cmds").
 		SetUsage("list or run a command").
 		Aliases("c", "m").
-		Subcommanders(listMenus()),
+		Subcommanders(
+			listMenus(),
+			fuzzy(),
+		),
 		"name", func(ctx context.Context, args *withConf[[]string]) error {
 			stage, err := WriteCommandList(ctx, &args.conf.Operations, args.arg)
 			if err != nil {
@@ -41,6 +46,42 @@ func SearchMenu() *cmdr.Commander {
 			return buf.Flush()
 		},
 	)
+}
+
+func fuzzy() *cmdr.Commander {
+	return addOpCommand(
+		cmdr.MakeCommander().
+			SetName("fuzzy").
+			Aliases("fuzz", "fzf", "f", "ff"),
+		"name",
+		func(ctx context.Context, args *withConf[[]string]) error {
+			op := args.arg
+			var selected string
+
+			for {
+				stage, err := WriteCommandList(ctx, &args.conf.Operations, op)
+				switch {
+				case err != nil:
+					return err
+				case stage.Commands != nil:
+					return runCommands(ctx, stage.Commands)
+				case stage.Selections != nil:
+					idx, err := fuzzyfinder.Find(stage.Selections, func(idx int) string { return stage.Selections[idx] })
+					if err != nil {
+						return err
+					}
+					selected = stage.Selections[idx]
+
+					if stage.Prefix != "" {
+						selected = fmt.Sprintf("%s.%s", stage.Prefix, selected)
+					}
+					op = []string{selected}
+				default:
+					// this should be impossible
+					return ers.Error("unexpect outcome")
+				}
+			}
+		})
 }
 
 type CommandListStage struct {

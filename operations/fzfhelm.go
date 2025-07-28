@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	fuzzyfinder "github.com/ktr0731/go-fuzzyfinder"
+	fzf "github.com/koki-develop/go-fzf"
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
@@ -57,6 +57,14 @@ func fuzzy() *cmdr.Commander {
 		func(ctx context.Context, args *withConf[[]string]) error {
 			op := args.arg
 			var selected string
+			ff, err := fzf.New(
+				fzf.WithPrompt("sardis ==> "),
+				fzf.WithNoLimit(true),
+				fzf.WithCaseSensitive(false),
+			)
+			if err != nil {
+				return err
+			}
 
 			for {
 				stage, err := WriteCommandList(ctx, &args.conf.Operations, op)
@@ -66,16 +74,25 @@ func fuzzy() *cmdr.Commander {
 				case stage.Commands != nil:
 					return runCommands(ctx, stage.Commands)
 				case stage.Selections != nil:
-					idx, err := fuzzyfinder.Find(stage.Selections, func(idx int) string { return stage.Selections[idx] })
+					idxs, err := ff.Find(
+						stage.Selections,
+						func(idx int) string {
+							return stage.Selections[idx]
+						})
 					if err != nil {
 						return err
 					}
-					selected = stage.Selections[idx]
 
-					if stage.Prefix != "" {
-						selected = fmt.Sprintf("%s.%s", stage.Prefix, selected)
+					op = make([]string, 0, len(idxs))
+
+					for _, v := range idxs {
+						selected = stage.Selections[v]
+						if stage.Prefix != "" {
+							op = append(op, fmt.Sprintf("%s.%s", stage.Prefix, selected))
+						} else {
+							op = append(op, selected)
+						}
 					}
-					op = []string{selected}
 				default:
 					// this should be impossible
 					return ers.Error("unexpect outcome")

@@ -77,22 +77,27 @@ func (cg *Group) Validate() error {
 		cg.Commands = append(cg.Commands, Command{Name: selection, Command: selection})
 	}
 
-	if cg.Category == "" && cg.CmdNamePrefix != "" {
-		cg.Category = cg.Name
-		cg.Name = cg.CmdNamePrefix
-		cg.CmdNamePrefix = ""
-	}
+	{ // this is in braces because it's sus as hell.
+		if cg.Category == "" && cg.Name != "" && cg.CmdNamePrefix != "" {
+			grip.Warningf("deprecated and unnecessary mangling for %s and %s", cg.Category, cg.Name)
+			cg.Category = cg.Name
+			cg.Name = cg.CmdNamePrefix
+			cg.CmdNamePrefix = ""
+		}
 
-	if cg.Name == "" && cg.CmdNamePrefix != "" {
-		grip.Warningf("command group cat=%q prefix=%q is missing name, rotating name", cg.Category, cg.CmdNamePrefix)
-		cg.Name = cg.CmdNamePrefix
-		cg.CmdNamePrefix = ""
+		if cg.Name == "" && cg.CmdNamePrefix != "" {
+			grip.Warningf("command group cat=%q prefix=%q is missing name, rotating name", cg.Category, cg.CmdNamePrefix)
+			cg.Name = cg.CmdNamePrefix
+			cg.CmdNamePrefix = ""
+		}
+
 	}
 
 	ec.When(cg.Name == "", ers.Error("command group must have name"))
 
 	for idx := range cg.Commands {
 		cmd := cg.Commands[idx]
+		cmd.GroupCategory = cg.Category
 		cmd.GroupName = cg.Name
 		cmd.Notify = ft.Default(cmd.Notify, cg.Notify)
 		cmd.Background = ft.Default(cmd.Background, cg.Background)
@@ -101,7 +106,6 @@ func (cg *Group) Validate() error {
 		ec.Whenf(cmd.Name == "", "command in group [%s](%d) must have a name", cg.Name, idx)
 		ec.Whenf(cmd.Command == "" && cmd.OverrideDefault, "cannot override default without an override, in group [%s] command [%s] at index (%d)", cg.Name, cmd.Name, idx)
 
-		// ec.Whenf(cmd.Command != "" && cmd.WorkerDefinition != nil, "invalid definition in group [%s] for [%s] at index (%d) [%q]", cg.Name, cmd.Name, idx, cmd.Command)
 		if cg.Environment != nil || cmd.Environment != nil {
 			env := dt.Map[string, string]{}
 			if cg.Environment != nil {

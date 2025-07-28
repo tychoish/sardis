@@ -22,14 +22,15 @@ import (
 type Command struct {
 	Name            string                 `bson:"name" json:"name" yaml:"name"`
 	GroupName       string                 `bson:"-" json:"-" yaml:"-"`
+	GroupCategory   string                 `bson:"-" json:"-" yaml:"-"`
 	Directory       string                 `bson:"directory" json:"directory" yaml:"directory"`
 	Environment     dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
 	Command         string                 `bson:"command" json:"command" yaml:"command"`
 	Commands        []string               `bson:"commands" json:"commands" yaml:"commands"`
 	OverrideDefault bool                   `bson:"override_default" json:"override_default" yaml:"override_default"`
-	Notify          *bool                  `bson:"notify" json:"notify" yaml:"notify"`
-	Background      *bool                  `bson:"bson" json:"bson" yaml:"bson"`
-	SortHint        int                    `bson:"sort_hint" json:"sort_hint" yaml:"sort_hint"`
+	Notify          *bool                  `bson:"notify,omitempty" json:"notify,omitempty" yaml:"notify,omitempty"`
+	Background      *bool                  `bson:"background,omitempty" json:"background,omitempty" yaml:"background,omitempty"`
+	SortHint        int                    `bson:"sort_hint,omitempty" json:"sort_hint,omitempty" yaml:"sort_hint,omitempty"`
 	Logs            Logging                `bson:"logs" json:"logs" yaml:"logs"`
 
 	// if possible call the operation rather
@@ -39,6 +40,9 @@ type Command struct {
 }
 
 func (conf *Command) NamePrime() string { return ft.Default(conf.unaliasedName, conf.Name) }
+func (conf *Command) FQN() string {
+	return dotJoin(conf.GroupCategory, conf.GroupName, conf.NamePrime())
+}
 
 func (conf *Command) Worker() fun.Worker {
 	if conf.WorkerDefinition != nil {

@@ -5,11 +5,23 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"slices"
+	"strings"
+	"syscall"
+	"time"
 
 	fzf "github.com/koki-develop/go-fzf"
+	"github.com/mattn/go-isatty"
+	"github.com/shirou/gopsutil/process"
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/srv"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/subexec"
 )
@@ -37,15 +49,74 @@ func SearchMenu() *cmdr.Commander {
 			for _, opt := range stage.Selections {
 				if stage.Prefix != "" {
 					fmt.Fprintf(buf, "%s.%s", stage.Prefix, opt)
-				} else {
-					_, _ = buf.WriteString(opt)
+					continue
 				}
-				_ = buf.WriteByte('\n')
+				fmt.Fprintln(buf, opt)
 			}
 
 			return buf.Flush()
 		},
 	)
+}
+
+type OperationRuntimeInfo struct {
+	ShouldBlock bool
+	TTY         bool
+	ParentPID   int32
+	ParentName  string
+}
+
+func operationRuntime(ctx context.Context) (context.Context, OperationRuntimeInfo) {
+	opr := OperationRuntimeInfo{}
+
+	opr.ParentPID = int32(os.Getppid())
+	parentProc, err := process.NewProcessWithContext(ctx, opr.ParentPID)
+	opr.TTY = isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd())
+	if err != nil {
+		grip.Warning(message.Fields{
+			"error": err,
+			"ppid":  opr.ParentPID,
+			"msg":   "falling back to is-a-tty",
+			"stage": "gopsuti.NewProcess",
+			"tty":   opr.TTY,
+		})
+		opr.ShouldBlock = opr.TTY
+	} else {
+		opr.ParentName, err = parentProc.NameWithContext(ctx)
+		if err != nil {
+			grip.Warning(message.Fields{
+				"error": err,
+				"ppid":  opr.ParentPID,
+				"msg":   "falling back to is-a-tty",
+				"stage": "gopsuti.Process.Name",
+				"tty":   opr.TTY,
+			})
+		}
+
+		switch opr.ParentName {
+		case "zsh", "bash", "fish", "sh", "nu":
+			opr.ShouldBlock = false && ft.Not(opr.TTY)
+		case "emacs":
+			opr.ShouldBlock = false
+		case "ssh":
+			opr.ShouldBlock = opr.TTY
+		case "alacritty", "urxvt", "xterm", "Terminal.app":
+			opr.ShouldBlock = true
+		}
+
+		grip.Debug(message.Fields{
+			"ppid":   opr.ParentPID,
+			"block":  opr.ShouldBlock,
+			"parent": opr.ParentName,
+			"stage":  "passed",
+			"tty":    opr.TTY,
+		})
+	}
+
+	var cancel context.CancelFunc
+	ctx, cancel = signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGINT)
+	srv.AddCleanup(ctx, fun.MakeOperation(cancel).Worker())
+	return ctx, opr
 }
 
 func fuzzy() *cmdr.Commander {
@@ -66,13 +137,32 @@ func fuzzy() *cmdr.Commander {
 				return err
 			}
 
+			ctx, opr := operationRuntime(ctx)
 			for {
 				stage, err := WriteCommandList(ctx, &args.conf.Operations, op)
 				switch {
 				case err != nil:
 					return err
 				case stage.Commands != nil:
-					return runCommands(ctx, stage.Commands)
+					startedAt := time.Now()
+					err := runCommands(ctx, stage.Commands)
+					ranFor := time.Since(startedAt)
+
+					if opr.ShouldBlock {
+						<-ctx.Done()
+					}
+
+					waited := time.Since(startedAt) - ranFor
+
+					grip.Notice(message.BuildPair().
+						Pair("op", "cmd.fuzzy").
+						Pair("state", "COMPLETED").
+						Pair("err", err != nil).
+						Pair("runtime", ranFor).
+						Pair("waited", waited).
+						Pair("commands", strings.Join(stage.CommandNames(), ", ")))
+
+					return err
 				case stage.Selections != nil:
 					idxs, err := ff.Find(
 						stage.Selections,
@@ -84,7 +174,6 @@ func fuzzy() *cmdr.Commander {
 					}
 
 					op = make([]string, 0, len(idxs))
-
 					for _, v := range idxs {
 						selected = stage.Selections[v]
 						if stage.Prefix != "" {
@@ -106,6 +195,17 @@ type CommandListStage struct {
 	Prefix     string
 	Selections []string
 	Commands   []subexec.Command
+}
+
+func (cls CommandListStage) CommandNames() []string {
+	if len(cls.Commands) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(cls.Commands))
+	for cmd := range slices.Values(cls.Commands) {
+		out = append(out, cmd.FQN())
+	}
+	return out
 }
 
 func WriteCommandList(ctx context.Context, conf *subexec.Configuration, args []string) (*CommandListStage, error) {

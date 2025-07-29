@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/cheynewallace/tabby"
+	"github.com/mattn/go-isatty"
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
@@ -40,6 +41,7 @@ func hacking() *cmdr.Commander {
 			grip.Noticeln("has default jasper", jasper.HasManager(ctx))
 
 			grip.Info(message.Fields{
+				"istty":                      isatty.IsTerminal(os.Stdin.Fd()),
 				"version":                    sardis.BuildRevision,
 				"alacritty":                  conf.Operations.AlacrittySocket(),
 				"ssh_agent":                  conf.Operations.SSHAgentSocket(),

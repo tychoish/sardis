@@ -10,8 +10,10 @@ require (
 	github.com/go-git/go-git/v5 v5.2.0
 	github.com/google/go-github/v50 v50.2.0
 	github.com/koki-develop/go-fzf v0.15.0
+	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nwidger/jsoncolor v0.3.2
+	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/tychoish/birch v0.3.0
 	github.com/tychoish/cmdr v0.4.0
 	github.com/tychoish/fun v0.12.0
@@ -84,7 +86,6 @@ require (
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mholt/archiver v3.1.1+incompatible // indirect
@@ -104,7 +105,6 @@ require (
 	github.com/sergeymakinen/go-bmp v1.0.0 // indirect
 	github.com/sergeymakinen/go-ico v1.0.0-beta.0 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
-	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	github.com/tadvi/systray v0.0.0-20190226123456-11a2b8fa57af // indirect
 	github.com/tklauser/go-sysconf v0.3.11 // indirect

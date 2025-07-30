@@ -21,6 +21,11 @@ import (
 type LinkConfiguration struct {
 	Links []LinkDefinition `bson:"links" json:"links" yaml:"links"`
 
+	ManagedLinkTrees []struct {
+		Name string `bson:"name" json:"name" yaml:"name"`
+		Sudo bool   `bson:"sudo" json:"sudo" yaml:"sudo"`
+	} `bson:"manged" json:"manged" yaml:"manged"`
+
 	System struct{} `bson:"system" json:"system" yaml:"system"`
 }
 
@@ -120,7 +125,7 @@ func (conf *LinkConfiguration) expand() error {
 	return ec.Resolve()
 }
 
-func (lnd *LinkDefinition) CreateJob() fun.Worker {
+func (lnd *LinkDefinition) CreateLinkJob() fun.Worker {
 	return func(ctx context.Context) (err error) {
 		ec := &erc.Collector{}
 		defer func() { err = ec.Resolve() }()

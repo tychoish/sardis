@@ -75,7 +75,7 @@ func setupLinks() *cmdr.Commander {
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 				links := fun.SliceStream(conf.System.Links.Links)
 
-				jobs := fun.MakeConverter(func(c sysmgmt.LinkDefinition) fun.Worker { return c.CreateJob() }).Stream(links)
+				jobs := fun.MakeConverter(func(c sysmgmt.LinkDefinition) fun.Worker { return c.CreateLinkJob() }).Stream(links)
 
 				return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 			}).Add)
@@ -108,7 +108,7 @@ func nightly() *cmdr.Commander {
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 			jobs := fun.JoinStreams(
-				fun.MakeConverter(func(c sysmgmt.LinkDefinition) fun.Worker { return c.CreateJob() }).Stream(fun.SliceStream(conf.System.Links.Links)),
+				fun.MakeConverter(func(c sysmgmt.LinkDefinition) fun.Worker { return c.CreateLinkJob() }).Stream(fun.SliceStream(conf.System.Links.Links)),
 				fun.MakeConverter(func(c repo.GitRepository) fun.Worker { return c.CleanupJob() }).Stream(fun.SliceStream(conf.Repos.GitRepos)),
 				fun.MakeConverter(func(c sysmgmt.SystemdService) fun.Worker { return c.Worker() }).Stream(fun.SliceStream(conf.System.SystemD.Services)),
 			)

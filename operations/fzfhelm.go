@@ -5,21 +5,17 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"slices"
 	"strings"
-	"syscall"
 	"time"
 
 	fzf "github.com/koki-develop/go-fzf"
 	"github.com/mattn/go-isatty"
 	"github.com/shirou/gopsutil/process"
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
@@ -67,13 +63,14 @@ type OperationRuntimeInfo struct {
 	ParentName  string
 }
 
-func operationRuntime(ctx context.Context) (context.Context, OperationRuntimeInfo) {
+func operationRuntime(ctx context.Context) OperationRuntimeInfo {
 	opr := OperationRuntimeInfo{}
 
 	opr.ParentPID = int32(os.Getppid())
+	opr.ShouldBlock = os.Getenv("SARDIS_CMDS_BLOCKING") != ""
+	opr.TTY = isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd())
 
 	parentProc, err := process.NewProcessWithContext(ctx, opr.ParentPID)
-	opr.TTY = os.Getenv("SARDIS_CMDS_BLOCKING") != "" || (isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd()))
 	if err != nil {
 		grip.Warning(message.Fields{
 			"error": err,
@@ -82,8 +79,10 @@ func operationRuntime(ctx context.Context) (context.Context, OperationRuntimeInf
 			"stage": "gopsuti.NewProcess",
 			"tty":   opr.TTY,
 		})
-		opr.ShouldBlock = opr.TTY
-	} else {
+		if !opr.ShouldBlock {
+			opr.ShouldBlock = opr.TTY
+		}
+	} else if err == nil {
 		opr.ParentName, err = parentProc.NameWithContext(ctx)
 		if err != nil {
 			grip.Warning(message.Fields{
@@ -95,17 +94,18 @@ func operationRuntime(ctx context.Context) (context.Context, OperationRuntimeInf
 			})
 		}
 
-		switch opr.ParentName {
-		case "zsh", "bash", "fish", "sh", "nu":
-			opr.ShouldBlock = false && ft.Not(opr.TTY)
-		case "emacs":
-			opr.ShouldBlock = false
-		case "ssh":
-			opr.ShouldBlock = true
-		case "alacritty", "urxvt", "xterm", "Terminal.app":
-			opr.ShouldBlock = true
+		if !opr.ShouldBlock {
+			switch opr.ParentName {
+			case "zsh", "bash", "fish", "sh", "nu":
+				opr.ShouldBlock = false && ft.Not(opr.TTY)
+			case "emacs":
+				opr.ShouldBlock = false
+			case "ssh":
+				opr.ShouldBlock = true
+			case "alacritty", "urxvt", "xterm", "Terminal.app":
+				opr.ShouldBlock = true
+			}
 		}
-
 		grip.Debug(message.Fields{
 			"ppid":   opr.ParentPID,
 			"block":  opr.ShouldBlock,
@@ -114,11 +114,7 @@ func operationRuntime(ctx context.Context) (context.Context, OperationRuntimeInf
 			"tty":    opr.TTY,
 		})
 	}
-
-	var cancel context.CancelFunc
-	ctx, cancel = signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGINT)
-	srv.AddCleanup(ctx, fun.MakeOperation(cancel).Worker())
-	return ctx, opr
+	return opr
 }
 
 func fuzzy() *cmdr.Commander {
@@ -139,7 +135,7 @@ func fuzzy() *cmdr.Commander {
 				return err
 			}
 
-			ctx, opr := operationRuntime(ctx)
+			opr := operationRuntime(ctx)
 			for {
 				stage, err := WriteCommandList(ctx, &args.conf.Operations, op)
 				switch {

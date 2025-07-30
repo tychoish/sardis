@@ -100,7 +100,7 @@ func operationRuntime(ctx context.Context) (context.Context, OperationRuntimeInf
 		case "emacs":
 			opr.ShouldBlock = false
 		case "ssh":
-			opr.ShouldBlock = opr.TTY
+			opr.ShouldBlock = true
 		case "alacritty", "urxvt", "xterm", "Terminal.app":
 			opr.ShouldBlock = true
 		}

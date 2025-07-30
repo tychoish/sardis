@@ -71,8 +71,9 @@ func operationRuntime(ctx context.Context) (context.Context, OperationRuntimeInf
 	opr := OperationRuntimeInfo{}
 
 	opr.ParentPID = int32(os.Getppid())
+
 	parentProc, err := process.NewProcessWithContext(ctx, opr.ParentPID)
-	opr.TTY = isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd())
+	opr.TTY = os.Getenv("SARDIS_CMDS_BLOCKING") != "" || (isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd()))
 	if err != nil {
 		grip.Warning(message.Fields{
 			"error": err,

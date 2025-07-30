@@ -24,6 +24,7 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/subexec"
+	"github.com/tychoish/sardis/util"
 )
 
 func SearchMenu() *cmdr.Commander {
@@ -129,7 +130,7 @@ func fuzzy() *cmdr.Commander {
 			op := args.arg
 			var selected string
 			ff, err := fzf.New(
-				fzf.WithPrompt("sardis ==> "),
+				fzf.WithPrompt(fmt.Sprintf("%s.%s ==> ", util.GetHostname(), sardis.ApplicationName)),
 				fzf.WithNoLimit(true),
 				fzf.WithCaseSensitive(false),
 			)

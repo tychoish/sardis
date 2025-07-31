@@ -24,13 +24,17 @@ func (Utilities) CommandToWorker(_ context.Context, c Command) (fun.Worker, erro
 	return c.Worker(), nil
 }
 
+func (Utilities) WorkerHandler() fun.Handler[fun.Worker] {
+	return func(ctx context.Context, wf fun.Worker) error { return wf.Run(ctx) }
+}
+
 func (Utilities) CommandPool(st *fun.Stream[Command]) fun.Worker {
 	return TOOLS.WorkerPool(TOOLS.Converter().Stream(st))
 }
 
 func (Utilities) WorkerPool(st *fun.Stream[fun.Worker]) fun.Worker {
 	return st.Parallel(
-		func(ctx context.Context, wf fun.Worker) error { return wf.Run(ctx) },
+		TOOLS.WorkerHandler(),
 		fun.WorkerGroupConfContinueOnError(),
 		fun.WorkerGroupConfWorkerPerCPU(),
 	)

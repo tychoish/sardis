@@ -3,11 +3,17 @@ package operations
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 
+	"github.com/mattn/go-isatty"
+	"github.com/shirou/gopsutil/process"
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
 )
 
@@ -108,4 +114,65 @@ func addOpCommand[T cmdr.FlagTypes](
 
 			return arg, nil
 		}, op)
+}
+
+type OperationRuntimeInfo struct {
+	ShouldBlock bool
+	TTY         bool
+	ParentPID   int32
+	ParentName  string
+}
+
+func GetOperationRuntime(ctx context.Context) OperationRuntimeInfo {
+	opr := OperationRuntimeInfo{}
+
+	opr.ParentPID = int32(os.Getppid())
+	opr.ShouldBlock = os.Getenv("SARDIS_CMDS_BLOCKING") != ""
+	opr.TTY = isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd())
+
+	parentProc, err := process.NewProcessWithContext(ctx, opr.ParentPID)
+	if err != nil {
+		grip.Warning(message.Fields{
+			"error": err,
+			"ppid":  opr.ParentPID,
+			"msg":   "falling back to is-a-tty",
+			"stage": "gopsuti.NewProcess",
+			"tty":   opr.TTY,
+		})
+		if !opr.ShouldBlock {
+			opr.ShouldBlock = opr.TTY
+		}
+	} else if err == nil {
+		opr.ParentName, err = parentProc.NameWithContext(ctx)
+		if err != nil {
+			grip.Warning(message.Fields{
+				"error": err,
+				"ppid":  opr.ParentPID,
+				"msg":   "falling back to is-a-tty",
+				"stage": "gopsuti.Process.Name",
+				"tty":   opr.TTY,
+			})
+		}
+
+		if !opr.ShouldBlock {
+			switch opr.ParentName {
+			case "zsh", "bash", "fish", "sh", "nu":
+				opr.ShouldBlock = false && ft.Not(opr.TTY)
+			case "emacs":
+				opr.ShouldBlock = false
+			case "ssh":
+				opr.ShouldBlock = true
+			case "alacritty", "urxvt", "xterm", "Terminal.app":
+				opr.ShouldBlock = true
+			}
+		}
+		grip.Debug(message.Fields{
+			"ppid":   opr.ParentPID,
+			"block":  opr.ShouldBlock,
+			"parent": opr.ParentName,
+			"stage":  "passed",
+			"tty":    opr.TTY,
+		})
+	}
+	return opr
 }

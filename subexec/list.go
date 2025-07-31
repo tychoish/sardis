@@ -1,8 +1,8 @@
 package subexec
 
 import (
-	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/tychoish/fun/dt"
@@ -10,8 +10,8 @@ import (
 
 type CommandListStage struct {
 	NextLabel  string
-	Prefix     string
 	Selections []string
+	Prefixed   []string
 	Commands   []Command
 }
 
@@ -26,43 +26,47 @@ func (cls CommandListStage) CommandNames() []string {
 	return out
 }
 
-func WriteCommandList(ctx context.Context, conf *Configuration, args []string) (*CommandListStage, error) {
-	var options []string
+func WriteCommandList(conf *Configuration, args []string) (*CommandListStage, error) {
+	output := CommandListStage{
+		NextLabel: "sardis", // default
+	}
 
 	switch len(args) {
 	case 0:
 		cmds := conf.ExportAllCommands()
-		options = make([]string, 0, len(cmds))
 		cmds.ReadAll(func(c Command) {
-			options = append(options, c.NamePrime())
+			output.Selections = append(output.Selections, c.NamePrime())
 		})
-		return &CommandListStage{NextLabel: "sardis", Selections: options}, nil
+		return &output, nil
 	case 1:
 		selection := args[0]
 		switch selection {
 		case "all", "a":
-			return WriteCommandList(ctx, conf, nil)
+			return WriteCommandList(conf, nil)
 		case "groups", "group", "g":
-			conf.ExportCommandGroups().Keys().ReadAll(func(name string) {
-				options = append(options, name)
-			}).Ignore().Run(ctx)
-			return &CommandListStage{NextLabel: "groups", Selections: options}, nil
+			output.Selections = slices.Collect(maps.Keys(conf.ExportCommandGroups()))
+			output.NextLabel = "groups"
+			return &output, nil
 		default:
 			groupMap := conf.ExportCommandGroups()
 
 			if gr, ok := groupMap[selection]; ok {
-				gr.Commands.ReadAll(func(c Command) {
-					options = append(options, c.NamePrime())
-				})
-				return &CommandListStage{NextLabel: selection, Selections: options, Prefix: selection}, nil
-			}
+				output.NextLabel = selection
 
-			cmds, err := FilterCommands(conf.ExportAllCommands(), args)
-			if err != nil {
+				gr.Commands.ReadAll(func(c Command) {
+					np := c.NamePrime()
+					output.Selections = append(output.Selections, np)
+					output.Prefixed = append(output.Prefixed, dotJoin(selection, np))
+				})
+
+				return &output, nil
+			}
+			var err error
+			if output.Commands, err = FilterCommands(conf.ExportAllCommands(), args); err != nil {
 				return nil, err
 			}
 
-			return &CommandListStage{Commands: cmds}, nil
+			return &output, nil
 		}
 	default:
 		switch args[0] {
@@ -86,12 +90,13 @@ func WriteCommandList(ctx context.Context, conf *Configuration, args []string) (
 				return nil, fmt.Errorf("ambiguous operation, cannot mix groups %s and commands %s", groups, missing)
 			case len(groups) > 0:
 				ops := dt.NewSetFromSlice(args)
-				if err := groupMap.Keys().Filter(ops.Check).ReadAll(func(name string) {
-					options = append(options, name)
-				}).Run(ctx); err != nil {
-					return nil, err
+				if ops.Len() != len(args) {
+					return nil, fmt.Errorf("invalid list of groups %d vs %d %s", ops.Len(), len(args), args)
 				}
-				return &CommandListStage{NextLabel: "groups", Selections: options}, nil
+
+				output.Selections = slices.Collect(slices.Values(args))
+				output.NextLabel = "groups"
+				return &output, nil
 			case len(missing) > 0:
 				cmds, err := FilterCommands(conf.ExportAllCommands(), args)
 				if err != nil {

@@ -1,25 +1,55 @@
 package operations
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 
+	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/grip"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis/tools/dupe"
 	"github.com/tychoish/sardis/tools/munger"
 )
 
+type bufCloser struct{ bytes.Buffer }
+
+func (b bufCloser) Close() error { return nil }
+
+func qrCode() *cmdr.Commander {
+	return cmdr.MakeCommander().
+		SetName("qr").
+		SetUsage("gets qrcode from x11 clipboard and renders it on the terminal").
+		SetAction(func(ctx context.Context, _ *cli.Context) error {
+			buf := &bufCloser{}
+
+			err := jasper.Context(ctx).CreateCommand(ctx).
+				AppendArgs("xsel", "--clipboard", "--output").SetOutputWriter(buf).
+				Run(ctx)
+			if err != nil {
+				return fmt.Errorf("problem getting clipboard: %w", err)
+			}
+
+			grip.Info(buf.String())
+			qrcodeTerminal.New().Get(buf.String()).Print()
+
+			return nil
+		})
+}
+
 func Utilities() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("utility").
+		Aliases("util").
 		SetUsage("short utility commands").
 		Subcommanders(
 			diffTrees(),
 			blogConvert(),
+			qrCode(),
 		)
 }
 

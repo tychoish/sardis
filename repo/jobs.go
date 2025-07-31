@@ -183,7 +183,7 @@ func (conf *GitRepository) CloneJob() fun.Worker {
 func (conf *GitRepository) UpdateJob() fun.Worker {
 	const opName = "repo-update"
 	count := &atomic.Int64{}
-	return func(ctx context.Context) error {
+	return func(ctx context.Context) (err error) {
 		wg := &fun.WaitGroup{}
 		ec := &erc.Collector{}
 
@@ -194,7 +194,7 @@ func (conf *GitRepository) UpdateJob() fun.Worker {
 
 		id := fmt.Sprintf("%s[%d]", strings.ToLower(string(rand.Text()[:8])), count.Add(1))
 
-		if err := conf.Validate(); err != nil {
+		if err = conf.Validate(); err != nil {
 			return ers.Wrap(err, id)
 		}
 
@@ -207,14 +207,21 @@ func (conf *GitRepository) UpdateJob() fun.Worker {
 		)
 
 		defer func() {
-			grip.Info(message.BuildPair().
+			msg := message.BuildPair().
 				Pair("op", opName).
 				Pair("state", "COMPLETED").
 				Pair("id", id).
 				Pair("dur", time.Since(startAt)).
+				Pair("err", err != nil).
 				Pair("path", conf.Path).
-				Pair("operator", host),
-			)
+				Pair("operator", host)
+
+			if err != nil {
+				msg.Pair("error", err)
+				grip.Critical(msg)
+			} else {
+				grip.Info(msg)
+			}
 		}()
 
 		for _, mirror := range conf.Mirrors {

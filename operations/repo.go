@@ -6,21 +6,18 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
+	"sync/atomic"
 
 	"github.com/cheynewallace/tabby"
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
-	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/repo"
 	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/util"
@@ -88,58 +85,21 @@ func repoUpdate() *cmdr.Commander {
 			SetName("update").
 			Aliases("sync"),
 		"repo", func(ctx context.Context, args *withConf[[]string]) error {
-			started := time.Now()
+			ct := &atomic.Int64{}
 
-			repos := args.conf.Repos.FindAll(args.arg...)
-			if len(repos) == 0 {
-				return fmt.Errorf("no tagged repository named '%v' configured", args.arg)
-			}
+			repos := args.conf.Repos.FindAll(args.arg...).Stream()
 
-			shouldNotify := false
-			repoNames := make([]string, 0, len(args.arg))
-			filterd := repos.Stream().Filter(func(conf repo.GitRepository) bool {
-				shouldNotify = shouldNotify || conf.Disabled && conf.Notify
-				if ft.Not(conf.Disabled) {
-					repoNames = append(repoNames, conf.Name)
-					return true
-				}
-				return false
-			})
+			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { ct.Add(1); return rc.UpdateJob() }).Stream(repos)
 
-			var err error
-			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.UpdateJob() }).Stream(filterd)
-
-			grip.Info(message.BuildPair().
-				Pair("op", opName).
-				Pair("state", "STARTED").
-				Pair("ops", args.arg).
-				Pair("host", args.conf.Settings.Runtime.Hostname),
-			)
-			defer func() {
-				// QUESTION: should we send notification here
-				grip.Notice(message.BuildPair().
-					Pair("op", opName).
-					Pair("err", ers.IsError(err)).
-					Pair("state", "COMPLETED").
-					Pair("host", args.conf.Settings.Runtime.Hostname).
-					Pair("args", args.arg).
-					Pair("repos", repoNames).
-					Pair("dur", time.Since(started)),
-				)
-			}()
-
-			err = subexec.TOOLS.WorkerPool(jobs).Run(ctx)
-			if err != nil {
-				sardis.RemoteNotify(ctx).NoticeWhen(shouldNotify, message.Fields{
-					"arg":   args.arg,
-					"repos": repoNames,
-					"op":    opName,
-					"dur":   time.Since(started).Seconds(),
-				})
+			err := subexec.TOOLS.WorkerPool(jobs).Run(ctx)
+			switch {
+			case ct.Load() == 0:
+				return fmt.Errorf("no repositories for %s", args.arg)
+			case err != nil:
 				return err
+			default:
+				return nil
 			}
-
-			return nil
 		},
 	)
 }
@@ -153,9 +113,19 @@ func repoCleanup() *cmdr.Commander {
 		"repo", func(ctx context.Context, args *withConf[[]string]) error {
 			repos := args.conf.Repos.FindAll(args.arg...).Stream()
 
-			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.CleanupJob() }).Stream(repos)
+			ct := &atomic.Int64{}
 
-			return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
+			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { ct.Add(1); return rc.CleanupJob() }).Stream(repos)
+
+			err := subexec.TOOLS.WorkerPool(jobs).Run(ctx)
+			switch {
+			case ct.Load() == 0:
+				return fmt.Errorf("no repositories for %s", args.arg)
+			case err != nil:
+				return err
+			default:
+				return nil
+			}
 		},
 	)
 }
@@ -199,6 +169,55 @@ func fallbackTo[T comparable](first T, args ...T) (out T) {
 	return out
 }
 
+func repoStatus() *cmdr.Commander {
+	return addOpCommand(
+		cmdr.MakeCommander().
+			SetName("status").
+			SetUsage("report on the status of repos"),
+		"repo", func(ctx context.Context, args *withConf[[]string]) error {
+			repos := args.conf.Repos.FindAll(args.arg...).Stream()
+
+			ct := &atomic.Int64{}
+
+			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { ct.Add(1); return rc.StatusJob() }).Stream(repos)
+
+			err := subexec.TOOLS.WorkerPool(jobs).Run(ctx)
+			switch {
+			case ct.Load() == 0:
+				return fmt.Errorf("no repositories for %s", args.arg)
+			case err != nil:
+				return err
+			default:
+				return nil
+			}
+		},
+	)
+}
+
+func repoFetch() *cmdr.Commander {
+	return addOpCommand(
+		cmdr.MakeCommander().
+			SetName("fetch").
+			SetUsage("fetch one or more repos"),
+		"repo", func(ctx context.Context, args *withConf[[]string]) error {
+			repos := args.conf.Repos.FindAll(args.arg...).Stream().
+				Filter(func(repo repo.GitRepository) bool { return repo.Fetch })
+
+			ct := &atomic.Int64{}
+			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { ct.Add(1); return rc.FetchJob() }).Stream(repos)
+
+			err := subexec.TOOLS.WorkerPool(jobs).Run(ctx)
+			switch {
+			case ct.Load() == 0:
+				return fmt.Errorf("no repositories for %s", args.arg)
+			case err != nil:
+				return err
+			default:
+				return nil
+			}
+		})
+}
+
 func repoGithubClone() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("gh-clone").Aliases("gh", "ghc").
@@ -233,46 +252,5 @@ func repoGithubClone() *cmdr.Commander {
 				Directory(cc.String("path")).
 				SetCombinedSender(level.Debug, grip.Sender()).
 				AppendArgs("git", "clone", repoPath).Run(ctx)
-		})
-}
-
-func repoStatus() *cmdr.Commander {
-	return addOpCommand(
-		cmdr.MakeCommander().
-			SetName("status").
-			SetUsage("report on the status of repos"),
-		"repo", func(ctx context.Context, args *withConf[[]string]) error {
-			ec := &erc.Collector{}
-
-			repos := args.conf.Repos.FindAll(args.arg...).Stream()
-
-			fun.MakeConverter(
-				func(rc repo.GitRepository) fun.Operation {
-					grip.Info(rc.Name)
-					return rc.StatusJob().Operation(ec.Push)
-				},
-			).Stream(repos).ReadAll(func(op fun.Operation) { op.Run(ctx) }).Operation(ec.Push).Run(ctx)
-
-			return ec.Resolve()
-		},
-	)
-}
-
-func repoFetch() *cmdr.Commander {
-	return addOpCommand(
-		cmdr.MakeCommander().
-			SetName("fetch").
-			SetUsage("fetch one or more repos"),
-		"repo", func(ctx context.Context, args *withConf[[]string]) error {
-			repos := args.conf.Repos.
-				FindAll(args.arg...).
-				Stream().
-				Filter(func(repo repo.GitRepository) bool {
-					return repo.Fetch
-				})
-
-			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.FetchJob() }).Stream(repos)
-
-			return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 		})
 }

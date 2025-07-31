@@ -1,7 +1,9 @@
 package subexec
 
 import (
+	"context"
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -26,7 +28,7 @@ type Group struct {
 	Notify         *bool                  `bson:"notify" json:"notify" yaml:"notify"`
 	Background     *bool                  `bson:"background" json:"background" yaml:"background"`
 	Host           *string                `bson:"host" json:"host" yaml:"host"`
-	Commands       dt.Slice[Command]           `bson:"commands" json:"commands" yaml:"commands"`
+	Commands       dt.Slice[Command]      `bson:"commands" json:"commands" yaml:"commands"`
 	MenuSelections []string               `bson:"menu" json:"menu" yaml:"menu"`
 	SortHint       int                    `bson:"sort_hint" json:"sort_hint" yaml:"sort_hint"`
 	Synthetic      bool                   `bson:"-" json:"-" yaml:"-"`
@@ -35,7 +37,6 @@ type Group struct {
 func dotJoin(elems ...string) string       { return dotJoinParts(elems) }
 func dotJoinParts(elems []string) string   { return strings.Join(removeZeros(elems), ".") }
 func dotSplit(in string) []string          { return strings.Split(in, ".") }
-func dotSplitN(in string, n int) []string  { return strings.SplitN(in, ".", n) } // nolint:unused
 func removeZeros[T comparable](in []T) []T { return slices.DeleteFunc(in, isZero) }
 func isZero[T comparable](i T) bool        { var z T; return i == z }
 
@@ -201,4 +202,19 @@ func FilterCommands(cmds dt.Slice[Command], args []string) (dt.Slice[Command], e
 	}
 
 	return out, nil
+}
+
+func RunCommands(ctx context.Context, cmds dt.Slice[Command]) error {
+	size := cmds.Len()
+	switch {
+	case size == 1:
+		return ers.Wrapf(ft.Ptr(cmds[0]).Worker().Run(ctx), "running command %q", cmds[0])
+	case size < runtime.NumCPU():
+		return ers.Wrapf(
+			fun.MAKE.WorkerPool(TOOLS.Converter().Stream(cmds.Stream())).Run(ctx),
+			"running small %d batch  of commands %s", size, cmds,
+		)
+	default:
+		return ers.Wrapf(TOOLS.CommandPool(cmds.Stream()).Run(ctx), "running  %d batch of commands %s", size, cmds)
+	}
 }

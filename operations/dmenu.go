@@ -10,6 +10,7 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/godmenu"
 )
 
@@ -23,7 +24,7 @@ func DMenu() *cmdr.Commander {
 			var selected string
 
 			for {
-				stage, err := WriteCommandList(ctx, &args.conf.Operations, op)
+				stage, err := subexec.WriteCommandList(ctx, &args.conf.Operations, op)
 				switch {
 				case err != nil:
 					return err

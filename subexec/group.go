@@ -1,6 +1,7 @@
 package subexec
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -25,7 +26,7 @@ type Group struct {
 	Notify         *bool                  `bson:"notify" json:"notify" yaml:"notify"`
 	Background     *bool                  `bson:"background" json:"background" yaml:"background"`
 	Host           *string                `bson:"host" json:"host" yaml:"host"`
-	Commands       dt.Slice[Command]      `bson:"commands" json:"commands" yaml:"commands"`
+	Commands       dt.Slice[Command]           `bson:"commands" json:"commands" yaml:"commands"`
 	MenuSelections []string               `bson:"menu" json:"menu" yaml:"menu"`
 	SortHint       int                    `bson:"sort_hint" json:"sort_hint" yaml:"sort_hint"`
 	Synthetic      bool                   `bson:"-" json:"-" yaml:"-"`
@@ -170,4 +171,34 @@ func (cg *Group) doMerge(rhv Group) bool {
 	cg.SortHint = intish.AbsMax(cg.SortHint, rhv.SortHint)
 
 	return true
+}
+
+func FilterCommands(cmds dt.Slice[Command], args []string) (dt.Slice[Command], error) {
+	ops := dt.NewSetFromSlice(args)
+	switch {
+	case len(cmds) == 0:
+		return nil, ers.New("cannot resolve commands without input commands")
+	case len(args) == 0:
+		return nil, ers.New("must specify one or more commands to resolve")
+	case ops.Len() != len(args):
+		return nil, fmt.Errorf("ambiguous input with %d duplicate items %s", ops.Len()-len(args), args)
+	}
+
+	seen := dt.Set[string]{}
+	seen.Order()
+
+	out := cmds.Filter(func(cmd Command) bool {
+		name := cmd.NamePrime()
+		return ops.Check(name) && !seen.AddCheck(name)
+	})
+
+	// if we didn't find all that we were looking for?
+	if ops.Len() != len(out) {
+		return nil, fmt.Errorf("found %d [%s] ops, of %d [%s] arguments",
+			len(out), strings.Join(fun.NewGenerator(seen.Stream().Slice).Force().Resolve(), ", "),
+			ops.Len(), strings.Join(fun.NewGenerator(ops.Stream().Slice).Force().Resolve(), ", "),
+		)
+	}
+
+	return out, nil
 }

@@ -23,7 +23,7 @@ type Configuration struct {
 
 	caches struct {
 		commandGroups       adt.Once[map[string]Group]
-		allCommdands        adt.Once[[]Command]
+		allCommdands        adt.Once[dt.Slice[Command]]
 		comandGroupNames    adt.Once[[]string]
 		validation          adt.Once[error]
 		sshAgentPath        adt.Once[string]
@@ -183,7 +183,7 @@ func (conf *Configuration) ExportAllCommands() dt.Slice[Command] {
 	return conf.caches.allCommdands.Call(conf.doExportAllCommands)
 }
 
-func (conf *Configuration) doExportAllCommands() []Command {
+func (conf *Configuration) doExportAllCommands() dt.Slice[Command] {
 	out := dt.NewSlice([]Command{})
 	host := util.GetHostname()
 

@@ -37,7 +37,7 @@ func blogPublish() *cmdr.Commander {
 				return errors.New("no blog configured")
 			}
 
-			blog := conf.Projects.ByName(name)
+			blog := conf.Repos.ProjectsByName(name)
 			if blog == nil {
 				return fmt.Errorf("blog %q is not defined", name)
 			}

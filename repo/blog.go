@@ -8,11 +8,6 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-// These are things that are deployable, previously (and stiil... used for blogs.)
-type ProjectConfiguration struct {
-	Projects []Project `bson:"projects" json:"projects" yaml:"projects"`
-}
-
 type Project struct {
 	Name           string   `bson:"name" json:"name" yaml:"name"`
 	Type           string   `bson:"type" json:"type" yaml:"type"`
@@ -22,7 +17,7 @@ type Project struct {
 	DeployCommands []string `bson:"deploy_commands" json:"deploy_commands" yaml:"deploy_commands"`
 }
 
-func (conf *ProjectConfiguration) Validate() error {
+func (conf *Configuration) projectsValidate() error {
 	set := &dt.Set[string]{}
 	ec := &erc.Collector{}
 
@@ -47,7 +42,7 @@ func (conf *ProjectConfiguration) Validate() error {
 	return ec.Resolve()
 }
 
-func (conf *ProjectConfiguration) ByName(name string) *Project {
+func (conf *Configuration) ProjectsByName(name string) *Project {
 	for idx := range conf.Projects {
 		if conf.Projects[idx].Name == name {
 			return &conf.Projects[idx]

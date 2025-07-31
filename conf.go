@@ -20,18 +20,17 @@ import (
 )
 
 type Configuration struct {
-	Settings   *Settings                 `bson:"settings" json:"settings" yaml:"settings"`
-	Repos      repo.Configuration        `bson:"repositories" json:"repositories" yaml:"repositories"`
-	Operations subexec.Configuration     `bson:"operations" json:"operations" yaml:"operations"`
-	System     SystemConf                `bson:"system" json:"system" yaml:"system"`
-	Network    NetworkConf               `bson:"network" json:"network" yaml:"network"`
-	Projects   repo.ProjectConfiguration `bson:"projects" json:"projects" yaml:"projects"`
+	Settings   *Settings             `bson:"settings" json:"settings" yaml:"settings"`
+	Repos      repo.Configuration    `bson:"repositories" json:"repositories" yaml:"repositories"`
+	Operations subexec.Configuration `bson:"operations" json:"operations" yaml:"operations"`
+	System     SystemConf            `bson:"system" json:"system" yaml:"system"`
+	Network    NetworkConf           `bson:"network" json:"network" yaml:"network"`
 
 	HostsCOMPAT    []HostDefinition         `bson:"hosts,omitempty" json:"hosts,omitempty" yaml:"hosts,omitempty"`
 	BlogCOMPAT     []repo.Project           `bson:"blog,omitempty" json:"blog,omitempty" yaml:"blog,omitempty"`
 	CommandsCOMPAT []subexec.Group          `bson:"commands,omitempty" json:"commands,omitempty" yaml:"commands,omitempty"`
 	RepoCOMPAT     []repo.GitRepository     `bson:"repo,omitempty" json:"repo,omitempty" yaml:"repo,omitempty"`
-	LinksCOMPAT    []sysmgmt.LinkDefinition `bson:"links" json:"links" yaml:"links"`
+	LinksCOMPAT    []sysmgmt.LinkDefinition `bson:"links,omitempty" json:"links,omitempty" yaml:"links,omitempty"`
 
 	linkedFilesRead bool
 	originalPath    string
@@ -154,7 +153,6 @@ func (conf *Configuration) doValidate() error {
 	ec.Push(conf.System.Links.Validate())
 	ec.Push(conf.Repos.Validate())
 	ec.Push(conf.Operations.Validate())
-	ec.Push(conf.Projects.Validate())
 
 	return ec.Resolve()
 }
@@ -216,7 +214,7 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) error {
 
 		conf.Operations.Commands = append(conf.Operations.Commands, mcf.Operations.Commands...)
 		conf.Repos.GitRepos = append(conf.Repos.GitRepos, mcf.Repos.GitRepos...)
-		conf.Projects.Projects = append(conf.Projects.Projects, mcf.Projects.Projects...)
+		conf.Repos.Projects = append(conf.Repos.Projects, mcf.Repos.Projects...)
 		conf.Network.Hosts = append(conf.Network.Hosts, mcf.Network.Hosts...)
 
 		conf.System.Arch.AurPackages = append(conf.System.Arch.AurPackages, mcf.System.Arch.AurPackages...)
@@ -233,7 +231,7 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) error {
 		conf.BlogCOMPAT[idx].Type = "blog"
 	}
 
-	conf.Projects.Projects = append(conf.Projects.Projects, conf.BlogCOMPAT...)
+	conf.Repos.Projects = append(conf.Repos.Projects, conf.BlogCOMPAT...)
 	conf.BlogCOMPAT = nil
 
 	conf.System.SystemD.Services = append(conf.System.SystemD.Services, conf.System.ServicesLEGACY...)

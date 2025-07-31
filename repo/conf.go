@@ -11,6 +11,7 @@ import (
 
 type Configuration struct {
 	GitRepos dt.Slice[GitRepository] `bson:"git" json:"git" yaml:"git"`
+	Projects []Project               `bson:"projects" json:"projects" yaml:"projects"`
 
 	lookupProcessed bool
 	caches          struct {
@@ -23,6 +24,7 @@ type Configuration struct {
 func (conf *Configuration) Validate() error { return conf.caches.validation.Call(conf.doValidate) }
 func (conf *Configuration) doValidate() error {
 	ec := &erc.Collector{}
+	ec.Push(conf.projectsValidate())
 	for idx := range conf.GitRepos {
 		repo := &conf.GitRepos[idx]
 		ec.Wrapf(repo.Validate(), "%d/%d of %T is not valid", idx, len(conf.GitRepos), conf.GitRepos[idx])

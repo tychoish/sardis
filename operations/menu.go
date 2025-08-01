@@ -49,8 +49,9 @@ func SearchMenu() *cmdr.Commander {
 		SetUsage("list or run a command").
 		Aliases("c", "m", "cmds").
 		Subcommanders(
-			listCommands(),
 			fuzzy(),
+			searchCommand(),
+			listCommands(),
 		),
 		"name", func(ctx context.Context, args *withConf[[]string]) error {
 			stage, err := args.conf.Operations.ResolveCommands(args.arg)
@@ -77,52 +78,55 @@ func SearchMenu() *cmdr.Commander {
 	)
 }
 
-func DMenu() *cmdr.Commander {
+func searchCommand() *cmdr.Commander {
 	return addOpCommand(cmdr.MakeCommander().
-		SetName("dmenu").
-		SetUsage("unless running a subcommand, launches a menu for specific group specific group, or attmepts to run a command directly.").
+		SetName("search").
+		SetUsage("list or run a command").
+		Aliases("s", "find", "f").
 		Subcommanders(
 			listCommands(),
+			fuzzy(),
 		),
-		commandFlagName, func(ctx context.Context, args *withConf[[]string]) error {
-			op := args.arg
-			var selected string
+		"name", func(ctx context.Context, args *withConf[string]) error {
+			searchTree := args.conf.Operations.Tree().Find(args.arg)
 
-			for {
-				stage, err := args.conf.Operations.ResolveCommands(op)
-				switch {
-				case err != nil:
-					return err
-				case stage.Commands != nil:
-					return subexec.RunCommands(ctx, stage.Commands)
-				case stage.Selections != nil:
-					selected, err = godmenu.Run(ctx,
-						godmenu.SetSelections(stage.Selections),
-						godmenu.WithFlags(ft.Ptr(args.conf.Settings.DMenuFlags)),
-						godmenu.Prompt(fmt.Sprintf("%s ==>>", ft.Default(stage.NextLabel, "sardis"))),
-						godmenu.MenuLines(min(len(stage.Selections), 16)),
+			var options []string
+			switch {
+			case searchTree == nil:
+				return fmt.Errorf("no command found named %q", args.arg)
+			case searchTree.HasCommand() && searchTree.HasChidren():
+				cmd := searchTree.Command()
+				options = searchTree.KeysAtLevel()
+
+				// hopefully logging for this all goes to standard err and not stdout 😬
+				if err := subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{cmd})); err != nil {
+					return fmt.Errorf("problem running command %s, %w; missed running children %s",
+						cmd.Name, err, strings.Join(options, ", "),
 					)
-
-					switch {
-					case err != nil && ers.Is(err, godmenu.ErrSelectionMissing):
-						return nil
-					case err != nil:
-						return err
-					default:
-						op = []string{util.DotJoin(stage.Prefix, selected)}
-					}
-				default:
-					return ers.Error("unexpect outcome")
 				}
+			case searchTree.HasCommand():
+				return subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()}))
+			case searchTree.HasChidren():
+				options = searchTree.KeysAtLevel()
+			default:
+				return ers.Error("unexpect outcome")
 			}
-		})
+
+			buf := bufio.NewWriter(os.Stdout)
+			for op := range options {
+				ft.Ignore(ft.Must(fmt.Fprintln(buf, op)))
+			}
+
+			return buf.Flush()
+		},
+	)
 }
 
 func fuzzy() *cmdr.Commander {
 	return addOpCommand(
 		cmdr.MakeCommander().
 			SetName("fuzzy").
-			Aliases("fuzz", "fzf", "f", "ff"),
+			Aliases("fuzz", "fzf", "fz", "ff"),
 		"name",
 		func(ctx context.Context, args *withConf[[]string]) error {
 			op := args.arg
@@ -171,6 +175,107 @@ func fuzzy() *cmdr.Commander {
 				default:
 					// this should be impossible
 					return ers.Error("unexpect outcome")
+				}
+			}
+		})
+}
+
+func DMenu() *cmdr.Commander {
+	return addOpCommand(cmdr.MakeCommander().
+		SetName("dmenu").
+		Aliases("d", "menu").
+		SetUsage("unless running a subcommand, launches a menu for specific group specific group, or attmepts to run a command directly.").
+		Subcommanders(
+			dmenuSearch(),
+			listCommands(),
+		),
+		commandFlagName, func(ctx context.Context, args *withConf[[]string]) error {
+			op := args.arg
+			var selected string
+
+			for {
+				stage, err := args.conf.Operations.ResolveCommands(op)
+				switch {
+				case err != nil:
+					return err
+				case stage.Commands != nil:
+					return subexec.RunCommands(ctx, stage.Commands)
+				case stage.Selections != nil:
+					selected, err = godmenu.Run(ctx,
+						godmenu.SetSelections(stage.Selections),
+						godmenu.WithFlags(ft.Ptr(args.conf.Settings.DMenuFlags)),
+						godmenu.Prompt(fmt.Sprintf("%s ==>>", ft.Default(stage.NextLabel, "sardis"))),
+						godmenu.MenuLines(min(len(stage.Selections), 16)),
+					)
+
+					switch {
+					case err != nil && ers.Is(err, godmenu.ErrSelectionMissing):
+						return nil
+					case err != nil:
+						return err
+					default:
+						op = []string{util.DotJoin(stage.Prefix, selected)}
+					}
+				default:
+					return ers.Error("unexpect outcome")
+				}
+			}
+		})
+}
+
+func dmenuSearch() *cmdr.Commander {
+	return addOpCommand(
+		cmdr.MakeCommander().
+			SetName("search").
+			Aliases("find"),
+		"name",
+		func(ctx context.Context, args *withConf[string]) error {
+			path := new(dt.List[string])
+
+			searchTree := args.conf.Operations.Tree()
+			if args.arg != "" {
+				path.PushBack(args.arg)
+				searchTree = searchTree.NarrowTo(args.arg)
+			}
+
+			prompt := "sardis.root"
+			for {
+				var options []string
+				switch {
+				case searchTree == nil:
+					return fmt.Errorf("no command found named %s []", util.DotJoin(path.Slice()...))
+				case searchTree.HasCommand() && searchTree.HasChidren():
+					if path.Len() > 0 && searchTree.ID() == path.Back().Value() {
+						return subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()}))
+					}
+				case searchTree.HasCommand():
+					return subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()}))
+				case !searchTree.HasChidren():
+					return fmt.Errorf("no further selections at %s", util.DotJoin(path.Slice()...))
+				default:
+					return ers.Error("unexpect outcome")
+				}
+
+				if path.Len() > 0 {
+					prompt = path.Back().Value()
+				}
+
+				selected, err := godmenu.Run(ctx,
+					godmenu.Sorted(),
+					godmenu.SetSelections(searchTree.KeysAtLevel()),
+					godmenu.WithFlags(ft.Ptr(args.conf.Settings.DMenuFlags)),
+					godmenu.Prompt(fmt.Sprintf("%s =>>", prompt)),
+					godmenu.MenuLines(min(len(options), 16)),
+				)
+
+				switch {
+				case err != nil && ers.Is(err, godmenu.ErrSelectionMissing):
+					return nil
+				case err != nil:
+					return err
+				default:
+					path.PushBack(selected)
+					searchTree = searchTree.NarrowTo(selected)
 				}
 			}
 		})
@@ -279,7 +384,7 @@ func listCommandsWithInfo() *cmdr.Commander {
 							table.AddLine(
 								cmd.Name,                               // name
 								chunk,                                  // command
-								util.TryCollapseHomeDir(cmd.Directory), // dir
+								util.TryCollapseHomeDir(cmd.Directory), //  dir
 							)
 						} else {
 							table.AddLine(

@@ -3,6 +3,7 @@ package util
 import (
 	"slices"
 	"strings"
+<<<<<<< Updated upstream
 
 	"github.com/tychoish/fun/ft"
 )
@@ -41,3 +42,12 @@ func JoinOr[T any](pfn ...func(T) bool) func(T) bool {
 		return false
 	}
 }
+=======
+)
+
+func DotJoin(elems ...string) string       { return DotJoinParts(elems) }
+func DotJoinParts(elems []string) string   { return strings.Join(RemoveZeros(elems), ".") }
+func DotSplit(in string) []string          { return strings.Split(in, ".") }
+func RemoveZeros[T comparable](in []T) []T { return slices.DeleteFunc(in, isZero) }
+func isZero[T comparable](i T) bool        { var z T; return i == z }
+>>>>>>> Stashed changes

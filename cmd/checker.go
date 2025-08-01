@@ -2,7 +2,41 @@ package main
 
 import (
 	"fmt"
-	"os"
+
+	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/sardis/util"
 )
 
-func main() { fmt.Println(os.Hostname()) }
+type ListNS[T any] struct{ dt.Slice[T] }
+
+func NewList[T any](items ...T) *ListNS[T] {
+	return &ListNS[T]{dt.NewSlice(items)}
+}
+
+func (ls ListNS[T]) Len() int { return ls.Slice.Len() }
+
+func main() {
+	fmt.Println(len(util.DotSplit("")))
+	fmt.Println(len(util.DotSplit("..")))
+	fmt.Println(len(util.DotSplit("  ")))
+	fmt.Println((util.DotSplit("")))
+	fmt.Println((util.DotSplit("..")))
+	fmt.Println((util.DotSplit("  ")))
+	fmt.Println(util.MakeSparse(util.DotSplit("")))
+	fmt.Println(util.MakeSparse(util.DotSplit("..")))
+	fmt.Println(util.MakeSparse(util.DotSplit("  ")))
+
+	l := NewList("one", "two", "three")
+	l.Add("four")
+	fmt.Println(l, l.Len())
+	alter(l)
+	l.Add("seven")
+	fmt.Println(l, l.Len())
+}
+
+func alter(ls *ListNS[string]) {
+	fmt.Println("alter -->")
+	ls.Add("seven")
+	fmt.Println(ls, ls.Len())
+	fmt.Println("<-- alter")
+}

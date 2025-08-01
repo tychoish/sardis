@@ -6,13 +6,28 @@ import (
 	"slices"
 
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/sardis/util"
 )
 
 type CommandListStage struct {
-	NextLabel  string
 	Selections []string
 	Prefixed   []string
 	Commands   []Command
+	Prefix     string
+	NextLabel  string
+}
+
+func (cls *CommandListStage) SelectionAt(idx int) string { return cls.Selections[idx] }
+func (cls *CommandListStage) Resolve(idxs []int) []string {
+	out := make([]string, 0, len(idxs))
+	for _, v := range idxs {
+		if len(cls.Prefixed) != 0 {
+			out = append(out, cls.Prefixed[v])
+		} else {
+			out = append(out, cls.Selections[v])
+		}
+	}
+	return out
 }
 
 func (cls CommandListStage) CommandNames() []string {
@@ -26,7 +41,7 @@ func (cls CommandListStage) CommandNames() []string {
 	return out
 }
 
-func WriteCommandList(conf *Configuration, args []string) (*CommandListStage, error) {
+func (conf *Configuration) ResolveCommands(args []string) (*CommandListStage, error) {
 	output := CommandListStage{
 		NextLabel: "sardis", // default
 	}
@@ -42,7 +57,7 @@ func WriteCommandList(conf *Configuration, args []string) (*CommandListStage, er
 		selection := args[0]
 		switch selection {
 		case "all", "a":
-			return WriteCommandList(conf, nil)
+			return conf.ResolveCommands(nil)
 		case "groups", "group", "g":
 			output.Selections = slices.Collect(maps.Keys(conf.ExportCommandGroups()))
 			output.NextLabel = "groups"
@@ -52,11 +67,12 @@ func WriteCommandList(conf *Configuration, args []string) (*CommandListStage, er
 
 			if gr, ok := groupMap[selection]; ok {
 				output.NextLabel = selection
+				output.Prefix = selection
 
 				gr.Commands.ReadAll(func(c Command) {
 					np := c.NamePrime()
 					output.Selections = append(output.Selections, np)
-					output.Prefixed = append(output.Prefixed, dotJoin(selection, np))
+					output.Prefixed = append(output.Prefixed, util.DotJoin(selection, np))
 				})
 
 				return &output, nil

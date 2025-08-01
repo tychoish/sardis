@@ -91,7 +91,7 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	index := make(map[string]int, len(conf.Commands))
 	haveMerged := false
 	for idx := range conf.Commands {
-		lhn := dotJoin(conf.Commands[idx].Category, conf.Commands[idx].Name)
+		lhn := util.DotJoin(conf.Commands[idx].Category, conf.Commands[idx].Name)
 
 		if _, ok := index[lhn]; !ok {
 			index[lhn] = idx
@@ -195,7 +195,7 @@ func (conf *Configuration) doExportAllCommands() dt.Slice[Command] {
 
 		for cidx := range grp.Commands {
 			cmd := grp.Commands[cidx]
-			cmd.Name = dotJoin(grp.Category, grp.Name, cmd.Name)
+			cmd.Name = util.DotJoin(grp.Category, grp.Name, cmd.Name)
 			out = append(out, cmd)
 		}
 	}
@@ -225,7 +225,7 @@ func (conf *Configuration) doExportCommandGroups() map[string]Group {
 			continue
 		}
 
-		out[dotJoin(group.Category, group.Name)] = group
+		out[util.DotJoin(group.Category, group.Name)] = group
 
 		for _, alias := range group.Aliases {
 			ag := conf.Commands[idx]

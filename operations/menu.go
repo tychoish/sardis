@@ -8,7 +8,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/cheynewallace/tabby"
 	fzf "github.com/koki-develop/go-fzf"
@@ -54,24 +53,21 @@ func SearchMenu() *cmdr.Commander {
 			fuzzy(),
 		),
 		"name", func(ctx context.Context, args *withConf[[]string]) error {
-			stage, err := subexec.WriteCommandList(&args.conf.Operations, args.arg)
-			if err != nil {
-				return err
-			}
-
-			if stage.Commands != nil {
-				return subexec.RunCommands(ctx, stage.Commands)
-			}
-
+			stage, err := args.conf.Operations.ResolveCommands(args.arg)
 			var ops iter.Seq[string]
-			if len(stage.Prefixed) != 0 {
+
+			switch {
+			case err != nil:
+				return err
+			case stage.Commands != nil:
+				return subexec.RunCommands(ctx, stage.Commands)
+			case stage.Prefixed != nil:
 				ops = slices.Values(stage.Prefixed)
-			} else {
+			case stage.Selections != nil:
 				ops = slices.Values(stage.Selections)
 			}
 
 			buf := bufio.NewWriter(os.Stdout)
-
 			for op := range ops {
 				ft.Ignore(ft.Must(fmt.Fprintln(buf, op)))
 			}
@@ -93,7 +89,7 @@ func DMenu() *cmdr.Commander {
 			var selected string
 
 			for {
-				stage, err := subexec.WriteCommandList(&args.conf.Operations, op)
+				stage, err := args.conf.Operations.ResolveCommands(op)
 				switch {
 				case err != nil:
 					return err
@@ -101,26 +97,21 @@ func DMenu() *cmdr.Commander {
 					return subexec.RunCommands(ctx, stage.Commands)
 				case stage.Selections != nil:
 					selected, err = godmenu.Run(ctx,
-						godmenu.SetSelections(op),
+						godmenu.SetSelections(stage.Selections),
 						godmenu.WithFlags(ft.Ptr(args.conf.Settings.DMenuFlags)),
 						godmenu.Prompt(fmt.Sprintf("%s ==>>", ft.Default(stage.NextLabel, "sardis"))),
 						godmenu.MenuLines(min(len(stage.Selections), 16)),
 					)
 
 					switch {
-					case err == nil && len(stage.Prefixed) != 0:
-						selected = stage.Prefixed[0]
-					case err == nil && len(stage.Prefixed) == 0:
-						selected = stage.Selections[0]
-					case ers.Is(err, godmenu.ErrSelectionMissing):
+					case err != nil && ers.Is(err, godmenu.ErrSelectionMissing):
 						return nil
 					case err != nil:
 						return err
+					default:
+						op = []string{util.DotJoin(stage.Prefix, selected)}
 					}
-
-					op = []string{selected}
 				default:
-					// this should be impossible
 					return ers.Error("unexpect outcome")
 				}
 			}
@@ -147,48 +138,36 @@ func fuzzy() *cmdr.Commander {
 
 			opr := GetOperationRuntime(ctx)
 			for {
-				stage, err := subexec.WriteCommandList(&args.conf.Operations, op)
+				stage, err := args.conf.Operations.ResolveCommands(op)
 				switch {
 				case err != nil:
 					return err
 				case stage.Commands != nil:
-					startedAt := time.Now()
-					err := subexec.RunCommands(ctx, stage.Commands)
-					ranFor := time.Since(startedAt)
+					err, ranFor := util.DoWithTiming(func() error { return subexec.RunCommands(ctx, stage.Commands) })
 
-					if opr.ShouldBlock {
-						<-ctx.Done()
-					}
-
-					waited := time.Since(startedAt) - ranFor
+					waitedFor := util.CallWithTiming(func() {
+						if opr.ShouldBlock && err == nil {
+							<-ctx.Done()
+						}
+					})
 
 					grip.Notice(message.BuildPair().
 						Pair("op", "cmd.fuzzy").
 						Pair("state", "COMPLETED").
 						Pair("err", err != nil).
-						Pair("runtime", ranFor).
-						Pair("waited", waited).
+						Pair("waited", opr.ShouldBlock).
+						Pair("run_dur", ranFor.Span()).
+						Pair("wait_dur", waitedFor.Span()).
 						Pair("commands", strings.Join(stage.CommandNames(), ", ")))
 
 					return err
 				case stage.Selections != nil:
-					idxs, err := ff.Find(
-						stage.Selections,
-						func(idx int) string {
-							return stage.Selections[idx]
-						})
+					idxs, err := ff.Find(stage.Selections, stage.SelectionAt)
 					if err != nil {
 						return err
 					}
 
-					op = make([]string, 0, len(idxs))
-					for _, v := range idxs {
-						if len(stage.Prefixed) != 0 {
-							op = append(op, stage.Prefixed[v])
-						} else {
-							op = append(op, stage.Selections[v])
-						}
-					}
+					op = stage.Resolve(idxs)
 				default:
 					// this should be impossible
 					return ers.Error("unexpect outcome")
@@ -243,7 +222,7 @@ func listCommandsPlain() *cmdr.Commander {
 		SetUsage("return a simple printed list of commands.").
 		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				stage, err := subexec.WriteCommandList(&conf.Operations, nil)
+				stage, err := conf.Operations.ResolveCommands(nil)
 
 				switch {
 				case err != nil:

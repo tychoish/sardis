@@ -14,7 +14,8 @@ import (
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/jasper/util"
+	jutil "github.com/tychoish/jasper/util"
+	"github.com/tychoish/sardis/util"
 )
 
 type Group struct {
@@ -34,19 +35,13 @@ type Group struct {
 	Synthetic      bool                   `bson:"-" json:"-" yaml:"-"`
 }
 
-func dotJoin(elems ...string) string       { return dotJoinParts(elems) }
-func dotJoinParts(elems []string) string   { return strings.Join(removeZeros(elems), ".") }
-func dotSplit(in string) []string          { return strings.Split(in, ".") }
-func removeZeros[T comparable](in []T) []T { return slices.DeleteFunc(in, isZero) }
-func isZero[T comparable](i T) bool        { var z T; return i == z }
-
 func (cg *Group) ResolvedCategory() string {
 	if cg.Category != "" {
 		return cg.Category
 	}
 	return cg.Name
 }
-func (cg *Group) ID() string       { return dotJoinParts(cg.IDPath()) }
+func (cg *Group) ID() string       { return util.DotJoinParts(cg.IDPath()) }
 func (cg *Group) IDPath() []string { return []string{cg.Category, cg.Name, cg.CmdNamePrefix} }
 
 func (cg *Group) NamesAtIndex(idx int) []string {
@@ -54,7 +49,7 @@ func (cg *Group) NamesAtIndex(idx int) []string {
 	ops := []string{}
 
 	for _, grp := range append([]string{cg.Name}, cg.Aliases...) {
-		ops = append(ops, dotJoin(cg.Category, grp, cg.Commands[idx].Name))
+		ops = append(ops, util.DotJoin(cg.Category, grp, cg.Commands[idx].Name))
 	}
 
 	return ops
@@ -72,7 +67,8 @@ func (cg *Group) Selectors() []string {
 }
 
 func (cg *Group) Validate() error {
-	home := util.GetHomedir()
+	home := util.GetHomeDir()
+
 	ec := &erc.Collector{}
 
 	for _, selection := range cg.MenuSelections {
@@ -103,7 +99,7 @@ func (cg *Group) Validate() error {
 		cmd.GroupName = cg.Name
 		cmd.Notify = ft.Default(cmd.Notify, cg.Notify)
 		cmd.Background = ft.Default(cmd.Background, cg.Background)
-		cmd.Directory = util.TryExpandHomedir(ft.Default(cmd.Directory, home))
+		cmd.Directory = jutil.TryExpandHomedir(ft.Default(cmd.Directory, home))
 
 		ec.Whenf(cmd.Name == "", "command in group [%s](%d) must have a name", cg.Name, idx)
 		ec.Whenf(cmd.Command == "" && cmd.OverrideDefault, "cannot override default without an override, in group [%s] command [%s] at index (%d)", cg.Name, cmd.Name, idx)
@@ -146,7 +142,7 @@ func (cg *Group) Validate() error {
 			}
 		}
 
-		cmd.Name = dotJoin(cg.CmdNamePrefix, cmd.Name)
+		cmd.Name = util.DotJoin(cg.CmdNamePrefix, cmd.Name)
 
 		cg.Commands[idx] = cmd
 	}

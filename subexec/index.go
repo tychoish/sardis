@@ -8,6 +8,7 @@ import (
 
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/sardis/util"
 )
 
 type Node struct {
@@ -37,7 +38,7 @@ func (n *Node) add(cmds []Command) {
 		var prev *Node
 		next := n
 
-		parts := dotSplit(cmd.NamePrime())
+		parts := util.DotSplit(cmd.NamePrime())
 		for idx, elem := range parts {
 			prev = next
 
@@ -56,7 +57,7 @@ func (n *Node) add(cmds []Command) {
 	}
 }
 
-func (n *Node) Find(id string) *Node { return n.itersearch(dotSplit(id)) }
+func (n *Node) Find(id string) *Node { return n.itersearch(util.DotSplit(id)) }
 
 func (n *Node) FindCommand(id string) *Command {
 	found := n.Find(id)

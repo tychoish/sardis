@@ -41,7 +41,7 @@ type Command struct {
 
 func (conf *Command) NamePrime() string { return ft.Default(conf.unaliasedName, conf.Name) }
 func (conf *Command) FQN() string {
-	return dotJoin(conf.GroupCategory, conf.GroupName, conf.NamePrime())
+	return util.DotJoin(conf.GroupCategory, conf.GroupName, conf.NamePrime())
 }
 
 func (conf *Command) Worker() fun.Worker {

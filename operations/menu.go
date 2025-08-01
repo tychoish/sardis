@@ -7,6 +7,7 @@ import (
 	"iter"
 	"os"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/cheynewallace/tabby"
@@ -87,34 +88,34 @@ func searchCommand() *cmdr.Commander {
 			listCommands(),
 			fuzzy(),
 		),
-		"name", func(ctx context.Context, args *withConf[string]) error {
-			searchTree := args.conf.Operations.Tree().Find(args.arg)
+		"name", func(ctx context.Context, args *withConf[[]string]) error {
+			prefix := util.DotJoinParts(args.arg)
+			searchTree := args.conf.Operations.Tree().Find(prefix)
 
 			var options []string
 			switch {
 			case searchTree == nil:
-				return fmt.Errorf("no command found named %q", args.arg)
+				return fmt.Errorf("no command found with prefix %q", prefix)
 			case searchTree.HasCommand() && searchTree.HasChidren():
 				cmd := searchTree.Command()
-				options = searchTree.KeysAtLevel()
 
 				// hopefully logging for this all goes to standard err and not stdout 😬
 				if err := subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{cmd})); err != nil {
-					return fmt.Errorf("problem running command %s, %w; missed running children %s",
-						cmd.Name, err, strings.Join(options, ", "),
-					)
+					return fmt.Errorf("problem running command %s, %w; missed running children %s", cmd.Name, err, prefix)
 				}
 			case searchTree.HasCommand():
 				return subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()}))
-			case searchTree.HasChidren():
-				options = searchTree.KeysAtLevel()
-			default:
-				return ers.Error("unexpect outcome")
+			case !searchTree.HasChidren():
+				return fmt.Errorf("no further selections at %q", prefix)
 			}
 
+			options = searchTree.KeysAtLevel()
+			sort.Strings(options)
+			slices.Sort(options)
+
 			buf := bufio.NewWriter(os.Stdout)
-			for op := range options {
-				ft.Ignore(ft.Must(fmt.Fprintln(buf, op)))
+			for op := range slices.Values(options) {
+				ft.Ignore(ft.Must(fmt.Fprintln(buf, util.DotJoin(prefix, op))))
 			}
 
 			return buf.Flush()
@@ -227,7 +228,7 @@ func dmenuSearch() *cmdr.Commander {
 	return addOpCommand(
 		cmdr.MakeCommander().
 			SetName("search").
-			Aliases("find"),
+			Aliases("find", "s", "f"),
 		"name",
 		func(ctx context.Context, args *withConf[string]) error {
 			path := new(dt.List[string])
@@ -240,32 +241,32 @@ func dmenuSearch() *cmdr.Commander {
 
 			prompt := "sardis.root"
 			for {
-				var options []string
 				switch {
 				case searchTree == nil:
 					return fmt.Errorf("no command found named %s []", util.DotJoin(path.Slice()...))
 				case searchTree.HasCommand() && searchTree.HasChidren():
 					if path.Len() > 0 && searchTree.ID() == path.Back().Value() {
-						return subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()}))
+						if err := subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()})); err != nil {
+							return err
+						}
 					}
 				case searchTree.HasCommand():
 					return subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()}))
 				case !searchTree.HasChidren():
 					return fmt.Errorf("no further selections at %s", util.DotJoin(path.Slice()...))
-				default:
-					return ers.Error("unexpect outcome")
 				}
 
 				if path.Len() > 0 {
 					prompt = path.Back().Value()
 				}
 
+				selections := searchTree.KeysAtLevel()
 				selected, err := godmenu.Run(ctx,
 					godmenu.Sorted(),
-					godmenu.SetSelections(searchTree.KeysAtLevel()),
+					godmenu.SetSelections(selections),
 					godmenu.WithFlags(ft.Ptr(args.conf.Settings.DMenuFlags)),
 					godmenu.Prompt(fmt.Sprintf("%s =>>", prompt)),
-					godmenu.MenuLines(min(len(options), 16)),
+					godmenu.MenuLines(min(len(selections), 16)),
 				)
 
 				switch {

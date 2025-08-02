@@ -1,4 +1,4 @@
-package sardis
+package srv
 
 import (
 	"context"
@@ -10,9 +10,11 @@ import (
 	"github.com/tychoish/jasper"
 )
 
-type NetworkConf struct {
+type Network struct {
 	Hosts []HostDefinition `bson:"hosts" json:"hosts" yaml:"hosts"`
 }
+
+func (conf *Network) Join(mcf Network) { conf.Hosts = append(conf.Hosts, mcf.Hosts...) }
 
 type HostDefinition struct {
 	Name     string `bson:"name" json:"name" yaml:"name"`
@@ -23,7 +25,7 @@ type HostDefinition struct {
 	Sardis   bool   `bson:"has_sardis" json:"has_sardis" yaml:"has_sardis"`
 }
 
-func (n *NetworkConf) Validate() error {
+func (n *Network) Validate() error {
 	ec := &erc.Collector{}
 
 	for idx := range n.Hosts {
@@ -33,7 +35,7 @@ func (n *NetworkConf) Validate() error {
 	return ec.Resolve()
 }
 
-func (n *NetworkConf) ByName(name string) (*HostDefinition, error) {
+func (n *Network) ByName(name string) (*HostDefinition, error) {
 	for _, h := range n.Hosts {
 		if h.Name == name {
 			return &h, nil

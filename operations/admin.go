@@ -16,6 +16,7 @@ import (
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/global"
 	"github.com/tychoish/sardis/repo"
 	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/sysmgmt"
@@ -46,9 +47,8 @@ func hacking() *cmdr.Commander {
 				"alacritty":                  conf.Operations.AlacrittySocket(),
 				"ssh_agent":                  conf.Operations.SSHAgentSocket(),
 				"ops.include_local":          conf.Operations.Settings.IncludeLocalSHH,
-				"runtime.include_local":      conf.Settings.Runtime.IncludeLocalSHH,
-				sardis.EnvVarAlacrittySocket: os.Getenv(sardis.EnvVarAlacrittySocket),
-				sardis.EnvVarSSHAgentSocket:  os.Getenv(sardis.EnvVarSSHAgentSocket),
+				global.EnvVarAlacrittySocket: os.Getenv(global.EnvVarAlacrittySocket),
+				global.EnvVarSSHAgentSocket:  os.Getenv(global.EnvVarSSHAgentSocket),
 			})
 			table := tabby.New()
 			table.AddHeader("Group", "Command")

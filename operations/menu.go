@@ -20,6 +20,7 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/global"
 	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/util"
 )
@@ -133,7 +134,7 @@ func fuzzy() *cmdr.Commander {
 			op := args.arg
 
 			ff, err := fzf.New(
-				fzf.WithPrompt(fmt.Sprintf("%s.%s ==> ", util.GetHostname(), sardis.ApplicationName)),
+				fzf.WithPrompt(fmt.Sprintf("%s.%s ==> ", util.GetHostname(), global.ApplicationName)),
 				fzf.WithNoLimit(true),
 				fzf.WithCaseSensitive(false),
 			)

@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/srv"
 )
 
 func Notify() *cmdr.Commander {
@@ -31,9 +32,11 @@ func notifyPipe() *cmdr.Commander {
 		Aliases("xmpp").
 		SetUsage("send the contents of standard input over xmpp").
 		With(StandardSardisOperationSpec().
-			SetMiddleware(sardis.WithRemoteNotify).
+			SetMiddleware(func(ctx context.Context, conf *sardis.Configuration) context.Context {
+				return srv.WithRemoteNotify(ctx, conf.Settings)
+			}).
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				logger := sardis.RemoteNotify(ctx)
+				logger := srv.RemoteNotify(ctx)
 
 				scanner := bufio.NewScanner(os.Stdin)
 				for scanner.Scan() {
@@ -48,7 +51,7 @@ func notifySend() *cmdr.Commander {
 		SetName("send").
 		SetUsage("send the remaining arguments over xmpp")
 	return addOpCommand(cmd, "message", func(ctx context.Context, args *withConf[[]string]) error {
-		sardis.RemoteNotify(ctx).Notice(strings.Join(args.arg, " "))
+		srv.RemoteNotify(ctx).Notice(strings.Join(args.arg, " "))
 		return nil
 	})
 }
@@ -58,7 +61,7 @@ func notifyDesktop() *cmdr.Commander {
 		SetName("desktop").
 		SetUsage("send desktop notification").
 		SetAction(func(ctx context.Context, c *cli.Context) error {
-			sardis.DesktopNotify(ctx).Notice(strings.Join(c.Args().Slice(), " "))
+			srv.DesktopNotify(ctx).Notice(strings.Join(c.Args().Slice(), " "))
 			return nil
 		})
 }

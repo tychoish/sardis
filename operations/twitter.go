@@ -8,6 +8,7 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/srv"
 )
 
 func Tweet() *cmdr.Commander {
@@ -27,8 +28,8 @@ func Tweet() *cmdr.Commander {
 					return fmt.Errorf("message is too long [%d]", len(msg))
 				}
 
-				ctx = sardis.WithTwitterLogger(ctx, sardis.AppConfiguration(ctx))
-				sardis.Twitter(ctx).Info(msg)
+				ctx = srv.WithTwitterLogger(ctx, &sardis.AppConfiguration(ctx).Settings.Credentials)
+				srv.Twitter(ctx).Info(msg)
 
 				return nil
 			}).Add)

@@ -5,51 +5,20 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/jasper"
 )
 
-type ctxKey string
+type ctxKey struct{}
 
-const confCtxKey ctxKey = "sardis-conf"
+func (ctxKey) String() string { return "sardis.conf" }
 
-type ContextSetupFunction[T any] func(context.Context, T) context.Context
-
-func ContextSetup[T any](fns ...ContextSetupFunction[T]) ContextSetupFunction[T] {
-	return func(ctx context.Context, conf T) context.Context {
-		for _, fn := range fns {
-			ctx = fn(ctx, conf)
-		}
-		return ctx
-	}
-}
+var confCtxKey struct{}
 
 func WithConfiguration(ctx context.Context, conf *Configuration) context.Context {
 	if HasAppConfiguration(ctx) {
 		return ctx
 	}
 	return context.WithValue(ctx, confCtxKey, conf)
-}
-
-func WithJasper(ctx context.Context, conf *Configuration) context.Context {
-	jpm := jasper.NewManager(
-		jasper.ManagerOptionSetSynchronized(),
-		jasper.ManagerOptionWithEnvVar(EnvVarAlacrittySocket, conf.Operations.AlacrittySocket()),
-		jasper.ManagerOptionWithEnvVar(EnvVarSSHAgentSocket, conf.Operations.SSHAgentSocket()),
-	)
-	srv.AddCleanup(ctx, jpm.Close)
-
-	noStdOut := jasper.NewManager(
-		jasper.ManagerOptionSetSynchronized(),
-		jasper.ManagerOptionWithEnvVar(EnvVarAlacrittySocket, conf.Operations.AlacrittySocket()),
-		jasper.ManagerOptionWithEnvVar(EnvVarSSHAgentSocket, conf.Operations.SSHAgentSocket()),
-		jasper.ManagerOptionWithEnvVar(EnvVarSardisLogQuietStdOut, "true"),
-	)
-	srv.AddCleanup(ctx, noStdOut.Close)
-
-	jasper.WithContextManager(ctx, "without-std-out", noStdOut)
-	return jasper.WithManager(ctx, jpm)
 }
 
 func AppConfiguration(ctx context.Context) *Configuration {
@@ -78,5 +47,5 @@ func MustAppConfiguration(ctx context.Context) *Configuration {
 }
 
 func HasAppConfiguration(ctx context.Context) bool {
-	return ft.IgnoreFirst(ft.Cast[*Configuration](ctx.Value(confCtxKey)))
+	return ft.IsType[*Configuration](ctx.Value(confCtxKey))
 }

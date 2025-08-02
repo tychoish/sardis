@@ -1,4 +1,4 @@
-package sardis
+package srv
 
 import (
 	"context"
@@ -10,11 +10,11 @@ import (
 
 	"github.com/coreos/go-systemd/journal"
 	"github.com/nwidger/jsoncolor"
-
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
 	"github.com/tychoish/grip/x/desktop"
@@ -27,26 +27,78 @@ import (
 	"github.com/tychoish/sardis/util"
 )
 
-func WithAppLogger(ctx context.Context, conf *Configuration) context.Context {
+type LoggingSettings struct {
+	DisableStandardOutput     bool           `bson:"disable_standard_output" json:"disable_standard_output" yaml:"disable_standard_output"`
+	EnableJSONFormating       bool           `bson:"enable_json_formatting" json:"enable_json_formatting" yaml:"enable_json_formatting"`
+	EnableJSONColorFormatting bool           `bson:"enable_json_color_formatting" json:"enable_json_color_formatting" yaml:"enable_json_color_formatting"`
+	DisableSyslog             bool           `bson:"disable_syslog" json:"disable_syslog" yaml:"disable_syslog"`
+	Priority                  level.Priority `bson:"priority" json:"priority" yaml:"priority"`
+}
+
+type NotifySettings struct {
+	Name     string `bson:"name" json:"name" yaml:"name"`
+	Target   string `bson:"target" json:"target" yaml:"target"`
+	Host     string `bson:"host" json:"host" yaml:"host"`
+	User     string `bson:"user" json:"user" yaml:"user"`
+	Password string `bson:"password" json:"password" yaml:"password"`
+	Disabled bool   `bson:"disabled" json:"disabled" yaml:"disabled"`
+}
+
+func (conf *NotifySettings) Validate() error {
+	if conf == nil || (conf.Target == "" && os.Getenv("SARDIS_NOTIFY_TARGET") == "") {
+		return nil
+	}
+
+	if conf.Name == "" {
+		conf.Name = "sardis"
+	}
+
+	if conf.Target == "" {
+		conf.Target = os.Getenv("SARDIS_NOTIFY_TARGET")
+	}
+	defaults := xmpp.GetConnectionInfo()
+	if conf.Host == "" {
+		conf.Host = defaults.Hostname
+	}
+	if conf.User == "" {
+		conf.User = defaults.Username
+	}
+	if conf.Password == "" {
+		conf.Password = defaults.Password
+	}
+
+	catcher := &erc.Collector{}
+	for k, v := range map[string]string{
+		"host": conf.Host,
+		"user": conf.User,
+		"pass": conf.Password,
+	} {
+		catcher.Whenf(v == "", "missing value for '%s'", k)
+	}
+
+	return catcher.Resolve()
+}
+
+func WithAppLogger(ctx context.Context, conf LoggingSettings) context.Context {
 	sender := SetupLogging(conf)
 	grip.SetSender(sender)
 	return grip.WithLogger(ctx, grip.NewLogger(sender))
 }
 
-func SetupLogging(conf *Configuration) send.Sender {
+func SetupLogging(conf LoggingSettings) send.Sender {
 	var sender send.Sender
 
-	if conf.Settings.Logging.EnableJSONFormating || conf.Settings.Logging.EnableJSONColorFormatting {
+	if conf.EnableJSONFormating || conf.EnableJSONColorFormatting {
 		sender = send.MakePlain()
 	} else {
 		sender = send.MakeStdError()
 	}
 
-	if runtime.GOOS == "linux" && !conf.Settings.Logging.DisableSyslog && journal.Enabled() {
+	if runtime.GOOS == "linux" && !conf.DisableSyslog && journal.Enabled() {
 		syslog := system.MakeDefault()
 		syslog.SetName(filepath.Base(os.Args[0]))
 
-		if conf.Settings.Logging.DisableStandardOutput {
+		if conf.DisableStandardOutput {
 			sender = syslog
 		} else {
 			sender = send.MakeMulti(syslog, sender)
@@ -54,7 +106,7 @@ func SetupLogging(conf *Configuration) send.Sender {
 	}
 
 	switch {
-	case conf.Settings.Logging.EnableJSONColorFormatting:
+	case conf.EnableJSONColorFormatting:
 		sender.SetFormatter(func(m message.Composer) (string, error) {
 			out, err := jsoncolor.Marshal(m.Raw())
 			if err != nil {
@@ -62,11 +114,11 @@ func SetupLogging(conf *Configuration) send.Sender {
 			}
 			return string(out), nil
 		})
-	case conf.Settings.Logging.EnableJSONFormating:
+	case conf.EnableJSONFormating:
 		sender.SetFormatter(send.MakeJSONFormatter())
 	}
 
-	sender.SetPriority(conf.Settings.Logging.Priority)
+	sender.SetPriority(conf.Priority)
 	sender.SetName(filepath.Base(os.Args[0]))
 
 	return sender
@@ -76,14 +128,14 @@ func Twitter(ctx context.Context) grip.Logger {
 	return grip.ContextLogger(ctx, global.ContextTwitterLogger)
 }
 
-func WithTwitterLogger(ctx context.Context, conf *Configuration) context.Context {
+func WithTwitterLogger(ctx context.Context, conf *Credentials) context.Context {
 	return grip.WithNewContextLogger(ctx, global.ContextTwitterLogger, func() send.Sender {
 		twitter, err := twitter.MakeSender(ctx, &twitter.Options{
-			Name:           fmt.Sprint("@", conf.Settings.Credentials.Twitter.Username, "/sardis"),
-			ConsumerKey:    conf.Settings.Credentials.Twitter.ConsumerKey,
-			ConsumerSecret: conf.Settings.Credentials.Twitter.ConsumerSecret,
-			AccessSecret:   conf.Settings.Credentials.Twitter.OauthSecret,
-			AccessToken:    conf.Settings.Credentials.Twitter.OauthToken,
+			Name:           fmt.Sprint("@", conf.Twitter.Username, "/sardis"),
+			ConsumerKey:    conf.Twitter.ConsumerKey,
+			ConsumerSecret: conf.Twitter.ConsumerSecret,
+			AccessSecret:   conf.Twitter.OauthSecret,
+			AccessToken:    conf.Twitter.OauthToken,
 		})
 		if err != nil {
 			err = ers.Wrap(err, "problem constructing twitter sender")
@@ -129,12 +181,12 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 
 	host := util.GetHostname()
 
-	if conf.Settings.Notification.Target != "" && !conf.Settings.Notification.Disabled {
-		sender, err := xmpp.NewSender(conf.Settings.Notification.Target,
+	if conf.Notify.Target != "" && !conf.Notify.Disabled {
+		sender, err := xmpp.NewSender(conf.Notify.Target,
 			xmpp.ConnectionInfo{
-				Hostname:             conf.Settings.Notification.Host,
-				Username:             conf.Settings.Notification.User,
-				Password:             conf.Settings.Notification.Password,
+				Hostname:             conf.Notify.Host,
+				Username:             conf.Notify.User,
+				Password:             conf.Notify.Password,
 				DisableTLS:           true,
 				AllowUnencryptedAuth: true,
 			})
@@ -156,12 +208,12 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 			catcher := &erc.Collector{}
 			catcher.Add(sender.Flush(ctx))
 			catcher.Add(sender.Close())
-			return ers.Wrapf(catcher.Resolve(), "xmpp [%s]", conf.Settings.Notification.Name)
+			return ers.Wrapf(catcher.Resolve(), "xmpp [%s]", conf.Notify.Name)
 		})
 	}
 
-	if conf.Settings.Telegram.Target != "" {
-		sender := send.MakeBuffered(telegram.New(conf.Settings.Telegram), time.Second, 10)
+	if conf.Telegram.Target != "" {
+		sender := send.MakeBuffered(telegram.New(conf.Telegram), time.Second, 10)
 		sender.SetPriority(root.Priority())
 		sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
 		sender.SetFormatter(func(m message.Composer) (string, error) {
@@ -174,7 +226,7 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 			catcher := &erc.Collector{}
 			catcher.Add(sender.Flush(ctx))
 			catcher.Add(sender.Close())
-			return ers.Wrapf(catcher.Resolve(), "telegram [%s]", conf.Settings.Telegram.Name)
+			return ers.Wrapf(catcher.Resolve(), "telegram [%s]", conf.Telegram.Name)
 		})
 
 	}
@@ -198,18 +250,18 @@ func WithJiraIssue(ctx context.Context, conf *Configuration) (out context.Contex
 		out = grip.WithContextLogger(ctx, "jira-issue", grip.NewLogger(send.MakeMulti(loggers...)))
 	}()
 
-	if conf.Settings.Credentials.Jira.URL == "" {
+	if conf.Credentials.Jira.URL == "" {
 		grip.Warning("jira credentials are not configured")
 		return
 	}
 
 	sender, err := jira.MakeIssueSender(ctx, &jira.Options{
-		Name:    conf.Settings.Notification.Name,
-		BaseURL: conf.Settings.Credentials.Jira.URL,
+		Name:    conf.Notify.Name,
+		BaseURL: conf.Credentials.Jira.URL,
 		BasicAuthOpts: jira.BasicAuth{
 			UseBasicAuth: true,
-			Username:     conf.Settings.Credentials.Jira.Username,
-			Password:     conf.Settings.Credentials.Jira.Password,
+			Username:     conf.Credentials.Jira.Username,
+			Password:     conf.Credentials.Jira.Password,
 		},
 	})
 	if err != nil {

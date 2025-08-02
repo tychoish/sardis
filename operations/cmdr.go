@@ -16,6 +16,9 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/global"
+	srsrv "github.com/tychoish/sardis/srv"
+	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/util"
 )
 
@@ -60,21 +63,24 @@ func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configu
 	}
 
 	conf.Settings.Logging.Priority = level.FromString(cc.String("level"))
-	conf.Settings.Logging.DisableSyslog = cc.Bool("quietSyslog") || os.Getenv(sardis.EnvVarSardisLogQuietSyslog) != ""
-	conf.Settings.Logging.DisableStandardOutput = cc.Bool("quietStdOut") || os.Getenv(sardis.EnvVarSardisLogQuietStdOut) != ""
-	conf.Settings.Logging.EnableJSONFormating = cc.Bool("jsonLog") || os.Getenv("SARDIS_LOG_FORMAT_JSON") != ""
-	conf.Settings.Logging.EnableJSONColorFormatting = cc.Bool("colorJsonLog") || os.Getenv("SARDIS_LOG_COLOR_JSON") != ""
+	conf.Settings.Logging.DisableSyslog = cc.Bool("quietSyslog") || os.Getenv(global.EnvVarSardisLogQuietSyslog) != ""
+	conf.Settings.Logging.DisableStandardOutput = cc.Bool("quietStdOut") || os.Getenv(global.EnvVarSardisLogQuietStdOut) != ""
+	conf.Settings.Logging.EnableJSONFormating = cc.Bool("jsonLog") || os.Getenv(global.EnvVarSardisLogFormatJSON) != ""
+	conf.Settings.Logging.EnableJSONColorFormatting = cc.Bool("colorJsonLog") || os.Getenv(global.EnvVarSardisLogJSONColor) != ""
 
 	return conf, nil
 }
 
 func StandardSardisOperationSpec() *cmdr.OperationSpec[*sardis.Configuration] {
 	return cmdr.SpecBuilder(ResolveConfiguration).
-		SetMiddleware(sardis.ContextSetup(
-			sardis.WithConfiguration,
-			sardis.WithAppLogger,
-			sardis.WithJasper,
-		))
+		SetMiddleware(
+			func(ctx context.Context, conf *sardis.Configuration) context.Context {
+				ctx = sardis.WithConfiguration(ctx, conf)
+				ctx = subexec.WithJasper(ctx, &conf.Operations)
+				ctx = srsrv.WithAppLogger(ctx, conf.Settings.Logging)
+				ctx = srsrv.WithRemoteNotify(ctx, conf.Settings)
+				return ctx
+			})
 }
 
 func Commander() *cmdr.Commander {
@@ -103,10 +109,10 @@ func Commander() *cmdr.Commander {
 					grip.Sender().SetPriority(priority)
 					return nil
 				}).Flag()).
-		Middleware(sardis.WithDesktopNotify).
+		Middleware(srsrv.WithDesktopNotify).
 		Middleware(func(ctx context.Context) context.Context {
 			return srv.SetWorkerPool(ctx,
-				sardis.ApplicationName,
+				global.ApplicationName,
 				pubsub.NewUnlimitedQueue[fun.Worker](),
 				fun.WorkerGroupConfWorkerPerCPU(),
 				fun.WorkerGroupConfContinueOnError(),

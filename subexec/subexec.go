@@ -14,7 +14,8 @@ import (
 )
 
 type Configuration struct {
-	Commands []Group `bson:"groups" json:"groups" yaml:"groups"`
+	Commands dt.Slice[Group] `bson:"groups" json:"groups" yaml:"groups"`
+
 	Settings struct {
 		SSHAgentSocketPath  string `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
 		AlacrittySocketPath string `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
@@ -33,6 +34,10 @@ type Configuration struct {
 
 func (conf *Configuration) AlacrittySocket() string { return conf.caches.alacrittySocketPath.Resolve() }
 func (conf *Configuration) SSHAgentSocket() string  { return conf.caches.sshAgentPath.Resolve() }
+
+func (conf *Configuration) Join(mcf *Configuration) {
+	conf.Commands = append(conf.Commands, mcf.Commands...)
+}
 
 func (conf *Configuration) Validate() error { return conf.caches.validation.Call(conf.doValidate) }
 func (conf *Configuration) doValidate() error {

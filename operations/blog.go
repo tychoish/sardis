@@ -12,7 +12,9 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
-	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/global"
+	"github.com/tychoish/sardis/srv"
+	"github.com/tychoish/sardis/util"
 )
 
 func Blog() *cmdr.Commander {
@@ -57,7 +59,7 @@ func blogPublish() *cmdr.Commander {
 					"name":  name,
 					"repo":  blog.RepoName,
 					"path":  repo.Path,
-					"host":  conf.Settings.Runtime.Hostname,
+					"host":  util.GetHostname(),
 				})
 				return nil
 			}
@@ -83,22 +85,23 @@ func blogPublish() *cmdr.Commander {
 				)
 			}()
 
-			err = repo.SyncRemoteJob(conf.Settings.Runtime.Hostname).WithErrorFilter(func(err error) error {
+			host := util.GetHostname()
+			err = repo.SyncRemoteJob(host).WithErrorFilter(func(err error) error {
 				return ers.Wrapf(err, "problem syncing blog %q repo", name)
 			}).Join(
 				jasper.Context(ctx).CreateCommand(ctx).
 					Append(blog.DeployCommands...).
 					Directory(repo.Path).
-					AddEnv(sardis.EnvVarSardisLogQuietStdOut, "true").
+					AddEnv(global.EnvVarSardisLogQuietStdOut, "true").
 					SetOutputSender(level.Info, grip.Sender()).
 					SetErrorSender(level.Error, grip.Sender()).Worker(),
 			).Run(ctx)
 			if err != nil {
-				sardis.RemoteNotify(ctx).Error(message.WrapError(err, message.Fields{
+				srv.RemoteNotify(ctx).Error(message.WrapError(err, message.Fields{
 					"op":   opName,
 					"repo": repo.Name,
 					"path": repo.Path,
-					"host": conf.Settings.Runtime.Hostname,
+					"host": host,
 				}))
 				return fmt.Errorf("problem deploying the blog %q: %w", name, err)
 			}

@@ -34,6 +34,11 @@ func (conf *Configuration) doValidate() error {
 	return ec.Resolve()
 }
 
+func (conf *Configuration) Join(mcf *Configuration) {
+	conf.GitRepos = append(conf.GitRepos, mcf.GitRepos...)
+	conf.Projects = append(conf.Projects, mcf.Projects...)
+}
+
 func (conf *Configuration) FindOne(name string) (*GitRepository, error) {
 	if rp, ok := conf.caches.lookup.Load(name); ok {
 		return &rp, nil

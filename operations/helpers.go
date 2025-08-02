@@ -15,6 +15,8 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/srv"
+	"github.com/tychoish/sardis/subexec"
 )
 
 type withConf[T any] struct {
@@ -40,12 +42,11 @@ func addCommandWithConf[T any](
 
 		return &withConf[T]{conf: conf, arg: arg}, nil
 	}).SetMiddleware(func(ctx context.Context, args *withConf[T]) context.Context {
-		return sardis.ContextSetup(
-			sardis.WithConfiguration,
-			sardis.WithAppLogger,
-			sardis.WithJasper,
-			sardis.WithRemoteNotify,
-		)(ctx, args.conf)
+		ctx = sardis.WithConfiguration(ctx, args.conf)
+		ctx = subexec.WithJasper(ctx, &args.conf.Operations)
+		ctx = srv.WithAppLogger(ctx, args.conf.Settings.Logging)
+		ctx = srv.WithRemoteNotify(ctx, args.conf.Settings)
+		return ctx
 	}).SetAction(op).Add)
 }
 

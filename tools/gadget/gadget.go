@@ -31,7 +31,7 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/jasper/options"
 	"github.com/tychoish/libfun"
-	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/global"
 )
 
 type Options struct {
@@ -138,7 +138,7 @@ func RunTests(ctx context.Context, opts Options) error {
 			err := jpm.CreateCommand(ctx).
 				ID(fmt.Sprint("lint.", name)).
 				Directory(opts.RootPath).
-				AddEnv(sardis.EnvVarSardisLogQuietSyslog, "true").
+				AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
 				SetOutputSender(level.Info, out).
 				SetErrorSender(level.Error, out).
 				AppendArgs("golangci-lint", "run", "--allow-parallel-runners", "--timeout", opts.Timeout.String()).
@@ -221,7 +221,7 @@ func RunTests(ctx context.Context, opts Options) error {
 			catch.Add(jpm.CreateCommand(ctx).
 				ID(fmt.Sprint("test.", pkg.PackageName)).
 				Directory(pkg.LocalDirectory).
-				AddEnv(sardis.EnvVarSardisLogQuietSyslog, "true").
+				AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
 				SetOutputSender(level.Info, testOut).
 				SetErrorSender(level.Error, testOut).
 				PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
@@ -251,13 +251,13 @@ func RunTests(ctx context.Context, opts Options) error {
 						PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
 						SetOutputSender(level.Debug, out).
 						SetErrorSender(level.Error, out).
-						AddEnv(sardis.EnvVarSardisLogQuietSyslog, "true").
+						AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
 						AppendArgs("go", "tool", "cover", "-html", coverout, "-o", fmt.Sprintf("coverage-%s.html", filepath.Base(result.Info.LocalDirectory))).
 						Run(ctx), "coverage html for %s", result.Package))
 					ec.Add(jpm.CreateCommand(ctx).
 						ID(fmt.Sprint("coverage.report", result.Package)).
 						Directory(result.Info.LocalDirectory).
-						AddEnv(sardis.EnvVarSardisLogQuietSyslog, "true").
+						AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
 						SetErrorSender(level.Error, out).
 						SetOutputSender(level.Info, sender).
 						AppendArgs("go", "tool", "cover", "-func", coverout).

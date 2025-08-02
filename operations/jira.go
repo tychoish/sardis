@@ -13,7 +13,7 @@ import (
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/x/jira"
-	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/srv"
 	"github.com/tychoish/sardis/util"
 )
 
@@ -55,8 +55,8 @@ func bulkCreateTickets() *cmdr.Commander {
 
 			data.Priority = level.Info
 
-			ctx = sardis.WithJiraIssue(ctx, op.conf)
-			logger := sardis.JiraIssue(ctx)
+			ctx = srv.WithJiraIssue(ctx, op.conf.Settings)
+			logger := srv.JiraIssue(ctx)
 
 			ec := &erc.Collector{}
 

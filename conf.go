@@ -1,115 +1,42 @@
 package sardis
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/godmenu"
-	"github.com/tychoish/grip/level"
-	"github.com/tychoish/grip/x/telegram"
-	"github.com/tychoish/grip/x/xmpp"
 	"github.com/tychoish/sardis/repo"
+	"github.com/tychoish/sardis/srv"
 	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/sysmgmt"
 	"github.com/tychoish/sardis/util"
 )
 
 type Configuration struct {
-	Settings   *Settings             `bson:"settings" json:"settings" yaml:"settings"`
+	Settings   *srv.Configuration    `bson:"settings" json:"settings" yaml:"settings"`
 	Repos      repo.Configuration    `bson:"repositories" json:"repositories" yaml:"repositories"`
 	Operations subexec.Configuration `bson:"operations" json:"operations" yaml:"operations"`
-	System     SystemConf            `bson:"system" json:"system" yaml:"system"`
-	Network    NetworkConf           `bson:"network" json:"network" yaml:"network"`
+	System     sysmgmt.Configuration `bson:"system" json:"system" yaml:"system"`
 
-	HostsCOMPAT    []HostDefinition         `bson:"hosts,omitempty" json:"hosts,omitempty" yaml:"hosts,omitempty"`
+	NetworkCOMPAT  srv.Network              `bson:"network" json:"network" yaml:"network"`
+	HostsCOMPAT    []srv.HostDefinition     `bson:"hosts,omitempty" json:"hosts,omitempty" yaml:"hosts,omitempty"`
 	BlogCOMPAT     []repo.Project           `bson:"blog,omitempty" json:"blog,omitempty" yaml:"blog,omitempty"`
 	CommandsCOMPAT []subexec.Group          `bson:"commands,omitempty" json:"commands,omitempty" yaml:"commands,omitempty"`
 	RepoCOMPAT     []repo.GitRepository     `bson:"repo,omitempty" json:"repo,omitempty" yaml:"repo,omitempty"`
 	LinksCOMPAT    []sysmgmt.LinkDefinition `bson:"links,omitempty" json:"links,omitempty" yaml:"links,omitempty"`
 
-	linkedFilesRead bool
-	originalPath    string
+	operationsGenerated bool
+	linkedFilesRead     bool
+	originalPath        string
 
 	caches struct {
 		validation adt.Once[error]
 	}
-}
-
-type SystemConf struct {
-	GoPackages []struct {
-		Name    string `bson:"name" json:"name" yaml:"name"`
-		Update  bool   `bson:"update" json:"update" yaml:"update"`
-		Version string `bson:"version" json:"version" yaml:"version"`
-	} `bson:"golang" json:"golang" yaml:"golang"`
-	Arch           sysmgmt.ArchLinux            `bson:"arch" json:"arch" yaml:"arch"`
-	SystemD        sysmgmt.SystemdConfiguration `bson:"systemd" json:"systemd" yaml:"systemd"`
-	Links          sysmgmt.LinkConfiguration    `bson:"links" json:"links" yaml:"links"`
-	ServicesLEGACY []sysmgmt.SystemdService     `bson:"services,omitempty" json:"services,omitempty" yaml:"services,omitempty"`
-}
-
-type NotifyConf struct {
-	Name     string `bson:"name" json:"name" yaml:"name"`
-	Target   string `bson:"target" json:"target" yaml:"target"`
-	Host     string `bson:"host" json:"host" yaml:"host"`
-	User     string `bson:"user" json:"user" yaml:"user"`
-	Password string `bson:"password" json:"password" yaml:"password"`
-	Disabled bool   `bson:"disabled" json:"disabled" yaml:"disabled"`
-}
-
-type Settings struct {
-	Notification        NotifyConf       `bson:"notify" json:"notify" yaml:"notify"`
-	Telegram            telegram.Options `bson:"telegram" json:"telegram" yaml:"telegram"`
-	Credentials         CredentialsConf  `bson:"credentials" json:"credentials" yaml:"credentials"`
-	SSHAgentSocketPath  string           `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
-	AlacrittySocketPath string           `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
-	Logging             LoggingConf      `bson:"logging" json:"logging" yaml:"logging"`
-	ConfigPaths         []string         `bson:"config_files" json:"config_files" yaml:"config_files"`
-	DMenuFlags          godmenu.Flags    `bson:"dmenu" json:"dmenu" yaml:"dmenu"`
-
-	Runtime struct {
-		Hostname        string `bson:"-" json:"-" yaml:"-"`
-		IncludeLocalSHH bool   `bson:"include_local_ssh" json:"include_local_ssh" yaml:"include_local_ssh"`
-	} `bson:"runtime" json:"runtime" yaml:"runtime"`
-}
-
-type LoggingConf struct {
-	DisableStandardOutput     bool           `bson:"disable_standard_output" json:"disable_standard_output" yaml:"disable_standard_output"`
-	EnableJSONFormating       bool           `bson:"enable_json_formatting" json:"enable_json_formatting" yaml:"enable_json_formatting"`
-	EnableJSONColorFormatting bool           `bson:"enable_json_color_formatting" json:"enable_json_color_formatting" yaml:"enable_json_color_formatting"`
-	DisableSyslog             bool           `bson:"disable_syslog" json:"disable_syslog" yaml:"disable_syslog"`
-	Priority                  level.Priority `bson:"priority" json:"priority" yaml:"priority"`
-}
-
-type CredentialsConf struct {
-	Path    string `bson:"path" json:"path" yaml:"path"`
-	Twitter struct {
-		Username       string `bson:"username" json:"username" yaml:"username"`
-		ConsumerKey    string `bson:"consumer_key" json:"consumer_key" yaml:"consumer_key"`
-		ConsumerSecret string `bson:"consumer_secret" json:"consumer_secret" yaml:"consumer_secret"`
-		OauthToken     string `bson:"oauth_token" json:"oauth_token" yaml:"oauth_token"`
-		OauthSecret    string `bson:"oauth_secret" json:"oauth_secret" yaml:"oauth_secret"`
-	} `bson:"twitter" json:"twitter" yaml:"twitter"`
-	Jira struct {
-		Username string `bson:"username" json:"username" yaml:"username"`
-		Password string `bson:"password" json:"password" yaml:"password"`
-		URL      string `bson:"url" json:"url" yaml:"url"`
-	} `bson:"jira" json:"jira" yaml:"jira"`
-	GitHub struct {
-		Username string `bson:"username" json:"username" yaml:"username"`
-		Password string `bson:"password" json:"password" yaml:"password"`
-		Token    string `bson:"token" json:"token" yaml:"token"`
-	} `bson:"github" json:"github" yaml:"github"`
-	AWS []struct {
-		Profile string `bson:"profile" json:"profile" yaml:"profile"`
-		Key     string `bson:"key" json:"key" yaml:"key"`
-		Secret  string `bson:"secret" json:"secret" yaml:"secret"`
-		Token   string `bson:"token" json:"token" yaml:"token"`
-	} `bson:"aws" json:"aws" yaml:"aws"`
 }
 
 func LoadConfiguration(fn string) (*Configuration, error) {
@@ -126,6 +53,10 @@ func LoadConfiguration(fn string) (*Configuration, error) {
 }
 
 func readConfiguration(fn string) (*Configuration, error) {
+	if _, err := os.Stat(fn); os.IsNotExist(err) {
+		return nil, fmt.Errorf("%s does not exist [%s]", fn, err)
+	}
+
 	out := &Configuration{}
 
 	if err := util.UnmarshalFile(fn, out); err != nil {
@@ -137,24 +68,34 @@ func readConfiguration(fn string) (*Configuration, error) {
 
 func (conf *Configuration) Validate() error { return conf.caches.validation.Call(conf.doValidate) }
 func (conf *Configuration) doValidate() error {
-	ec := &erc.Collector{}
-	ec.Push(conf.expandLinkedFiles()) // this is where merging files (and migrating legacy files)
-
 	conf.Settings = ft.DefaultNew(conf.Settings)
-	conf.Operations.Commands = append(conf.Operations.Commands, conf.Repos.ConcreteTaskGroups()...)
-	conf.Operations.Commands = append(conf.Operations.Commands, conf.Repos.SyntheticTaskGroups()...)
-	conf.Operations.Commands = append(conf.Operations.Commands, conf.System.SystemD.TaskGroups()...)
 
-	ec.Push(conf.Settings.Notification.Validate())
-	ec.Push(conf.Settings.Credentials.Validate())
-	ec.Push(conf.Settings.Validate())
-	ec.Push(conf.System.Arch.Validate())
-	ec.Push(conf.System.SystemD.Validate())
-	ec.Push(conf.System.Links.Validate())
+	ec := &erc.Collector{}
+
+	ec.Push(conf.expandLinkedFiles())
+	ec.Push(conf.expandOperations())
+
+	ec.Push(conf.System.Validate())
 	ec.Push(conf.Repos.Validate())
 	ec.Push(conf.Operations.Validate())
 
 	return ec.Resolve()
+}
+
+func (conf *Configuration) expandOperations() error {
+	defer func() { conf.operationsGenerated = true }()
+
+	if conf.operationsGenerated {
+		return errors.New("cannot generate operations more than once")
+	}
+
+	conf.Operations.Commands = dt.MergeSlices(
+		conf.Operations.Commands,
+		conf.Repos.ConcreteTaskGroups(),
+		conf.Repos.SyntheticTaskGroups(),
+		conf.System.SystemD.TaskGroups(),
+	)
+	return nil
 }
 
 func (conf *Configuration) expandLinkedFiles() error {
@@ -163,79 +104,53 @@ func (conf *Configuration) expandLinkedFiles() error {
 	}
 	defer func() { conf.linkedFilesRead = true }()
 
-	confStream := fun.MakeConverterErr(func(fn string) (*Configuration, error) {
-		if _, err := os.Stat(fn); os.IsNotExist(err) {
-			return nil, fmt.Errorf("%s does not exist [%s]", fn, err)
-		}
-
+	mcf, err := fun.MakeConverterErr(func(fn string) (*Configuration, error) {
 		conf, err := readConfiguration(fn)
-		if err != nil {
+
+		switch {
+		case err != nil:
 			return nil, fmt.Errorf("problem reading linked config file %q: %w", fn, err)
-		}
-		if conf == nil {
+		case conf == nil:
 			return nil, fmt.Errorf("nil configuration for %q", fn)
-		}
-		if conf.Settings != nil {
+		case conf.Settings != nil:
 			return nil, fmt.Errorf("nested file %q specified system configuration", fn)
+		default:
+			return conf.Migrate(), nil
 		}
-		return conf, nil
 	}).Parallel(fun.SliceStream(conf.Settings.ConfigPaths),
 		fun.WorkerGroupConfContinueOnError(),
 		fun.WorkerGroupConfWorkerPerCPU(),
-	)
-
-	confs, err := fun.NewGenerator(confStream.Slice).Wait()
+	).Reduce(reduceConf).Wait()
 	if err != nil {
 		return err
 	}
 
-	if err = conf.Merge(confs...); err != nil {
-		return err
-	}
+	conf.Migrate().Join(mcf)
 
 	return nil
 }
 
-func (conf *Configuration) Merge(mcfs ...*Configuration) error {
-	ec := &erc.Collector{}
+func reduceConf(a, b *Configuration) (*Configuration, error) { return a.Join(b), nil }
 
-	for idx := range mcfs {
-		mcf := mcfs[idx]
-		if mcf == nil {
-			continue
-		}
-
-		conf.LinksCOMPAT = append(conf.LinksCOMPAT, mcf.LinksCOMPAT...)
-		conf.CommandsCOMPAT = append(conf.CommandsCOMPAT, mcf.CommandsCOMPAT...)
-		conf.RepoCOMPAT = append(conf.RepoCOMPAT, mcf.RepoCOMPAT...)
-		conf.BlogCOMPAT = append(conf.BlogCOMPAT, mcf.BlogCOMPAT...)
-		conf.HostsCOMPAT = append(conf.HostsCOMPAT, mcf.HostsCOMPAT...)
-		conf.System.ServicesLEGACY = append(conf.System.ServicesLEGACY, mcf.System.ServicesLEGACY...)
-
-		conf.Operations.Commands = append(conf.Operations.Commands, mcf.Operations.Commands...)
-		conf.Repos.GitRepos = append(conf.Repos.GitRepos, mcf.Repos.GitRepos...)
-		conf.Repos.Projects = append(conf.Repos.Projects, mcf.Repos.Projects...)
-		conf.Network.Hosts = append(conf.Network.Hosts, mcf.Network.Hosts...)
-
-		conf.System.Arch.AurPackages = append(conf.System.Arch.AurPackages, mcf.System.Arch.AurPackages...)
-		conf.System.Arch.Packages = append(conf.System.Arch.Packages, mcf.System.Arch.Packages...)
-		conf.System.SystemD.Services = append(conf.System.SystemD.Services, mcf.System.SystemD.Services...)
-		conf.System.GoPackages = append(conf.System.GoPackages, mcf.System.GoPackages...)
-		conf.System.Links.Links = append(conf.System.Links.Links, mcf.System.Links.Links...)
-
-		ec.Whenf(ft.NotZero(mcf.Operations.Settings), "config file at %q has defined operational settings that are not mergable", mcf.originalPath)
-		ec.Whenf(mcf.Settings != nil, "config file at %q has defined global settings that are not mergable", mcf.originalPath)
+func (conf *Configuration) Join(mcf *Configuration) *Configuration {
+	if mcf == nil {
+		return conf
 	}
 
+	conf.NetworkCOMPAT.Join(mcf.NetworkCOMPAT)
+	conf.System.Join(mcf.System)
+	conf.Repos.Join(&mcf.Repos)
+	conf.Operations.Join(&mcf.Operations)
+	return conf
+}
+
+func (conf *Configuration) Migrate() *Configuration {
 	for idx := range conf.BlogCOMPAT {
 		conf.BlogCOMPAT[idx].Type = "blog"
 	}
 
 	conf.Repos.Projects = append(conf.Repos.Projects, conf.BlogCOMPAT...)
 	conf.BlogCOMPAT = nil
-
-	conf.System.SystemD.Services = append(conf.System.SystemD.Services, conf.System.ServicesLEGACY...)
-	conf.System.ServicesLEGACY = nil
 
 	conf.Operations.Commands = append(conf.Operations.Commands, conf.CommandsCOMPAT...)
 	conf.CommandsCOMPAT = nil
@@ -246,79 +161,11 @@ func (conf *Configuration) Merge(mcfs ...*Configuration) error {
 	conf.System.Links.Links = append(conf.System.Links.Links, conf.LinksCOMPAT...)
 	conf.LinksCOMPAT = nil
 
-	conf.Network.Hosts = append(conf.Network.Hosts, conf.HostsCOMPAT...)
+	conf.Settings.Network.Hosts = append(conf.Settings.Network.Hosts, conf.HostsCOMPAT...)
 	conf.HostsCOMPAT = nil
 
-	return ec.Resolve()
-}
+	conf.Settings.Network.Hosts = append(conf.Settings.Network.Hosts, conf.NetworkCOMPAT.Hosts...)
+	conf.NetworkCOMPAT.Hosts = nil
 
-func (conf *Settings) Validate() error {
-	conf.Runtime.Hostname = ft.DefaultFuture(conf.Runtime.Hostname, util.GetHostname)
-	conf.DMenuFlags = ft.DefaultFuture(conf.DMenuFlags, func() godmenu.Flags {
-		return godmenu.Flags{
-			// Path:            godmenu.DefaultDMenuPath,
-			// BackgroundColor: godmenu.DefaultBackgroundColor,
-			// TextColor:       godmenu.DefaultTextColor,
-			// Font:            "Source Code Pro-13",
-			Lines:  16,
-			Prompt: "=>>",
-		}
-	})
-
-	if ft.Not(conf.Telegram.IsZero()) {
-		return conf.Telegram.Validate()
-	}
-
-	return nil
-}
-
-func (conf *Settings) DMenu() godmenu.Arg { return godmenu.WithFlags(&conf.DMenuFlags) }
-
-func (conf *NotifyConf) Validate() error {
-	if conf == nil || (conf.Target == "" && os.Getenv("SARDIS_NOTIFY_TARGET") == "") {
-		return nil
-	}
-
-	if conf.Name == "" {
-		conf.Name = "sardis"
-	}
-
-	if conf.Target == "" {
-		conf.Target = os.Getenv("SARDIS_NOTIFY_TARGET")
-	}
-	defaults := xmpp.GetConnectionInfo()
-	if conf.Host == "" {
-		conf.Host = defaults.Hostname
-	}
-	if conf.User == "" {
-		conf.User = defaults.Username
-	}
-	if conf.Password == "" {
-		conf.Password = defaults.Password
-	}
-
-	catcher := &erc.Collector{}
-	for k, v := range map[string]string{
-		"host": conf.Host,
-		"user": conf.User,
-		"pass": conf.Password,
-	} {
-		catcher.Whenf(v == "", "missing value for '%s'", k)
-	}
-
-	return catcher.Resolve()
-}
-
-func (conf *CredentialsConf) Validate() error {
-	if conf.Path == "" {
-		return nil
-	}
-
-	var err error
-	conf.Path, err = homedir.Expand(conf.Path)
-	if err != nil {
-		return err
-	}
-
-	return util.UnmarshalFile(conf.Path, &conf)
+	return conf
 }

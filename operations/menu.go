@@ -13,6 +13,7 @@ import (
 	"github.com/cheynewallace/tabby"
 	fzf "github.com/koki-develop/go-fzf"
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
@@ -128,7 +129,10 @@ func fuzzy() *cmdr.Commander {
 	return addOpCommand(
 		cmdr.MakeCommander().
 			SetName("fuzzy").
-			Aliases("fuzz", "fzf", "fz", "ff"),
+			Aliases("fuzz", "fzf", "fz", "ff").
+			Subcommanders(
+				fuzzySearch(),
+			),
 		"name",
 		func(ctx context.Context, args *withConf[[]string]) error {
 			op := args.arg
@@ -177,6 +181,79 @@ func fuzzy() *cmdr.Commander {
 				default:
 					// this should be impossible
 					return ers.Error("unexpect outcome")
+				}
+			}
+		})
+}
+
+func fuzzySearch() *cmdr.Commander {
+	return addOpCommand(
+		cmdr.MakeCommander().
+			SetName("search").
+			Aliases("find", "s", "f"),
+		"name",
+		func(ctx context.Context, args *withConf[[]string]) error {
+			ff, err := fzf.New(
+				fzf.WithPrompt(fmt.Sprintf("%s.%s ==> ", util.GetHostname(), global.ApplicationName)),
+				fzf.WithNoLimit(true),
+				fzf.WithCaseSensitive(false),
+			)
+			if err != nil {
+				return err
+			}
+
+			searchTree := args.conf.Operations.Tree()
+			path := new(dt.List[string])
+
+			for {
+				switch {
+				case searchTree == nil:
+					return fmt.Errorf("no command found", util.DotJoin(path.Slice()...))
+				case searchTree.HasCommand() && searchTree.HasChidren():
+					fun.Invariant.Ok(searchTree.ID() != "", "cannot execute command defined without name")
+					if err := subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()})); err != nil {
+						return err
+					}
+				case searchTree.HasCommand():
+					return subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()}))
+				case !searchTree.HasChidren():
+					return fmt.Errorf("no further selections at %s", util.DotJoin(path.Slice()...))
+				}
+
+				selections := searchTree.KeysAtLevel()
+				selected, err := ff.Find(selections, func(id int) string { return selections[id] })
+				if err != nil {
+					return err
+				}
+
+				next := subexec.NewNode()
+				misses := []string{}
+				matches := []string{}
+				count := 0
+
+				for _, sidx := range selected {
+					id := selections[sidx]
+
+					switch next.Push(searchTree.NarrowTo(id)) {
+					case true:
+						matches = append(matches, id)
+					case false:
+						misses = append(misses, id)
+					}
+				}
+
+				switch {
+				case len(misses) > 0:
+					return fmt.Errorf("did not find %s.{%s} (found %d)",
+						util.DotJoinParts(path.Slice()),
+						strings.Join(misses, ", "),
+						len(matches))
+				case count == 0:
+					return fmt.Errorf("could not find any items for %s.{%s}",
+						util.DotJoinParts(path.Slice()),
+						strings.Join(selections, ", "))
+				default:
+					searchTree = next
 				}
 			}
 		})

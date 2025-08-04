@@ -20,7 +20,7 @@ type Node struct {
 }
 
 func NewTree(commands []Command) *Node {
-	tree := makeNode()
+	tree := NewNode()
 	tree.add(slices.Values(commands))
 	return tree
 }
@@ -31,6 +31,14 @@ func (n *Node) KeysAtLevel() []string {
 	return util.SparseString(slices.Collect(maps.Keys(n.children)))
 }
 
+func (n *Node) Push(rhn *Node) bool {
+	if rhn == nil || n.word != rhn.word {
+		return false
+	}
+
+	n.children[rhn.word] = rhn
+	return true
+}
 func (n *Node) NarrowTo(key string) *Node { return n.children[key] }
 func (n *Node) HasCommand() bool          { return n.command != nil }
 func (n *Node) HasChidren() bool          { return n.children.Len() > 0 }
@@ -43,7 +51,7 @@ func (n *Node) MarshalJSON() ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func makeNode() *Node { return &Node{children: make(map[string]*Node)} }
+func NewNode() *Node { return &Node{children: make(map[string]*Node)} }
 
 func (n *Node) add(cmds iter.Seq[Command]) {
 	var ok bool
@@ -57,7 +65,7 @@ func (n *Node) add(cmds iter.Seq[Command]) {
 			prev = next
 
 			if next, ok = prev.children[elem]; !ok {
-				next = makeNode()
+				next = NewNode()
 				next.word = elem
 			}
 

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"iter"
 	"slices"
 	"strings"
 
@@ -18,6 +19,26 @@ func MakeSparse[T comparable](in []T) (out []T) { return NilWhenEmpty(slices.Del
 func NilWhenEmpty[T any](in []T) []T            { return ft.IfElse(len(in) > 0, in, nil) }
 func SparseString(in []string) []string {
 	return NilWhenEmpty(slices.DeleteFunc(in, JoinAnd(IsZero, IsWhitespace)))
+}
+
+func Filter[T any](it iter.Seq[T], pfn func(T) bool) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for value := range it {
+			if pfn(value) && !yield(value) {
+				return
+			}
+		}
+	}
+}
+
+func Convert[IN any, OUT any](mpf func(IN) OUT, input iter.Seq[IN]) iter.Seq[OUT] {
+	return func(yield func(val OUT) bool) {
+		for val := range input {
+			if !yield(mpf(val)) {
+				return
+			}
+		}
+	}
 }
 
 func JoinAnd[T any](pfn ...func(T) bool) func(T) bool {

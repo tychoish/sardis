@@ -19,26 +19,43 @@ type Node struct {
 	children dt.Map[string, *Node]
 }
 
-func NewTree(commands []Command) *Node {
+func NewCommandTree(commands []Command) *Node {
 	tree := NewNode()
 	tree.add(slices.Values(commands))
 	return tree
 }
 
-func (conf *Configuration) Tree() *Node { return NewTree(conf.ExportAllCommands()) }
+func NewTree(nodes []*Node) *Node {
+	n := NewNode()
+	for node := range slices.Values(nodes) {
+		n.Push(node)
+	}
+	return n
+}
+func (conf *Configuration) Tree() *Node { return NewCommandTree(conf.ExportAllCommands()) }
 
 func (n *Node) KeysAtLevel() []string {
 	return util.SparseString(slices.Collect(maps.Keys(n.children)))
 }
 
 func (n *Node) Push(rhn *Node) bool {
-	if rhn == nil || n.word != rhn.word {
+	if rhn == nil {
 		return false
 	}
 
 	n.children[rhn.word] = rhn
 	return true
 }
+
+func (n *Node) Extend(ns iter.Seq[*Node]) *Node {
+	for nn := range ns {
+		n.Push(nn)
+	}
+	return n
+}
+
+func (n *Node) Len() int                  { return len(n.children) }
+func (n *Node) Children() iter.Seq[*Node] { return maps.Values(n.children) }
 func (n *Node) NarrowTo(key string) *Node { return n.children[key] }
 func (n *Node) HasCommand() bool          { return n.command != nil }
 func (n *Node) HasChidren() bool          { return n.children.Len() > 0 }

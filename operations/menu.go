@@ -137,14 +137,9 @@ func fuzzy() *cmdr.Commander {
 		func(ctx context.Context, args *withConf[[]string]) error {
 			op := args.arg
 
-			ff, err := fzf.New(
-				fzf.WithPrompt(fmt.Sprintf("%s.%s ==> ", util.GetHostname(), global.ApplicationName)),
-				fzf.WithNoLimit(true),
-				fzf.WithCaseSensitive(false),
-			)
-			if err != nil {
-				return err
-			}
+			prompt := new(dt.List[string])
+			prompt.PushBack(util.GetHostname())
+			prompt.PushBack("sardis")
 
 			opr := GetOperationRuntime(ctx)
 			for {
@@ -172,12 +167,27 @@ func fuzzy() *cmdr.Commander {
 
 					return err
 				case stage.Selections != nil:
-					idxs, err := ff.Find(stage.Selections, stage.SelectionAt)
+					pv := util.DotJoinParts(prompt.Slice())
+					idxs, err := ft.Must(fzf.New(
+						fzf.WithPrompt(fmt.Sprintf("%s =>> ", pv)),
+						fzf.WithNoLimit(true),
+						fzf.WithCaseSensitive(false),
+					)).Find(stage.Selections, stage.SelectionAt)
 					if err != nil {
-						return err
+						return fmt.Errorf("fuzzy selection [%s]: %w", pv, err)
 					}
 
 					op = stage.Resolve(idxs)
+
+					switch len(op) {
+					case 0:
+						return ers.New("not found")
+					case 1:
+						prompt.PushBack(op[0])
+					default:
+						prompt.PushBack(fmt.Sprintf("[%s]", strings.Join(op, ",")))
+					}
+
 				default:
 					// this should be impossible
 					return ers.Error("unexpect outcome")
@@ -193,69 +203,55 @@ func fuzzySearch() *cmdr.Commander {
 			Aliases("find", "s", "f"),
 		"name",
 		func(ctx context.Context, args *withConf[[]string]) error {
-			ff, err := fzf.New(
-				fzf.WithPrompt(fmt.Sprintf("%s.%s ==> ", util.GetHostname(), global.ApplicationName)),
-				fzf.WithNoLimit(true),
-				fzf.WithCaseSensitive(false),
-			)
-			if err != nil {
-				return err
-			}
-
 			searchTree := args.conf.Operations.Tree()
-			path := new(dt.List[string])
 
-			for {
+			for ct := 0; true; ct++ {
 				switch {
 				case searchTree == nil:
-					return fmt.Errorf("no command found", util.DotJoin(path.Slice()...))
+					return fmt.Errorf("no command found at level %d, ", ct)
 				case searchTree.HasCommand() && searchTree.HasChidren():
-					fun.Invariant.Ok(searchTree.ID() != "", "cannot execute command defined without name")
 					if err := subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()})); err != nil {
 						return err
 					}
 				case searchTree.HasCommand():
 					return subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()}))
 				case !searchTree.HasChidren():
-					return fmt.Errorf("no further selections at %s", util.DotJoin(path.Slice()...))
+					return fmt.Errorf("no further selections at level %d", ct)
 				}
 
 				selections := searchTree.KeysAtLevel()
-				selected, err := ff.Find(selections, func(id int) string { return selections[id] })
+				selected, err := ft.Must(fzf.New(
+					fzf.WithPrompt(fmt.Sprintf("%s.%s ==> ", util.GetHostname(), global.ApplicationName)),
+					fzf.WithNoLimit(true),
+					fzf.WithCaseSensitive(false),
+				)).Find(selections, func(id int) string { return selections[id] })
 				if err != nil {
-					return err
+					return fmt.Errorf("fuzzy search selections [%s]: %w", searchTree.ID(), err)
 				}
 
-				next := subexec.NewNode()
-				misses := []string{}
-				matches := []string{}
-				count := 0
+				cmds := []*subexec.Command{}
+				nextSearch := subexec.NewNode()
 
 				for _, sidx := range selected {
 					id := selections[sidx]
+					sn := searchTree.NarrowTo(id)
+					fun.Invariant.Ok(sn != nil, "cannot resolve nil nodes in the search")
 
-					switch next.Push(searchTree.NarrowTo(id)) {
-					case true:
-						matches = append(matches, id)
-					case false:
-						misses = append(misses, id)
+					cmds = append(cmds, sn.Command())
+					nextSearch.Extend(sn.Children())
+				}
+
+				searchTree = nextSearch
+				if len(cmds) > 0 {
+					if err := subexec.RunCommands(ctx, slices.Collect(util.MakeSparseRefs(slices.Values(cmds)))); err != nil {
+						return err
+					}
+					if searchTree.Len() == 0 {
+						return nil
 					}
 				}
-
-				switch {
-				case len(misses) > 0:
-					return fmt.Errorf("did not find %s.{%s} (found %d)",
-						util.DotJoinParts(path.Slice()),
-						strings.Join(misses, ", "),
-						len(matches))
-				case count == 0:
-					return fmt.Errorf("could not find any items for %s.{%s}",
-						util.DotJoinParts(path.Slice()),
-						strings.Join(selections, ", "))
-				default:
-					searchTree = next
-				}
 			}
+			panic("unreachable")
 		})
 }
 

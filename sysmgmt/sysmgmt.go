@@ -24,6 +24,4 @@ func (conf *Configuration) Join(mcf Configuration) {
 	conf.GoPackages = append(conf.GoPackages, mcf.GoPackages...)
 	conf.Links.Links = append(conf.Links.Links, mcf.Links.Links...)
 	conf.SystemD.Services = append(conf.SystemD.Services, mcf.SystemD.Services...)
-	conf.SystemD.Services = append(conf.SystemD.Services, mcf.ServicesLEGACY...)
-	conf.ServicesLEGACY = nil
 }

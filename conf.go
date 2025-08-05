@@ -132,18 +132,6 @@ func (conf *Configuration) expandLinkedFiles() error {
 
 func reduceConf(a, b *Configuration) (*Configuration, error) { return a.Join(b), nil }
 
-func (conf *Configuration) Join(mcf *Configuration) *Configuration {
-	if mcf == nil {
-		return conf
-	}
-
-	conf.NetworkCOMPAT.Join(mcf.NetworkCOMPAT)
-	conf.System.Join(mcf.System)
-	conf.Repos.Join(&mcf.Repos)
-	conf.Operations.Join(&mcf.Operations)
-	return conf
-}
-
 func (conf *Configuration) Migrate() *Configuration {
 	for idx := range conf.BlogCOMPAT {
 		conf.BlogCOMPAT[idx].Type = "blog"
@@ -167,5 +155,20 @@ func (conf *Configuration) Migrate() *Configuration {
 	conf.Settings.Network.Hosts = append(conf.Settings.Network.Hosts, conf.NetworkCOMPAT.Hosts...)
 	conf.NetworkCOMPAT.Hosts = nil
 
+	conf.System.SystemD.Services = append(conf.System.SystemD.Services, conf.System.ServicesLEGACY...)
+	conf.System.ServicesLEGACY = nil
+
+	return conf
+}
+
+func (conf *Configuration) Join(mcf *Configuration) *Configuration {
+	if mcf == nil {
+		return conf
+	}
+
+	conf.NetworkCOMPAT.Join(mcf.NetworkCOMPAT)
+	conf.System.Join(mcf.System)
+	conf.Repos.Join(&mcf.Repos)
+	conf.Operations.Join(&mcf.Operations)
 	return conf
 }

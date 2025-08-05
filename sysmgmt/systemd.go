@@ -22,8 +22,7 @@ import (
 
 type SystemdConfiguration struct {
 	Services []SystemdService `bson:"services" json:"services" yaml:"services"`
-
-	Settings struct{} `bson:"settings" json:"settings" yaml:"settings"`
+	Settings struct{}         `bson:"settings" json:"settings" yaml:"settings"`
 }
 
 type SystemdService struct {

@@ -69,6 +69,7 @@ func readConfiguration(fn string) (*Configuration, error) {
 
 func (conf *Configuration) Validate() error { return conf.caches.validation.Call(conf.doValidate) }
 func (conf *Configuration) doValidate() error {
+	grip.Debugf("validating %q", conf.originalPath)
 	conf.Settings = ft.DefaultNew(conf.Settings)
 
 	ec := &erc.Collector{}
@@ -135,6 +136,8 @@ func (conf *Configuration) Migrate() *Configuration {
 		conf.BlogCOMPAT[idx].Type = "blog"
 	}
 
+	grip.Debugf("migrating config file %q", conf.originalPath)
+
 	conf.Repos.Projects = append(conf.Repos.Projects, conf.BlogCOMPAT...)
 	conf.BlogCOMPAT = nil
 
@@ -166,6 +169,7 @@ func (conf *Configuration) Join(mcf *Configuration) *Configuration {
 	if mcf == nil {
 		return conf
 	}
+	grip.Debugf("merging config files: %q into %q", mcf.originalPath, conf.originalPath)
 
 	conf.NetworkCOMPAT.Join(mcf.NetworkCOMPAT)
 	conf.System.Join(mcf.System)

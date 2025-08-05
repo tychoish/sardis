@@ -10,6 +10,7 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis/repo"
 	"github.com/tychoish/sardis/srv"
 	"github.com/tychoish/sardis/subexec"
@@ -104,33 +105,30 @@ func (conf *Configuration) expandLinkedFiles() error {
 	}
 	defer func() { conf.linkedFilesRead = true }()
 
-	mcf, err := fun.MakeConverterErr(func(fn string) (*Configuration, error) {
-		conf, err := readConfiguration(fn)
-
+	conf.Migrate()
+	err := fun.MakeConverterErr(func(fn string) (*Configuration, error) {
+		grip.Debugf("reading linked config file %q", fn)
+		iconf, err := readConfiguration(fn)
 		switch {
 		case err != nil:
 			return nil, fmt.Errorf("problem reading linked config file %q: %w", fn, err)
-		case conf == nil:
+		case iconf == nil:
 			return nil, fmt.Errorf("nil configuration for %q", fn)
-		case conf.Settings != nil:
+		case iconf.Settings != nil:
 			return nil, fmt.Errorf("nested file %q specified system configuration", fn)
 		default:
-			return conf.Migrate(), nil
+			return iconf.Migrate(), nil
 		}
 	}).Parallel(fun.SliceStream(conf.Settings.ConfigPaths),
 		fun.WorkerGroupConfContinueOnError(),
 		fun.WorkerGroupConfWorkerPerCPU(),
-	).Reduce(reduceConf).Wait()
+	).ReadAll(func(sconf *Configuration) { conf.Join(sconf) }).Wait()
 	if err != nil {
 		return err
 	}
 
-	conf.Migrate().Join(mcf)
-
 	return nil
 }
-
-func reduceConf(a, b *Configuration) (*Configuration, error) { return a.Join(b), nil }
 
 func (conf *Configuration) Migrate() *Configuration {
 	for idx := range conf.BlogCOMPAT {
@@ -149,11 +147,14 @@ func (conf *Configuration) Migrate() *Configuration {
 	conf.System.Links.Links = append(conf.System.Links.Links, conf.LinksCOMPAT...)
 	conf.LinksCOMPAT = nil
 
-	conf.Settings.Network.Hosts = append(conf.Settings.Network.Hosts, conf.HostsCOMPAT...)
-	conf.HostsCOMPAT = nil
+	conf.NetworkCOMPAT.Hosts = append(conf.NetworkCOMPAT.Hosts, conf.NetworkCOMPAT.Hosts...)
+	if conf.Settings != nil {
+		conf.Settings.Network.Hosts = append(conf.Settings.Network.Hosts, conf.HostsCOMPAT...)
+		conf.HostsCOMPAT = nil
 
-	conf.Settings.Network.Hosts = append(conf.Settings.Network.Hosts, conf.NetworkCOMPAT.Hosts...)
-	conf.NetworkCOMPAT.Hosts = nil
+		conf.Settings.Network.Hosts = append(conf.Settings.Network.Hosts, conf.NetworkCOMPAT.Hosts...)
+		conf.NetworkCOMPAT.Hosts = nil
+	}
 
 	conf.System.SystemD.Services = append(conf.System.SystemD.Services, conf.System.ServicesLEGACY...)
 	conf.System.ServicesLEGACY = nil

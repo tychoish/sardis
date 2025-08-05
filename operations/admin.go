@@ -84,7 +84,23 @@ func setupLinks() *cmdr.Commander {
 func configCheck() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("config").
+		Aliases("conf").
 		SetUsage("validated configuration").
+		Subcommanders(addOpCommand(cmdr.MakeCommander().
+			SetName("system").
+			Aliases("sys"),
+			"para", func(ctx context.Context, args *withConf[string]) error {
+				ec := &erc.Collector{}
+
+				buf := bufio.NewWriter(os.Stdout)
+				enc := json.NewEncoder(buf)
+				enc.SetIndent("", "    ")
+
+				ec.Push(enc.Encode(args.conf.System.SystemD))
+				ec.Push(buf.Flush())
+
+				return ec.Resolve()
+			})).
 		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 				ec := &erc.Collector{}

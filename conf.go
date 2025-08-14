@@ -34,8 +34,7 @@ type Configuration struct {
 	operationsGenerated bool
 	linkedFilesRead     bool
 	originalPath        string
-
-	caches struct {
+	caches              struct {
 		validation adt.Once[error]
 	}
 }

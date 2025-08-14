@@ -1,6 +1,8 @@
 package srv
 
 import (
+	"net/http"
+
 	"github.com/mitchellh/go-homedir"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
@@ -61,6 +63,13 @@ func (conf *Configuration) Validate() error {
 	ec := &erc.Collector{}
 	ec.Push(conf.Notify.Validate())
 	ec.Push(conf.Credentials.Validate())
+
+	// TODO: actually have a client pool
+	conf.Telegram.Client = http.DefaultClient
+
+	// TODO fix: there's an IsZero method
+	// which checks if the client is set,
+	// but users shouldn't have to fix this.
 
 	if ft.Not(conf.Telegram.IsZero()) {
 		ec.Push(conf.Telegram.Validate())

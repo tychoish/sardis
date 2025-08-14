@@ -3,6 +3,7 @@ package srv
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -213,7 +214,10 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 	}
 
 	if conf.Telegram.Target != "" {
-		sender := send.MakeBuffered(telegram.New(conf.Telegram), time.Second, 10)
+		opts := conf.Telegram
+		opts.BaseURL = "https://api.telegram.org"
+		opts.Client = http.DefaultClient
+		sender := send.MakeBuffered(telegram.New(opts), time.Second, 10)
 		sender.SetPriority(root.Priority())
 		sender.SetErrorHandler(send.ErrorHandlerFromSender(root))
 		sender.SetFormatter(func(m message.Composer) (string, error) {

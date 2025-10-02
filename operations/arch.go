@@ -69,12 +69,8 @@ func buildPkg() *cmdr.Commander {
 func installAur() *cmdr.Commander {
 	return addOpCommand(cmdr.MakeCommander().
 		SetName("install").
-		SetUsage("fetch AUR package to the ABS directory, and install it").
-		Flags(cmdr.FlagBuilder([]string{}).
-			SetName(nameFlagName, "n").
-			SetUsage("specify a package or packages from the AUR").
-			Flag()),
-		"name", func(ctx context.Context, args *withConf[[]string]) error {
+		SetUsage("fetch AUR package to the ABS directory, and install it"),
+		nameFlagName, func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf.System.Arch
 
 			return fun.MakeConverter(func(name string) fun.Worker {

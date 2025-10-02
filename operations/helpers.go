@@ -58,10 +58,15 @@ func addOpCommand[T cmdr.FlagTypes](
 	var zero T
 
 	return addCommandWithConf(cmd.
-		Flags((&cmdr.FlagOptions[T]{}).
-			SetName(name).
-			SetUsage(fmt.Sprintf("specify one or more %s", name)).
-			Flag()),
+		Flags(
+			cmdr.FlagBuilder(false).
+				SetName("annotate").
+				SetUsage("enable additional annotations").
+				Flag(),
+			(&cmdr.FlagOptions[T]{}).
+				SetName(name).
+				SetUsage(fmt.Sprintf("specify one or more %s", name)).
+				Flag()),
 		func(cc *cli.Context) (T, error) {
 			arg := cmdr.GetFlag[T](cc, name)
 

@@ -57,8 +57,23 @@ func SearchMenu() *cmdr.Commander {
 			listCommands(),
 		),
 		"name", func(ctx context.Context, args *withConf[[]string]) error {
+			if args.conf.Settings.Runtime.WithAnnotations {
+				fun.Invariant.Ok(len(args.conf.Settings.Runtime.AnnotationSeparator) > 0,
+					"annotation separator must be defined as something other than the empty string.")
+
+				fun.Invariant.Ok(args.conf.Settings.Runtime.AnnotationSeparator != "\n",
+					"annotation separator must be defined as something other than a newline character.")
+
+				for idx, op := range args.arg {
+					if op == "" {
+						continue
+					}
+					args.arg[idx] = strings.SplitN(op, args.conf.Settings.Runtime.AnnotationSeparator, 1)[0]
+				}
+			}
+
 			stage, err := args.conf.Operations.ResolveCommands(args.arg)
-			var ops iter.Seq[string]
+			var ops []string
 
 			switch {
 			case err != nil:
@@ -66,13 +81,24 @@ func SearchMenu() *cmdr.Commander {
 			case stage.Commands != nil:
 				return subexec.RunCommands(ctx, stage.Commands)
 			case stage.Prefixed != nil:
-				ops = slices.Values(stage.Prefixed)
+				ops = stage.Prefixed
 			case stage.Selections != nil:
-				ops = slices.Values(stage.Selections)
+				ops = stage.Selections
+			}
+
+			if args.conf.Settings.Runtime.WithAnnotations {
+				index := args.conf.Operations.Tree()
+				for idx, op := range ops {
+					cmd := index.FindCommand(op)
+					ops[idx] = fmt.Sprint(op, " ", args.conf.Settings.Runtime.AnnotationSeparator, " ", cmd.Command)
+					if len(cmd.Commands) > 0 {
+						ops[idx] = fmt.Sprintf("%s ... +%d", ops[idx], len(cmd.Commands))
+					}
+				}
 			}
 
 			buf := bufio.NewWriter(os.Stdout)
-			for op := range ops {
+			for _, op := range ops {
 				ft.Ignore(ft.Must(fmt.Fprintln(buf, op)))
 			}
 

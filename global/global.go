@@ -13,10 +13,15 @@ const (
 	EnvVarSardisLogQuietSyslog = "SARDIS_LOG_QUIET_SYSLOG"
 	EnvVarSardisLogFormatJSON  = "SARDIS_LOG_FORMAT_JSON"
 	EnvVarSardisLogJSONColor   = "SARDIS_LOG_COLOR_JSON"
+	EnvVarSardisAnnotate       = "SARDIS_ANNOTATE_OUTPUT"
 )
 
 const (
 	ContextDesktopLogger = "desktop"
 	ContextRemoteLogger  = "remote"
 	ContextTwitterLogger = "twitter"
+)
+
+const (
+	MenuCommanderDefaultAnnotationSeparator string = "\t"
 )

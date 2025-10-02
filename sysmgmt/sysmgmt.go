@@ -3,11 +3,12 @@ package sysmgmt
 import "github.com/tychoish/fun/erc"
 
 type Configuration struct {
-	GoPackages     []GoPackage          `bson:"golang" json:"golang" yaml:"golang"`
-	Arch           ArchLinux            `bson:"arch" json:"arch" yaml:"arch"`
-	SystemD        SystemdConfiguration `bson:"systemd" json:"systemd" yaml:"systemd"`
-	Links          LinkConfiguration    `bson:"links" json:"links" yaml:"links"`
-	ServicesLEGACY []SystemdService     `bson:"services,omitempty" json:"services,omitempty" yaml:"services,omitempty"`
+	GoPackages []GoPackage          `bson:"golang" json:"golang" yaml:"golang"`
+	Arch       ArchLinux            `bson:"arch" json:"arch" yaml:"arch"`
+	SystemD    SystemdConfiguration `bson:"systemd" json:"systemd" yaml:"systemd"`
+	Links      LinkConfiguration    `bson:"links" json:"links" yaml:"links"`
+
+	ServicesLEGACY []SystemdService `bson:"services,omitempty" json:"services,omitempty" yaml:"services,omitempty"`
 }
 
 func (conf *Configuration) Validate() error {

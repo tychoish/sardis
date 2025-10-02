@@ -19,6 +19,10 @@ type Configuration struct {
 	Network     Network          `bson:"network" json:"network" yaml:"network"`
 	ConfigPaths []string         `bson:"config_files" json:"config_files" yaml:"config_files"`
 	DMenuFlags  godmenu.Flags    `bson:"dmenu" json:"dmenu" yaml:"dmenu"`
+	Runtime     struct {
+		WithAnnotations     bool   `bson:"annotate" json:"annotate" yaml:"annotate"`
+		AnnotationSeparator string `bson:"annotation_separator" json:"annotation_separator" yaml:"annotation_separator"`
+	} `bson:"runtime" json:"runtime" yaml:"runtime"`
 }
 
 type Credentials struct {

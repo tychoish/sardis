@@ -67,6 +67,8 @@ func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configu
 	conf.Settings.Logging.DisableStandardOutput = cc.Bool("quietStdOut") || os.Getenv(global.EnvVarSardisLogQuietStdOut) != ""
 	conf.Settings.Logging.EnableJSONFormating = cc.Bool("jsonLog") || os.Getenv(global.EnvVarSardisLogFormatJSON) != ""
 	conf.Settings.Logging.EnableJSONColorFormatting = cc.Bool("colorJsonLog") || os.Getenv(global.EnvVarSardisLogJSONColor) != ""
+	conf.Settings.Runtime.WithAnnotations = cc.Bool("annotate") || os.Getenv(global.EnvVarSardisAnnotate) != "" || conf.Settings.Runtime.AnnotationSeparator != ""
+	conf.Settings.Runtime.AnnotationSeparator = ft.Default(conf.Settings.Runtime.AnnotationSeparator, global.MenuCommanderDefaultAnnotationSeparator)
 
 	return conf, nil
 }

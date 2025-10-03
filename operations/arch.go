@@ -28,12 +28,8 @@ func ArchLinux() *cmdr.Commander {
 func fetchAur() *cmdr.Commander {
 	return addOpCommand(cmdr.MakeCommander().
 		SetName("fetch").
-		SetUsage("download source to build directory").
-		Flags(cmdr.FlagBuilder([]string{}).
-			SetName(nameFlagName, "n").
-			SetUsage("specify a package or packages to download from the AUR").
-			Flag()),
-		"name", func(ctx context.Context, args *withConf[[]string]) error {
+		SetUsage("download source to build directory"),
+		nameFlagName, func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf.System.Arch
 			return fun.MakeConverter(func(name string) fun.Worker {
 				return conf.FetchPackageFromAUR(name, true)
@@ -48,12 +44,8 @@ func fetchAur() *cmdr.Commander {
 func buildPkg() *cmdr.Commander {
 	return addOpCommand(cmdr.MakeCommander().
 		SetName("build").
-		SetUsage("build a package").
-		Flags(cmdr.FlagBuilder([]string{}).
-			SetName(nameFlagName, "n").
-			SetUsage("specify a package or packages from the AUR").
-			Flag()),
-		"name", func(ctx context.Context, args *withConf[[]string]) error {
+		SetUsage("build a package"),
+		nameFlagName, func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf.System.Arch
 
 			return fun.MakeConverter(func(name string) fun.Worker {

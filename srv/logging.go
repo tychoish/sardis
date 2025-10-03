@@ -206,10 +206,7 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 		loggers = append(loggers, sender)
 
 		srv.AddCleanup(ctx, func(ctx context.Context) error {
-			catcher := &erc.Collector{}
-			catcher.Add(sender.Flush(ctx))
-			catcher.Add(sender.Close())
-			return ers.Wrapf(catcher.Resolve(), "xmpp [%s]", conf.Notify.Name)
+			return ers.Wrapf(erc.Join(sender.Flush(ctx), sender.Close()), "xmpp [%s]", conf.Notify.Name)
 		})
 	}
 

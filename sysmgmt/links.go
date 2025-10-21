@@ -26,7 +26,7 @@ type LinkConfiguration struct {
 		Sudo bool   `bson:"sudo" json:"sudo" yaml:"sudo"`
 	} `bson:"manged" json:"manged" yaml:"manged"`
 
-	Discovery LinkDiscovery `bson:"discovery" json:"discovery" yaml:"discovery"`
+	// Discovery LinkDiscovery `bson:"discovery" json:"discovery" yaml:"discovery"`
 	System    struct{}      `bson:"system" json:"system" yaml:"system"`
 }
 

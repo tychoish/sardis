@@ -76,6 +76,7 @@ func (conf *Configuration) doValidate() error {
 	ec.Push(conf.expandLinkedFiles())
 	ec.Push(conf.expandOperations())
 
+	ec.Push(conf.Settings.Validate())
 	ec.Push(conf.System.Validate())
 	ec.Push(conf.Repos.Validate())
 	ec.Push(conf.Operations.Validate())
@@ -119,9 +120,8 @@ func (conf *Configuration) expandLinkedFiles() error {
 		default:
 			return iconf.Migrate(), nil
 		}
-	}).Parallel(fun.SliceStream(conf.Settings.ConfigPaths),
-		fun.WorkerGroupConfContinueOnError(),
-		fun.WorkerGroupConfWorkerPerCPU(),
+	}).Stream(fun.SliceStream(conf.Settings.ConfigPaths).
+		Transform(fun.MakeConverter(util.TryExpandHomeDir)),
 	).ReadAll(func(sconf *Configuration) { conf.Join(sconf) }).Wait()
 	if err != nil {
 		return err

@@ -113,6 +113,10 @@ func (conf *GitRepository) CloneJob() fun.Worker {
 	const opName = "repo-clone"
 
 	return func(ctx context.Context) error {
+		if err := conf.Validate(); err != nil {
+			return ers.Wrap(err, "invalid config.")
+		}
+
 		hostname := util.GetHostname()
 		startAt := time.Now()
 		nonce := strings.ToLower(rand.Text())[:7]

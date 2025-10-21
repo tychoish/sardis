@@ -53,16 +53,14 @@ type Credentials struct {
 }
 
 func (conf *Configuration) Validate() error {
-	conf.DMenuFlags = ft.DefaultFuture(conf.DMenuFlags, func() godmenu.Flags {
-		return godmenu.Flags{
-			// Path:            godmenu.DefaultDMenuPath,
-			// BackgroundColor: godmenu.DefaultBackgroundColor,
-			// TextColor:       godmenu.DefaultTextColor,
-			// Font:            "Source Code Pro-13",
-			Lines:  16,
-			Prompt: "=>>",
-		}
-	})
+	conf.DMenuFlags = godmenu.Flags{
+		Path:            ft.Default(conf.DMenuFlags.Path, godmenu.DefaultDMenuPath),
+		BackgroundColor: ft.Default(conf.DMenuFlags.BackgroundColor, godmenu.DefaultBackgroundColor),
+		TextColor:       ft.Default(conf.DMenuFlags.TextColor, godmenu.DefaultTextColor),
+		Font:            ft.Default(conf.DMenuFlags.Font, "Source Code Pro-14"),
+		Lines:           ft.Default(conf.DMenuFlags.Lines, 16),
+		Prompt:          ft.Default(conf.DMenuFlags.Prompt, "=>>"),
+	}
 
 	ec := &erc.Collector{}
 	ec.Push(conf.Notify.Validate())
@@ -77,6 +75,10 @@ func (conf *Configuration) Validate() error {
 
 	if ft.Not(conf.Telegram.IsZero()) {
 		ec.Push(conf.Telegram.Validate())
+	}
+
+	for idx := range conf.ConfigPaths {
+		conf.ConfigPaths[idx] = util.TryExpandHomeDir(conf.ConfigPaths[idx])
 	}
 
 	return ec.Resolve()

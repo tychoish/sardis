@@ -306,7 +306,7 @@ func DMenu() *cmdr.Commander {
 						godmenu.SetSelections(stage.Selections),
 						godmenu.WithFlags(ft.Ptr(args.conf.Settings.DMenuFlags)),
 						godmenu.Prompt(fmt.Sprintf("%s ==>>", ft.Default(stage.NextLabel, "sardis"))),
-						godmenu.MenuLines(min(len(stage.Selections), 16)),
+						godmenu.MenuLines(min(len(stage.Selections), args.conf.Settings.DMenuFlags.Lines)),
 					)
 
 					switch {
@@ -366,7 +366,7 @@ func dmenuSearch() *cmdr.Commander {
 					godmenu.SetSelections(selections),
 					godmenu.WithFlags(ft.Ptr(args.conf.Settings.DMenuFlags)),
 					godmenu.Prompt(fmt.Sprintf("%s =>>", prompt)),
-					godmenu.MenuLines(min(len(selections), 16)),
+					godmenu.MenuLines(min(len(selections), args.conf.Settings.DMenuFlags.Lines)),
 				)
 
 				switch {

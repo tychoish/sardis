@@ -26,9 +26,23 @@ func Apply[T any](fn func(T) T, in []T) []T {
 	return out
 }
 
-func TryExpandHomeDirs(in []string) []string { return Apply(jutil.TryExpandHomedir, in) }
-func TryExpandHomeDir(in string) string      { return jutil.TryExpandHomedir(in) }
+func TryExpandHomeDirs(in []string) []string { return Apply(TryExpandHomeDir, in) }
 func GetHomeDir() string                     { return jutil.GetHomedir() }
+
+func TryExpandHomeDir(in string) string {
+	in = strings.TrimSpace(in)
+
+	if len(in) == 0 || in[0] != '~' {
+		return in
+	}
+
+	if len(in) > 1 && in[1] != '/' && in[1] != '\\' {
+		// these are "~foo" or "~\" values which are ambiguous
+		return in
+	}
+
+	return filepath.Join(GetHomeDir(), in[1:])
+}
 
 func GetDirectoryContents(path string) (*fun.Stream[string], error) {
 	dir, err := os.Open(path)

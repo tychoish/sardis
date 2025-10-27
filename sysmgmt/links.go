@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -26,8 +27,8 @@ type LinkConfiguration struct {
 		Sudo bool   `bson:"sudo" json:"sudo" yaml:"sudo"`
 	} `bson:"manged" json:"manged" yaml:"manged"`
 
-	// Discovery LinkDiscovery `bson:"discovery" json:"discovery" yaml:"discovery"`
-	System    struct{}      `bson:"system" json:"system" yaml:"system"`
+	Discovery *LinkDiscovery `bson:"discovery" json:"discovery" yaml:"discovery"`
+	System    struct{}       `bson:"system" json:"system" yaml:"system"`
 }
 
 type LinkDefinition struct {
@@ -46,6 +47,9 @@ func (conf *LinkConfiguration) Validate() error {
 	for idx := range conf.Links {
 		ec.Wrapf(conf.Links[idx].Validate(), "%d/%d of %T is not valid", idx, len(conf.Links), conf.Links[idx])
 	}
+	conf.Discovery = ft.DefaultNew(conf.Discovery)
+	ec.Push(conf.Discovery.Validate())
+
 	return ec.Resolve()
 }
 

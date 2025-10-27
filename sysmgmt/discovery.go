@@ -1,23 +1,35 @@
 package sysmgmt
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/libfun"
 	"github.com/tychoish/sardis/util"
 )
 
 type LinkDiscovery struct {
-	// Target paths, if populated, are a list of path-prefixes for the targets of managed links. Use this list to filter
-	// links in the search path trees that should be managed. If not specified all links in the search paths are managed.
-	TargetPaths []string `bson:"targets" json:"targets" yaml:"targets"`
 	// SearchPaths are a a list of paths/trees where the links contained within are (potentially?) managed.
-	SearchPaths []string `bson:"search" json:"search" yaml:"search"`
+	SearchPaths          []string `bson:"search" json:"search" yaml:"search"`
+	IgnorePathPrefixes   []string `bson:"ignore_path_prefixes" json:"ignore_path_prefixes" yaml:"ignore_path_prefixes"`
+	IgnoreTargetPrefixes []string `bson:"ignore_target_prefixes" json:"ignore_target_prefixes" yaml:"ignore_target_prefixes"`
+
+	SkipMissingTargets  *bool `bson:"skip_missing_targets" json:"skip_missing_targets" yaml:"skip_missing_targets"`
+	SkipResolvedTargets *bool `bson:"skip_resolved_targets" json:"skip_resolved_targets" yaml:"skip_resolved_targets"`
+
+	Runtime struct {
+		hostname string
+	} `bson:"-" json:"-" yaml:"-"`
 }
 
 func tryAbsPath(path string) string {
@@ -32,70 +44,69 @@ func (disco *LinkDiscovery) Validate() error {
 		disco.SearchPaths = append(disco.SearchPaths, util.GetHomeDir())
 	}
 
-	disco.SearchPaths = util.TryExpandHomeDirs(util.Apply(tryAbsPath, disco.SearchPaths))
-	disco.TargetPaths = util.TryExpandHomeDirs(util.Apply(tryAbsPath, disco.TargetPaths))
+	disco.SearchPaths = fun.NewGenerator(dt.NewSlice(disco.SearchPaths).Stream().Transform(fun.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
+	disco.IgnorePathPrefixes = fun.NewGenerator(dt.NewSlice(disco.IgnorePathPrefixes).Stream().Transform(fun.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
+	disco.IgnoreTargetPrefixes = fun.NewGenerator(dt.NewSlice(disco.IgnoreTargetPrefixes).Stream().Transform(fun.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
+
 	for idx := range disco.SearchPaths {
 		path := disco.SearchPaths[idx]
 		stat, err := os.Stat(disco.SearchPaths[idx])
 		ec.Whenf(os.IsNotExist(err), "link search tree %q does not exist", path)
-		ec.Whenf(stat.Mode() != os.ModeDir|os.ModeSymlink,
+		ec.Whenf(!stat.IsDir() || stat.Mode().IsRegular(),
 			"search tree must be either symlinks or directories, %s is %s", path, stat.Mode())
 	}
 	return ec.Resolve()
 }
+func (disco *LinkDiscovery) ShouldSkipMissingTargets() bool  { return ft.Ref(disco.SkipMissingTargets) }
+func (disco *LinkDiscovery) ShouldSkipResolvedTargets() bool { return ft.Ref(disco.SkipMissingTargets) }
 
-type PathSearchMap dt.Map[string, PathSearchMap]
-
-func (conf *LinkDiscovery) Resolve() (*dt.Tuples[string, string], error) {
-	longest, shortest := 0, 0
-	search := PathSearchMap{}
-	mapping := search
-	for _, path := range conf.TargetPaths {
-		parts := strings.Split(path, string(filepath.Separator))
-		longest = max(longest, len(parts))
-		shortest = min(ft.Default(shortest, len(parts)), len(parts))
-		if size := len(parts); size > 0 {
-			shortest = max(0)
+func (disco *LinkDiscovery) FindLinks() *fun.Stream[*LinkDefinition] {
+	return fun.MakeConverter(func(in dt.Tuple[string, string]) *LinkDefinition {
+		return &LinkDefinition{
+			Name:        strings.TrimLeft(strings.ReplaceAll(in.One, string(filepath.Separator), "-"), "- _."),
+			Target:      in.One,
+			Path:        in.Two,
+			RequireSudo: strings.HasPrefix(in.Two, disco.Runtime.hostname),
 		}
-		for _, elem := range parts {
-			if _, ok := mapping[elem]; !ok {
-				mapping[elem] = PathSearchMap{}
+	}).Stream(fun.MergeStreams(fun.MakeConverter(func(path string) *fun.Stream[dt.Tuple[string, string]] {
+		return libfun.WalkDirIterator(path, func(p string, dir fs.DirEntry) (*dt.Tuple[string, string], error) {
+			// Check if the file is a symbolic link
+			if dir.Type()&fs.ModeSymlink != 0 {
+				target, err := os.Readlink(p)
+				if err != nil {
+					if errors.Is(err, fs.ErrPermission) {
+						return nil, nil
+					}
+					return nil, fmt.Errorf("error reading symbolic link %s: %w", path, err)
+				}
+				target = tryAbsPath(target)
+
+				if util.FileExists(target) {
+					if disco.ShouldSkipResolvedTargets() {
+						return nil, nil
+					}
+				} else if disco.ShouldSkipMissingTargets() {
+					return nil, nil
+				}
+
+				return ft.Ptr(dt.MakeTuple(target, p)), nil
 			}
-			mapping = mapping[elem]
-		}
-		mapping = search
-	}
 
-	// TODO: this implementation checks to see if any of the searchpaths are prefixes of the target paths, when what we
-	// really want to do is check if any of the target paths are prefixes of the targets of the links in the search paths.
-	toTraverse := make([]string, 0, len(conf.SearchPaths))
-	for _, tree := range conf.SearchPaths {
-
-		parts := strings.Split(tree, string(filepath.Separator))
-		if len(search) == 0 {
-			// if there aren't target constraints listed, then we look at everything
-			toTraverse = append(toTraverse, tree)
-			continue
-		}
-
-		if len(parts) > longest {
-			continue
-		}
-
-		targets := search
-		for _, p := range parts {
-			if next, ok := targets[p]; ok {
-				targets = next
-				continue
-			} else {
-				targets = nil
-				break
+			return nil, nil
+		})
+	}).Stream(fun.SliceStream(disco.SearchPaths)))).Filter(func(link *LinkDefinition) bool {
+		for ignore := range slices.Values(disco.IgnorePathPrefixes) {
+			if strings.HasPrefix(link.Path, ignore) {
+				return false
 			}
 		}
-		if targets != nil {
-			toTraverse = append(toTraverse, tree)
-		}
-	}
 
-	return nil, ers.New("not implemented")
+		for ignore := range slices.Values(disco.IgnoreTargetPrefixes) {
+			if strings.HasPrefix(link.Target, ignore) {
+				return false
+			}
+		}
+
+		return true
+	})
 }

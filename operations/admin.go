@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"os"
 	"slices"
+	"strconv"
 
 	"github.com/cheynewallace/tabby"
 	"github.com/mattn/go-isatty"
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
@@ -20,6 +22,7 @@ import (
 	"github.com/tychoish/sardis/repo"
 	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/sysmgmt"
+	"github.com/tychoish/sardis/util"
 )
 
 func Admin() *cmdr.Commander {
@@ -29,7 +32,7 @@ func Admin() *cmdr.Commander {
 		Subcommanders(
 			configCheck(),
 			nightly(),
-			setupLinks(),
+			linkOp(),
 			hacking(),
 		)
 }
@@ -67,9 +70,10 @@ func hacking() *cmdr.Commander {
 		}).Add)
 }
 
-func setupLinks() *cmdr.Commander {
+func linkOp() *cmdr.Commander {
 	return cmdr.MakeCommander().
-		SetName("setup-links").
+		SetName("links").
+		Aliases("setup-links").
 		SetUsage("setup all configured links").
 		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
@@ -78,7 +82,31 @@ func setupLinks() *cmdr.Commander {
 				jobs := fun.MakeConverter(func(c sysmgmt.LinkDefinition) fun.Worker { return c.CreateLinkJob() }).Stream(links)
 
 				return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
-			}).Add)
+			}).
+			Add).
+		Subcommanders(addOpCommand(cmdr.MakeCommander().
+			SetName("discover").
+			Aliases("disco", "disc").SetUsage("discover"),
+			"path", func(ctx context.Context, args *withConf[string]) error {
+				var idx int
+
+				ec := &erc.Collector{}
+				table := tabby.New()
+				table.AddHeader("Index", "+sudo", "Target", "Path")
+				args.conf.System.Links.Discovery.SearchPaths = append(args.conf.System.Links.Discovery.SearchPaths, args.arg)
+				args.conf.System.Links.Discovery.FindLinks().ReadAll(func(d *sysmgmt.LinkDefinition) {
+					table.AddLine(
+						strconv.Itoa(idx),
+						ft.IfElse(d.RequireSudo, "sudo", "-"),
+						util.TryCollapseHomeDir(d.Target),
+						util.TryCollapseHomeDir(d.Path),
+					)
+					idx++
+				}).Operation(ec.Push).Run(ctx)
+				table.Print()
+
+				return ec.Resolve()
+			}))
 }
 
 func configCheck() *cmdr.Commander {

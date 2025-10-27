@@ -4,9 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
-	"os/signal"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/urfave/cli/v2"
@@ -99,12 +97,12 @@ func BuildCommand() *cmdr.Commander {
 	return cmd
 }
 
-func main() {
-	// because the build command is blocking this context means
-	// that we'll catch and handle the sig term correctly.
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer cancel()
+// func main() {
+// 	// because the build command is blocking this context means
+// 	// that we'll catch and handle the sig term correctly.
+// 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+// 	defer cancel()
 
-	// run the command
-	cmdr.Main(ctx, BuildCommand())
-}
+// 	// run the command
+// 	cmdr.Main(ctx, BuildCommand())
+// }

@@ -39,6 +39,11 @@ type Configuration struct {
 	}
 }
 
+type ConfigurationFile struct {
+	Local  map[string]*Configuration `bson:"local" json:"local" yaml:"local"`
+	Global *Configuration            `bson:"global" json:"global" yaml:"global"`
+}
+
 func LoadConfiguration(fn string) (*Configuration, error) {
 	out, err := readConfiguration(fn)
 	if err != nil {
@@ -54,14 +59,36 @@ func LoadConfiguration(fn string) (*Configuration, error) {
 
 func readConfiguration(fn string) (*Configuration, error) {
 	if _, err := os.Stat(fn); os.IsNotExist(err) {
-		return nil, fmt.Errorf("%s does not exist [%s]", fn, err)
+		return nil, fmt.Errorf("%s does not exist: %w", fn, err)
 	}
 
-	out := &Configuration{}
-
-	if err := util.UnmarshalFile(fn, out); err != nil {
-		return nil, fmt.Errorf("problem unmarshaling config data: %w", err)
+	fnout := &ConfigurationFile{}
+	if err := util.UnmarshalFile(fn, fnout); err != nil {
+		return nil, fmt.Errorf("file %s was not parsable: %w", err)
 	}
+	var out *Configuration
+	hostname := util.GetHostname()
+	if fnout.Local == nil && fnout.Global != nil {
+		out = fnout.Global
+	} else if fnout.Local == nil && fnout.Global == nil {
+		out = &Configuration{}
+		if err := util.UnmarshalFile(fn, &out); err != nil {
+			return nil, fmt.Errorf("problem unmarshaling config data: %w", err)
+		}
+	} else if lc := fnout.Local[hostname]; lc == nil {
+		if fnout.Global != nil {
+			out = fnout.Global
+		} else {
+			return nil, fmt.Errorf("local configs defined but no base for %s", fn)
+		}
+	} else if lc != nil && fnout.Global != nil {
+		out = fnout.Global.Join(lc.Migrate())
+	} else if lc == nil && fnout.Global == nil {
+		out = lc
+	} else {
+		panic("this should be impossible")
+	}
+
 	out.originalPath = fn
 	return out, nil
 }
@@ -122,7 +149,7 @@ func (conf *Configuration) expandLinkedFiles() error {
 		}
 	}).Stream(fun.SliceStream(conf.Settings.ConfigPaths).
 		Transform(fun.MakeConverter(util.TryExpandHomeDir)),
-	).ReadAll(func(sconf *Configuration) { conf.Join(sconf) }).Wait()
+	).ReadAll(conf.doJoin).Wait()
 	if err != nil {
 		return err
 	}
@@ -150,6 +177,10 @@ func (conf *Configuration) Migrate() *Configuration {
 	conf.LinksCOMPAT = nil
 
 	conf.NetworkCOMPAT.Hosts = append(conf.NetworkCOMPAT.Hosts, conf.NetworkCOMPAT.Hosts...)
+	if conf.Settings == nil && len(conf.NetworkCOMPAT.Hosts) > 0 {
+		conf.Settings = &srv.Configuration{}
+	}
+
 	if conf.Settings != nil {
 		conf.Settings.Network.Hosts = append(conf.Settings.Network.Hosts, conf.HostsCOMPAT...)
 		conf.HostsCOMPAT = nil
@@ -164,6 +195,7 @@ func (conf *Configuration) Migrate() *Configuration {
 	return conf
 }
 
+func (conf *Configuration) doJoin(mcf *Configuration) { conf.Join(mcf) }
 func (conf *Configuration) Join(mcf *Configuration) *Configuration {
 	if mcf == nil {
 		return conf
@@ -171,6 +203,7 @@ func (conf *Configuration) Join(mcf *Configuration) *Configuration {
 	grip.Debugf("merging config files: %q into %q", mcf.originalPath, conf.originalPath)
 
 	conf.NetworkCOMPAT.Join(mcf.NetworkCOMPAT)
+	conf.Settings.Join(mcf.Settings)
 	conf.System.Join(mcf.System)
 	conf.Repos.Join(&mcf.Repos)
 	conf.Operations.Join(&mcf.Operations)

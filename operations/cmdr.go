@@ -63,10 +63,10 @@ func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configu
 	}
 
 	conf.Settings.Logging.Priority = level.FromString(cc.String("level"))
-	conf.Settings.Logging.DisableSyslog = cc.Bool("quietSyslog") || os.Getenv(global.EnvVarSardisLogQuietSyslog) != ""
-	conf.Settings.Logging.DisableStandardOutput = cc.Bool("quietStdOut") || os.Getenv(global.EnvVarSardisLogQuietStdOut) != ""
-	conf.Settings.Logging.EnableJSONFormating = cc.Bool("jsonLog") || os.Getenv(global.EnvVarSardisLogFormatJSON) != ""
-	conf.Settings.Logging.EnableJSONColorFormatting = cc.Bool("colorJsonLog") || os.Getenv(global.EnvVarSardisLogJSONColor) != ""
+	conf.Settings.Logging.DisableSyslog = ft.Ptr(cc.Bool("quietSyslog") || os.Getenv(global.EnvVarSardisLogQuietSyslog) != "")
+	conf.Settings.Logging.DisableStandardOutput = ft.Ptr(cc.Bool("quietStdOut") || os.Getenv(global.EnvVarSardisLogQuietStdOut) != "")
+	conf.Settings.Logging.EnableJSONFormating = ft.Ptr(cc.Bool("jsonLog") || os.Getenv(global.EnvVarSardisLogFormatJSON) != "")
+	conf.Settings.Logging.EnableJSONColorFormatting = ft.Ptr(cc.Bool("colorJsonLog") || os.Getenv(global.EnvVarSardisLogJSONColor) != "")
 	conf.Settings.Runtime.WithAnnotations = cc.Bool("annotate") || os.Getenv(global.EnvVarSardisAnnotate) != "" || conf.Settings.Runtime.AnnotationSeparator != ""
 	conf.Settings.Runtime.AnnotationSeparator = ft.Default(conf.Settings.Runtime.AnnotationSeparator, global.MenuCommanderDefaultAnnotationSeparator)
 

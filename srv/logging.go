@@ -13,6 +13,7 @@ import (
 	"github.com/nwidger/jsoncolor"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -29,11 +30,38 @@ import (
 )
 
 type LoggingSettings struct {
-	DisableStandardOutput     bool           `bson:"disable_standard_output" json:"disable_standard_output" yaml:"disable_standard_output"`
-	EnableJSONFormating       bool           `bson:"enable_json_formatting" json:"enable_json_formatting" yaml:"enable_json_formatting"`
-	EnableJSONColorFormatting bool           `bson:"enable_json_color_formatting" json:"enable_json_color_formatting" yaml:"enable_json_color_formatting"`
-	DisableSyslog             bool           `bson:"disable_syslog" json:"disable_syslog" yaml:"disable_syslog"`
+	DisableStandardOutput     *bool          `bson:"disable_standard_output" json:"disable_standard_output" yaml:"disable_standard_output"`
+	EnableJSONFormating       *bool          `bson:"enable_json_formatting" json:"enable_json_formatting" yaml:"enable_json_formatting"`
+	EnableJSONColorFormatting *bool          `bson:"enable_json_color_formatting" json:"enable_json_color_formatting" yaml:"enable_json_color_formatting"`
+	DisableSyslog             *bool          `bson:"disable_syslog" json:"disable_syslog" yaml:"disable_syslog"`
 	Priority                  level.Priority `bson:"priority" json:"priority" yaml:"priority"`
+}
+
+func (ls *LoggingSettings) Join(mc *LoggingSettings) {
+	if mc == nil {
+		return
+	}
+	ls.DisableStandardOutput = ft.Default(mc.DisableStandardOutput, ls.DisableStandardOutput)
+	ls.EnableJSONFormating = ft.Default(mc.EnableJSONFormating, ls.EnableJSONFormating)
+	ls.EnableJSONColorFormatting = ft.Default(mc.EnableJSONColorFormatting, ls.EnableJSONColorFormatting)
+	ls.DisableSyslog = ft.Default(mc.DisableSyslog, ls.DisableSyslog)
+	ls.Priority = ft.Default(mc.Priority, ls.Priority)
+}
+
+func (ls *LoggingSettings) DisableLoggingToStandardOutput() bool {
+	return ls.DisableStandardOutput != nil && ft.Ref(ls.DisableStandardOutput)
+}
+
+func (ls *LoggingSettings) DisableLoggingToSyslog() bool {
+	return ls.DisableSyslog != nil && ft.Ref(ls.DisableSyslog)
+}
+
+func (ls *LoggingSettings) EnableJSONFormattingForLogOutput() bool {
+	return ls.EnableJSONFormating != nil && ft.Ref(ls.EnableJSONFormating)
+}
+
+func (ls *LoggingSettings) EnableJSONColorFormattingForLogOutput() bool {
+	return ls.EnableJSONColorFormatting != nil && ft.Ref(ls.EnableJSONColorFormatting)
 }
 
 type NotifySettings struct {
@@ -42,8 +70,19 @@ type NotifySettings struct {
 	Host     string `bson:"host" json:"host" yaml:"host"`
 	User     string `bson:"user" json:"user" yaml:"user"`
 	Password string `bson:"password" json:"password" yaml:"password"`
-	Disabled bool   `bson:"disabled" json:"disabled" yaml:"disabled"`
+	Disabled *bool  `bson:"disabled" json:"disabled" yaml:"disabled"`
 }
+
+func (conf *NotifySettings) Join(mc *NotifySettings) {
+	conf.Name = ft.Default(mc.Name, conf.Name)
+	conf.Target = ft.Default(mc.Target, conf.Target)
+	conf.Host = ft.Default(mc.Host, conf.Host)
+	conf.User = ft.Default(mc.User, conf.User)
+	conf.Password = ft.Default(mc.Password, conf.Password)
+	conf.Disabled = ft.Default(mc.Disabled, conf.Disabled)
+}
+
+func (conf *NotifySettings) Enabled() bool { return conf.Disabled == nil || !ft.Ref(conf.Disabled) }
 
 func (conf *NotifySettings) Validate() error {
 	if conf == nil || (conf.Target == "" && os.Getenv("SARDIS_NOTIFY_TARGET") == "") {
@@ -89,17 +128,17 @@ func WithAppLogger(ctx context.Context, conf LoggingSettings) context.Context {
 func SetupLogging(conf LoggingSettings) send.Sender {
 	var sender send.Sender
 
-	if conf.EnableJSONFormating || conf.EnableJSONColorFormatting {
+	if conf.EnableJSONFormattingForLogOutput() || conf.EnableJSONColorFormattingForLogOutput() {
 		sender = send.MakePlain()
 	} else {
 		sender = send.MakeStdError()
 	}
 
-	if runtime.GOOS == "linux" && !conf.DisableSyslog && journal.Enabled() {
+	if runtime.GOOS == "linux" && !conf.DisableLoggingToSyslog() && journal.Enabled() {
 		syslog := system.MakeDefault()
 		syslog.SetName(filepath.Base(os.Args[0]))
 
-		if conf.DisableStandardOutput {
+		if conf.DisableLoggingToStandardOutput() {
 			sender = syslog
 		} else {
 			sender = send.MakeMulti(syslog, sender)
@@ -107,7 +146,7 @@ func SetupLogging(conf LoggingSettings) send.Sender {
 	}
 
 	switch {
-	case conf.EnableJSONColorFormatting:
+	case conf.EnableJSONColorFormattingForLogOutput():
 		sender.SetFormatter(func(m message.Composer) (string, error) {
 			out, err := jsoncolor.Marshal(m.Raw())
 			if err != nil {
@@ -115,7 +154,7 @@ func SetupLogging(conf LoggingSettings) send.Sender {
 			}
 			return string(out), nil
 		})
-	case conf.EnableJSONFormating:
+	case conf.EnableJSONColorFormattingForLogOutput():
 		sender.SetFormatter(send.MakeJSONFormatter())
 	}
 
@@ -182,7 +221,7 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 
 	host := util.GetHostname()
 
-	if conf.Notify.Target != "" && !conf.Notify.Disabled {
+	if conf.Notify.Target != "" && conf.Notify.Enabled() {
 		sender, err := xmpp.NewSender(conf.Notify.Target,
 			xmpp.ConnectionInfo{
 				Hostname:             conf.Notify.Host,

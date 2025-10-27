@@ -25,6 +25,30 @@ type Configuration struct {
 	} `bson:"runtime" json:"runtime" yaml:"runtime"`
 }
 
+func (conf *Configuration) Join(mc *Configuration) {
+	if mc == nil {
+		return
+	}
+	conf.ConfigPaths = append(conf.ConfigPaths, mc.ConfigPaths...)
+	conf.Notify.Join(&mc.Notify)
+	conf.Credentials.Join(&mc.Credentials)
+	conf.Logging.Join(&mc.Logging)
+
+	conf.DMenuFlags.BackgroundColor = ft.Default(mc.DMenuFlags.BackgroundColor, conf.DMenuFlags.BackgroundColor)
+	conf.DMenuFlags.Font = ft.Default(mc.DMenuFlags.Font, conf.DMenuFlags.Font)
+	conf.DMenuFlags.Lines = ft.Default(mc.DMenuFlags.Lines, conf.DMenuFlags.Lines)
+	conf.DMenuFlags.Path = ft.Default(mc.DMenuFlags.Path, conf.DMenuFlags.Path)
+	conf.DMenuFlags.TextColor = ft.Default(mc.DMenuFlags.TextColor, conf.DMenuFlags.TextColor)
+	conf.DMenuFlags.Prompt = ft.Default(mc.DMenuFlags.Prompt, conf.DMenuFlags.Prompt)
+	conf.DMenuFlags.Monitor = ft.Default(mc.DMenuFlags.Monitor, conf.DMenuFlags.Monitor)
+	conf.DMenuFlags.WindowID = ft.Default(mc.DMenuFlags.WindowID, conf.DMenuFlags.WindowID)
+
+	conf.Telegram.Name = ft.Default(mc.Telegram.Name, conf.Telegram.Name)
+	conf.Telegram.Target = ft.Default(mc.Telegram.Target, conf.Telegram.Target)
+	conf.Telegram.Token = ft.Default(mc.Telegram.Token, conf.Telegram.Token)
+	conf.Telegram.Client = ft.Default(mc.Telegram.Client, conf.Telegram.Client)
+}
+
 type Credentials struct {
 	Path    string `bson:"path" json:"path" yaml:"path"`
 	Twitter struct {
@@ -50,6 +74,29 @@ type Credentials struct {
 		Secret  string `bson:"secret" json:"secret" yaml:"secret"`
 		Token   string `bson:"token" json:"token" yaml:"token"`
 	} `bson:"aws" json:"aws" yaml:"aws"`
+}
+
+func (conf *Credentials) Join(mc *Credentials) {
+	if mc == nil {
+		return
+	}
+	conf.Path = ft.Default(mc.Path, conf.Path)
+
+	conf.Twitter.Username = ft.Default(mc.Twitter.Username, conf.Twitter.Username)
+	conf.Twitter.ConsumerKey = ft.Default(mc.Twitter.ConsumerKey, conf.Twitter.ConsumerKey)
+	conf.Twitter.ConsumerSecret = ft.Default(mc.Twitter.ConsumerSecret, conf.Twitter.ConsumerSecret)
+	conf.Twitter.OauthToken = ft.Default(mc.Twitter.OauthToken, conf.Twitter.OauthToken)
+	conf.Twitter.OauthSecret = ft.Default(mc.Twitter.OauthSecret, conf.Twitter.OauthSecret)
+
+	conf.Jira.Username = ft.Default(mc.Jira.Username, conf.Jira.Username)
+	conf.Jira.Password = ft.Default(mc.Jira.Password, conf.Jira.Password)
+	conf.Jira.URL = ft.Default(mc.Jira.URL, conf.Jira.URL)
+
+	conf.GitHub.Username = ft.Default(mc.GitHub.Username, conf.GitHub.Username)
+	conf.GitHub.Password = ft.Default(mc.GitHub.Password, conf.GitHub.Password)
+	conf.GitHub.Token = ft.Default(mc.GitHub.Token, conf.GitHub.Token)
+
+	conf.AWS = append(conf.AWS, mc.AWS...)
 }
 
 func (conf *Configuration) Validate() error {

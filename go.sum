@@ -288,6 +288,8 @@ github.com/tychoish/jasper/x/track v0.0.0-20251029030949-6c07b06c1b1d h1:t8h8hws
 github.com/tychoish/jasper/x/track v0.0.0-20251029030949-6c07b06c1b1d/go.mod h1:k+iANxdghKoUIyNcSeJjyLFymUJkJ4q4EdFfRxtlVNo=
 github.com/tychoish/libfun v0.0.0-20251029082330-5389c48f58ef h1:D12l4YcRw3HgPUeBY1DFl+5QUE3kLf7aRvM+6p37wF0=
 github.com/tychoish/libfun v0.0.0-20251029082330-5389c48f58ef/go.mod h1:o4z2BzSRd8i/qX7lv2SArX63/kBVakRpojH8/xLkmUk=
+github.com/tychoish/libfun v0.0.0-20251101202106-a92b84c51255 h1:Mp7QCK/CgW8TvLWX4YULCq5o2nmujqd9wzvHP01JGaM=
+github.com/tychoish/libfun v0.0.0-20251101202106-a92b84c51255/go.mod h1:o4z2BzSRd8i/qX7lv2SArX63/kBVakRpojH8/xLkmUk=
 github.com/ulikunitz/xz v0.5.6/go.mod h1:2bypXElzHzzJZwzH67Y6wb67pO62Rzfn7BSiF4ABRW8=
 github.com/ulikunitz/xz v0.5.11 h1:kpFauv27b6ynzBNT/Xy+1k+fK4WswhN/6PN5WhFAGw8=
 github.com/ulikunitz/xz v0.5.11/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=

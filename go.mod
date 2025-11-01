@@ -28,7 +28,7 @@ require (
 	github.com/tychoish/jasper v0.1.3
 	github.com/tychoish/jasper/x/cli v0.0.0-20251029030949-6c07b06c1b1d
 	github.com/tychoish/jasper/x/track v0.0.0-20251029030949-6c07b06c1b1d
-	github.com/tychoish/libfun v0.0.0-20251029082330-5389c48f58ef
+	github.com/tychoish/libfun v0.0.0-20251101202106-a92b84c51255
 	github.com/urfave/cli/v2 v2.27.7
 	go.mongodb.org/mongo-driver v1.11.6
 	golang.org/x/tools v0.36.0

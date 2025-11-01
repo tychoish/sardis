@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"slices"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
@@ -89,16 +89,28 @@ func linkOp() *cmdr.Commander {
 			SetName("discover").
 			Aliases("disco", "disc").SetUsage("discover"),
 			"path", func(ctx context.Context, args *withConf[string]) error {
+				if args.conf.System.Links.Discovery == nil {
+					return errors.New("discovery config not defined")
+				}
+
+				if args.arg != "" {
+					args.conf.System.Links.Discovery.SearchPaths = append(args.conf.System.Links.Discovery.SearchPaths, util.TryExpandHomeDir(args.arg))
+				}
+
+				if err := args.conf.System.Links.Validate(); err != nil {
+					return err
+				}
+
 				var idx int
 
 				ec := &erc.Collector{}
 				table := tabby.New()
-				table.AddHeader("Index", "+sudo", "Target", "Path")
-				args.conf.System.Links.Discovery.SearchPaths = append(args.conf.System.Links.Discovery.SearchPaths, args.arg)
+				table.AddHeader("Index", "Target", "Path")
+
 				args.conf.System.Links.Discovery.FindLinks().ReadAll(fnx.FromHandler(func(d *sysmgmt.LinkDefinition) {
 					table.AddLine(
 						strconv.Itoa(idx),
-						ft.IfElse(d.RequireSudo, "sudo", "-"),
+						// ft.IfElse(d.RequireSudo, "sudo", "-"),
 						util.TryCollapseHomeDir(d.Target),
 						util.TryCollapseHomeDir(d.Path),
 					)

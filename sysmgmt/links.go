@@ -93,6 +93,7 @@ func (conf *LinkConfiguration) expand() error {
 		lnk := conf.Links[idx]
 
 		lnk.Target = strings.ReplaceAll(lnk.Target, "{{hostname}}", hostname)
+		lnk.Path = strings.ReplaceAll(lnk.Path, "{{hostname}}", hostname)
 
 		if lnk.Target, err = homedir.Expand(lnk.Target); err != nil {
 			ec.Push(err)

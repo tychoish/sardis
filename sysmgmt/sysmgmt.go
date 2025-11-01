@@ -28,6 +28,8 @@ func (conf *Configuration) Join(mcf Configuration) {
 		conf.Links.Discovery.SearchPaths = append(conf.Links.Discovery.SearchPaths, mcf.Links.Discovery.SearchPaths...)
 		conf.Links.Discovery.IgnoreTargetPrefixes = append(conf.Links.Discovery.IgnoreTargetPrefixes, mcf.Links.Discovery.IgnoreTargetPrefixes...)
 		conf.Links.Discovery.IgnorePathPrefixes = append(conf.Links.Discovery.IgnorePathPrefixes, mcf.Links.Discovery.IgnorePathPrefixes...)
+		conf.Links.Discovery.SkipResolvedTargets = ft.Default(mcf.Links.Discovery.SkipResolvedTargets, conf.Links.Discovery.SkipResolvedTargets)
+		conf.Links.Discovery.SkipMissingTargets = ft.Default(mcf.Links.Discovery.SkipMissingTargets, conf.Links.Discovery.SkipMissingTargets)
 	}
 
 	conf.Arch.AurPackages = append(conf.Arch.AurPackages, mcf.Arch.AurPackages...)

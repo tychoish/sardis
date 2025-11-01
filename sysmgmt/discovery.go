@@ -38,8 +38,10 @@ func tryAbsPath(path string) string {
 	return ft.IfElse(ers.IsOk(err), abs, path)
 }
 
-func (disco *LinkDiscovery) Validate() error {
+func (disco *LinkDiscovery) Validate() (err error) {
 	ec := &erc.Collector{}
+	defer func() { err = ec.Resolve() }()
+	defer ec.Recover()
 
 	if len(disco.SearchPaths) == 0 {
 		disco.SearchPaths = append(disco.SearchPaths, util.GetHomeDir())
@@ -56,22 +58,50 @@ func (disco *LinkDiscovery) Validate() error {
 		ec.Whenf(!stat.IsDir() || stat.Mode().IsRegular(),
 			"search tree must be either symlinks or directories, %s is %s", path, stat.Mode())
 	}
-	return ec.Resolve()
+
+	slices.Sort(disco.SearchPaths)
+	disco.SearchPaths = slices.Compact(disco.SearchPaths)
+
+	return err
 }
-func (disco *LinkDiscovery) ShouldSkipMissingTargets() bool  { return ft.Ref(disco.SkipMissingTargets) }
-func (disco *LinkDiscovery) ShouldSkipResolvedTargets() bool { return ft.Ref(disco.SkipMissingTargets) }
+func (disco *LinkDiscovery) ShouldSkipMissingTargets() bool { return ft.Ref(disco.SkipMissingTargets) }
+
+func (disco *LinkDiscovery) ShouldSkipResolvedTargets() bool {
+	return ft.Ref(disco.SkipResolvedTargets)
+}
+
+func hasAnyPrefix(str string, prefixes []string) bool {
+	for pf := range slices.Values(prefixes) {
+		if strings.HasPrefix(str, pf) {
+			return true
+		}
+	}
+	return false
+}
 
 func (disco *LinkDiscovery) FindLinks() *fun.Stream[*LinkDefinition] {
 	return fun.Convert(fnx.MakeConverter(func(in dt.Tuple[string, string]) *LinkDefinition {
 		return &LinkDefinition{
-			Name:        strings.TrimLeft(strings.ReplaceAll(in.One, string(filepath.Separator), "-"), "- _."),
-			Target:      in.One,
-			Path:        in.Two,
-			RequireSudo: strings.HasPrefix(in.Two, disco.Runtime.hostname),
+			Name:   strings.TrimLeft(strings.ReplaceAll(in.One, string(filepath.Separator), "-"), "- _."),
+			Target: in.One,
+			Path:   in.Two,
+			// RequireSudo: strings.HasPrefix(in.Two, disco.Runtime.hostname),
 		}
 	})).Stream(fun.MergeStreams(fun.Convert(fnx.MakeConverter(func(path string) *fun.Stream[dt.Tuple[string, string]] {
-		return libfun.WalkDirIterator(path, func(p string, dir fs.DirEntry) (*dt.Tuple[string, string], error) {
-			// Check if the file is a symbolic link
+		path = tryAbsPath(path)
+		return libfun.FsWalkStream(libfun.FsWalkOptions{
+			Path:                 path,
+			SkipPermissionErrors: true,
+			IgnoreMode:           ft.Ptr(fs.ModeDir),
+		}, func(p string, dir fs.DirEntry) (*dt.Tuple[string, string], error) {
+			p = tryAbsPath(p)
+			if hasAnyPrefix(p, disco.IgnorePathPrefixes) {
+				if dir.IsDir() {
+					return nil, fs.SkipDir
+				}
+				return nil, nil
+			}
+
 			if dir.Type()&fs.ModeSymlink != 0 {
 				target, err := os.Readlink(p)
 				if err != nil {
@@ -82,32 +112,43 @@ func (disco *LinkDiscovery) FindLinks() *fun.Stream[*LinkDefinition] {
 				}
 				target = tryAbsPath(target)
 
-				if util.FileExists(target) {
-					if disco.ShouldSkipResolvedTargets() {
-						return nil, nil
-					}
-				} else if disco.ShouldSkipMissingTargets() {
+				switch {
+				case hasAnyPrefix(target, disco.IgnoreTargetPrefixes):
+					return nil, nil
+				case hasAnyPrefix(path, disco.IgnorePathPrefixes):
+					return nil, nil
+
+				}
+
+				exists := util.FileExists(target)
+				switch {
+				case exists && disco.ShouldSkipResolvedTargets():
+					return nil, nil
+				case ft.Not(exists) && disco.ShouldSkipMissingTargets():
 					return nil, nil
 				}
 
 				return ft.Ptr(dt.MakeTuple(target, p)), nil
+
 			}
 
 			return nil, nil
 		})
-	})).Stream(fun.SliceStream(disco.SearchPaths)))).Filter(func(link *LinkDefinition) bool {
-		for ignore := range slices.Values(disco.IgnorePathPrefixes) {
-			if strings.HasPrefix(link.Path, ignore) {
-				return false
-			}
-		}
+	})).Stream(fun.SliceStream(disco.SearchPaths))))
 
-		for ignore := range slices.Values(disco.IgnoreTargetPrefixes) {
-			if strings.HasPrefix(link.Target, ignore) {
-				return false
-			}
-		}
+	// .Filter(func(link *LinkDefinition) bool {
+	// 		for ignore := range slices.Values(disco.IgnorePathPrefixes) {
+	// 			if strings.HasPrefix(link.Path, ignore) {
+	// 				return false
+	// 			}
+	// 		}
 
-		return true
-	})
+	// 		for ignore := range slices.Values(disco.IgnoreTargetPrefixes) {
+	// 			if strings.HasPrefix(link.Target, ignore) {
+	// 				return false
+	// 			}
+	// 		}
+
+	//		return true
+	//	})
 }

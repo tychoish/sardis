@@ -24,7 +24,7 @@ func (conf *Configuration) projectsValidate() error {
 	for idx := range conf.Projects {
 		bc := conf.Projects[idx]
 		if bc.Name == "" && bc.RepoName == "" {
-			ec.Add(fmt.Errorf("blog at index %d is missing a name and a repo name", idx))
+			ec.Push(fmt.Errorf("blog at index %d is missing a name and a repo name", idx))
 			continue
 		}
 

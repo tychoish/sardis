@@ -13,11 +13,11 @@ import (
 	"time"
 
 	git "github.com/go-git/go-git/v5"
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -28,7 +28,7 @@ import (
 	"github.com/tychoish/sardis/util"
 )
 
-func (conf *GitRepository) FetchJob() fun.Worker {
+func (conf *GitRepository) FetchJob() fnx.Worker {
 	const opName = "repo-fetch"
 	return func(ctx context.Context) (err error) {
 		// double check this because we might have a stale
@@ -109,7 +109,7 @@ func (conf *GitRepository) FetchJob() fun.Worker {
 	}
 }
 
-func (conf *GitRepository) CloneJob() fun.Worker {
+func (conf *GitRepository) CloneJob() fnx.Worker {
 	const opName = "repo-clone"
 
 	return func(ctx context.Context) error {
@@ -184,11 +184,11 @@ func (conf *GitRepository) CloneJob() fun.Worker {
 	}
 }
 
-func (conf *GitRepository) UpdateJob() fun.Worker {
+func (conf *GitRepository) UpdateJob() fnx.Worker {
 	const opName = "repo-update"
 	count := &atomic.Int64{}
 	return func(ctx context.Context) (err error) {
-		wg := &fun.WaitGroup{}
+		wg := &fnx.WaitGroup{}
 		ec := &erc.Collector{}
 
 		host := util.GetHostname()
@@ -279,7 +279,7 @@ const (
 
 // this "remote" in the sense of a git remote, which means it might be
 // the local repository in some cases
-func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
+func (conf *GitRepository) SyncRemoteJob(host string) fnx.Worker {
 	hn := util.GetHostname()
 	if host == "LOCAL" {
 		host = hn
@@ -388,7 +388,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fun.Worker {
 	}
 }
 
-func (conf *GitRepository) CleanupJob() fun.Worker {
+func (conf *GitRepository) CleanupJob() fnx.Worker {
 	const opName = "repo-cleanup"
 	return func(ctx context.Context) (err error) {
 		if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
@@ -443,7 +443,7 @@ func (conf *GitRepository) CleanupJob() fun.Worker {
 	}
 }
 
-func (conf *GitRepository) StatusJob() fun.Worker {
+func (conf *GitRepository) StatusJob() fnx.Worker {
 	return func(ctx context.Context) error {
 		if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
 			return fmt.Errorf("cannot check status %s, no repository exists", conf.Path)
@@ -457,7 +457,7 @@ func (conf *GitRepository) StatusJob() fun.Worker {
 		sender := logger.Sender()
 
 		ec := &erc.Collector{}
-		ec.Add(cmd.CreateCommand(ctx).Priority(level.Debug).
+		ec.Push(cmd.CreateCommand(ctx).Priority(level.Debug).
 			Directory(conf.Path).
 			SetOutputSender(level.Debug, sender).
 			SetErrorSender(level.Debug, sender).
@@ -465,7 +465,7 @@ func (conf *GitRepository) StatusJob() fun.Worker {
 			AppendArgs("git", "status", "--short", "--branch").
 			Run(ctx))
 
-		ec.Add(conf.doOtherStat(logger))
+		ec.Push(conf.doOtherStat(logger))
 
 		logger.Debug(message.Fields{
 			"op":   "git status",

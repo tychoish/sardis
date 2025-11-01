@@ -13,6 +13,7 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -89,7 +90,7 @@ func repoUpdate() *cmdr.Commander {
 
 			repos := args.conf.Repos.FindAll(args.arg...).Stream()
 
-			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { ct.Add(1); return rc.UpdateJob() }).Stream(repos)
+			jobs := fun.Convert(fnx.MakeConverter(func(rc repo.GitRepository) fnx.Worker { ct.Add(1); return rc.UpdateJob() })).Stream(repos)
 
 			err := subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 			switch {
@@ -115,7 +116,7 @@ func repoCleanup() *cmdr.Commander {
 
 			ct := &atomic.Int64{}
 
-			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { ct.Add(1); return rc.CleanupJob() }).Stream(repos)
+			jobs := fun.Convert(fnx.MakeConverter(func(rc repo.GitRepository) fnx.Worker { ct.Add(1); return rc.CleanupJob() })).Stream(repos)
 
 			err := subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 			switch {
@@ -150,7 +151,7 @@ func repoClone() *cmdr.Commander {
 				return false
 			})
 
-			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { return rc.CloneJob() }).Stream(missingRepos)
+			jobs := fun.Convert(fnx.MakeConverter(func(rc repo.GitRepository) fnx.Worker { return rc.CloneJob() })).Stream(missingRepos)
 
 			return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 		})
@@ -179,7 +180,7 @@ func repoStatus() *cmdr.Commander {
 
 			ct := &atomic.Int64{}
 
-			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { ct.Add(1); return rc.StatusJob() }).Stream(repos)
+			jobs := fun.Convert(fnx.MakeConverter(func(rc repo.GitRepository) fnx.Worker { ct.Add(1); return rc.StatusJob() })).Stream(repos)
 
 			err := subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 			switch {
@@ -204,7 +205,7 @@ func repoFetch() *cmdr.Commander {
 				Filter(func(repo repo.GitRepository) bool { return repo.Fetch })
 
 			ct := &atomic.Int64{}
-			jobs := fun.MakeConverter(func(rc repo.GitRepository) fun.Worker { ct.Add(1); return rc.FetchJob() }).Stream(repos)
+			jobs := fun.Convert(fnx.MakeConverter(func(rc repo.GitRepository) fnx.Worker { ct.Add(1); return rc.FetchJob() })).Stream(repos)
 
 			err := subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 			switch {

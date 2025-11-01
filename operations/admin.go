@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
@@ -79,7 +80,7 @@ func linkOp() *cmdr.Commander {
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
 				links := fun.SliceStream(conf.System.Links.Links)
 
-				jobs := fun.MakeConverter(func(c sysmgmt.LinkDefinition) fun.Worker { return c.CreateLinkJob() }).Stream(links)
+				jobs := fun.Convert(fnx.MakeConverter(func(c sysmgmt.LinkDefinition) fnx.Worker { return c.CreateLinkJob() })).Stream(links)
 
 				return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 			}).
@@ -94,7 +95,7 @@ func linkOp() *cmdr.Commander {
 				table := tabby.New()
 				table.AddHeader("Index", "+sudo", "Target", "Path")
 				args.conf.System.Links.Discovery.SearchPaths = append(args.conf.System.Links.Discovery.SearchPaths, args.arg)
-				args.conf.System.Links.Discovery.FindLinks().ReadAll(func(d *sysmgmt.LinkDefinition) {
+				args.conf.System.Links.Discovery.FindLinks().ReadAll(fnx.FromHandler(func(d *sysmgmt.LinkDefinition) {
 					table.AddLine(
 						strconv.Itoa(idx),
 						ft.IfElse(d.RequireSudo, "sudo", "-"),
@@ -102,7 +103,7 @@ func linkOp() *cmdr.Commander {
 						util.TryCollapseHomeDir(d.Path),
 					)
 					idx++
-				}).Operation(ec.Push).Run(ctx)
+				})).Operation(ec.Push).Run(ctx)
 				table.Print()
 
 				return ec.Resolve()
@@ -151,12 +152,10 @@ func nightly() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			jobs := fun.JoinStreams(
-				fun.MakeConverter(func(c sysmgmt.LinkDefinition) fun.Worker { return c.CreateLinkJob() }).Stream(fun.SliceStream(conf.System.Links.Links)),
-				fun.MakeConverter(func(c repo.GitRepository) fun.Worker { return c.CleanupJob() }).Stream(fun.SliceStream(conf.Repos.GitRepos)),
-				fun.MakeConverter(func(c sysmgmt.SystemdService) fun.Worker { return c.Worker() }).Stream(fun.SliceStream(conf.System.SystemD.Services)),
-			)
-
-			return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
+			return subexec.TOOLS.WorkerPool(fun.JoinStreams(
+				fun.Convert(fnx.MakeConverter(func(c sysmgmt.LinkDefinition) fnx.Worker { return c.CreateLinkJob() })).Stream(fun.SliceStream(conf.System.Links.Links)),
+				fun.Convert(fnx.MakeConverter(func(c repo.GitRepository) fnx.Worker { return c.CleanupJob() })).Stream(fun.SliceStream(conf.Repos.GitRepos)),
+				fun.Convert(fnx.MakeConverter(func(c sysmgmt.SystemdService) fnx.Worker { return c.Worker() })).Stream(fun.SliceStream(conf.System.SystemD.Services)),
+			)).Run(ctx)
 		}).Add)
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/srv"
@@ -29,7 +30,7 @@ import (
 - [ ] TODO <fun/libfun> worker pool but be able to pause to let things coalese
 - [ ] TODO <cmdr> move to v3 of the cli lib
 - [ ] TODO <cmdr> do something with argflags.
-- [ ] TODO <cmdr> cmdr.Action adapter for fun.Worker/fun.Operation
+- [ ] TODO <cmdr> cmdr.Action adapter for fun.Worker/fnx.Operation
 - [ ] TODO <fun> finish fn.Converter[T, O] and fn.Filter[T]
 - [ ] TOOD [fun] WaitGroup should have and Add method that is an fn.Handler for workers/ops
 */
@@ -115,7 +116,7 @@ func Commander() *cmdr.Commander {
 		Middleware(func(ctx context.Context) context.Context {
 			return srv.SetWorkerPool(ctx,
 				global.ApplicationName,
-				pubsub.NewUnlimitedQueue[fun.Worker](),
+				pubsub.NewUnlimitedQueue[fnx.Worker](),
 				fun.WorkerGroupConfWorkerPerCPU(),
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfContinueOnPanic(),

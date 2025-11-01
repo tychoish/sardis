@@ -1,6 +1,7 @@
 package sardis
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis/repo"
@@ -134,7 +136,7 @@ func (conf *Configuration) expandLinkedFiles() error {
 	defer func() { conf.linkedFilesRead = true }()
 
 	conf.Migrate()
-	err := fun.MakeConverterErr(func(fn string) (*Configuration, error) {
+	err := fun.Convert(fnx.MakeConverterErr(func(fn string) (*Configuration, error) {
 		grip.Debugf("reading linked config file %q", fn)
 		iconf, err := readConfiguration(fn)
 		switch {
@@ -147,8 +149,8 @@ func (conf *Configuration) expandLinkedFiles() error {
 		default:
 			return iconf.Migrate(), nil
 		}
-	}).Stream(fun.SliceStream(conf.Settings.ConfigPaths).
-		Transform(fun.MakeConverter(util.TryExpandHomeDir)),
+	})).Stream(fun.SliceStream(conf.Settings.ConfigPaths).
+		Transform(fnx.MakeConverter(util.TryExpandHomeDir)),
 	).ReadAll(conf.doJoin).Wait()
 	if err != nil {
 		return err
@@ -195,7 +197,11 @@ func (conf *Configuration) Migrate() *Configuration {
 	return conf
 }
 
-func (conf *Configuration) doJoin(mcf *Configuration) { conf.Join(mcf) }
+func (conf *Configuration) doJoin(_ context.Context, mcf *Configuration) error {
+	conf.Join(mcf)
+	return nil
+}
+
 func (conf *Configuration) Join(mcf *Configuration) *Configuration {
 	if mcf == nil {
 		return conf

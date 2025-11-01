@@ -8,9 +8,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 )
 
 type Configuration struct {
@@ -36,7 +36,7 @@ type LockService interface {
 }
 
 type Lock interface {
-	Lock() fun.Operation
+	Lock() fnx.Operation
 	Unlock()
 }
 
@@ -52,7 +52,7 @@ func NewLockService(_ *Configuration) (LockService, error) {
 func (ls *mdbLockService) GetLock(_ context.Context, name string) Lock {
 	lock := &mdbLockImpl{
 		srv:    ls,
-		waiter: &adt.Atomic[*fun.Operation]{},
+		waiter: &adt.Atomic[*fnx.Operation]{},
 	}
 	lock.record.Name = name
 	return lock
@@ -71,7 +71,7 @@ type mdbLockImpl struct {
 	ctx    context.Context
 	srv    *mdbLockService
 	record LockRecord
-	waiter *adt.Atomic[*fun.Operation]
+	waiter *adt.Atomic[*fnx.Operation]
 }
 
 func (l *mdbLockImpl) getNextQuery(now time.Time) bson.M {
@@ -105,7 +105,7 @@ func (l *mdbLockImpl) updateLockView(ctx context.Context) error {
 	return res.Err()
 }
 
-func (l *mdbLockImpl) Lock() fun.Operation {
+func (l *mdbLockImpl) Lock() fnx.Operation {
 	ctx, cancel := context.WithCancel(l.ctx)
 	coll := l.srv.collection()
 	err := l.updateLockView(ctx)
@@ -149,7 +149,7 @@ func (l *mdbLockImpl) Lock() fun.Operation {
 	signal := l.startBackgroundLockPing(ctx)
 
 	var release func()
-	waiter := fun.Operation(func(ctx context.Context) {
+	waiter := fnx.Operation(func(ctx context.Context) {
 		defer release()
 		defer cancel()
 		select {
@@ -159,11 +159,11 @@ func (l *mdbLockImpl) Lock() fun.Operation {
 	})
 
 	release = func() {
-		adt.CompareAndSwap[*fun.Operation](l.waiter, &waiter, nil)
+		adt.CompareAndSwap[*fnx.Operation](l.waiter, &waiter, nil)
 	}
 
 	for {
-		if adt.CompareAndSwap[*fun.Operation](l.waiter, nil, &waiter) {
+		if adt.CompareAndSwap[*fnx.Operation](l.waiter, nil, &waiter) {
 			return waiter
 		}
 

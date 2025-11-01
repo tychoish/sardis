@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -39,7 +39,7 @@ type ArchLinuxPackagesAUR struct {
 	Update bool   `bson:"update" json:"update" yaml:"update"`
 }
 
-func (pkg *ArchLinuxPackagesAUR) FetchPackage() fun.Worker {
+func (pkg *ArchLinuxPackagesAUR) FetchPackage() fnx.Worker {
 	return func(context.Context) error { return nil }
 }
 
@@ -62,33 +62,33 @@ func (conf *ArchLinux) Validate() error {
 	ec := &erc.Collector{}
 	if stat, err := os.Stat(conf.BuildPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(conf.BuildPath, 0o755); err != nil {
-			ec.Add(fmt.Errorf("making %q: %w", conf.BuildPath, err))
+			ec.Push(fmt.Errorf("making %q: %w", conf.BuildPath, err))
 		}
 	} else if !stat.IsDir() {
-		ec.Add(fmt.Errorf("arch build path '%s' is a file not a directory", conf.BuildPath))
+		ec.Push(fmt.Errorf("arch build path '%s' is a file not a directory", conf.BuildPath))
 	}
 
 	for idx, pkg := range conf.AurPackages {
 		if pkg.Name == "" {
-			ec.Add(fmt.Errorf("aur package at index=%d does not have name", idx))
+			ec.Push(fmt.Errorf("aur package at index=%d does not have name", idx))
 		}
 		if strings.Contains(pkg.Name, ".+=") {
-			ec.Add(fmt.Errorf("aur package '%s' at index=%d has invalid character", pkg.Name, idx))
+			ec.Push(fmt.Errorf("aur package '%s' at index=%d has invalid character", pkg.Name, idx))
 		}
 	}
 
 	for idx, pkg := range conf.Packages {
 		if pkg.Name == "" {
-			ec.Add(fmt.Errorf("package at index=%d does not have name", idx))
+			ec.Push(fmt.Errorf("package at index=%d does not have name", idx))
 		}
 		if strings.Contains(pkg.Name, ".+=") {
-			ec.Add(fmt.Errorf("package '%s' at index=%d has invalid character", pkg.Name, idx))
+			ec.Push(fmt.Errorf("package '%s' at index=%d has invalid character", pkg.Name, idx))
 		}
 	}
 	return ec.Resolve()
 }
 
-func (conf *ArchLinux) FetchPackageFromAUR(name string, update bool) fun.Worker {
+func (conf *ArchLinux) FetchPackageFromAUR(name string, update bool) fnx.Worker {
 	const opName = "arch-build-abs"
 
 	hn := util.GetHostname()
@@ -127,10 +127,9 @@ func (conf *ArchLinux) FetchPackageFromAUR(name string, update bool) fun.Worker 
 					Pair("ID", nonce).
 					Pair("host", hn))
 			}).
-			Operation(ec.Push).
-			WithErrorHook(func() error {
+			WithErrorHook(ec.Push).
+			PostHook(func() {
 				err := ec.Resolve()
-
 				grip.Notice(message.BuildPair().
 					Pair("op", opName).
 					Pair("pkg", name).
@@ -140,8 +139,6 @@ func (conf *ArchLinux) FetchPackageFromAUR(name string, update bool) fun.Worker 
 					Pair("dur", time.Since(startAt)).
 					Pair("ID", nonce).
 					Pair("host", hn))
-
-				return err
 			})
 
 		if err := job.Run(ctx); err != nil {
@@ -151,7 +148,7 @@ func (conf *ArchLinux) FetchPackageFromAUR(name string, update bool) fun.Worker 
 	}
 }
 
-func (conf *ArchLinux) BuildPackageInABS(name string) fun.Worker {
+func (conf *ArchLinux) BuildPackageInABS(name string) fnx.Worker {
 	const opName = "arch-build-abs"
 	return func(ctx context.Context) error {
 		startAt := time.Now()
@@ -202,8 +199,8 @@ func (conf *ArchLinux) BuildPackageInABS(name string) fun.Worker {
 					Pair("pkg", name).
 					Pair("host", hn))
 			}).
-			Operation(ec.Push).
-			WithErrorHook(func() error {
+			WithErrorHook(ec.Push).
+			PostHook(func() {
 				err := ec.Resolve()
 
 				msg := message.BuildPair().
@@ -219,11 +216,10 @@ func (conf *ArchLinux) BuildPackageInABS(name string) fun.Worker {
 					proclog.Infoln("<---------------", jobID, "----------------")
 					grip.Error(msg)
 					grip.Info(buf.String())
-					return err
+					return
 				}
 
 				grip.Notice(msg)
-				return nil
 			}).PostHook(func() { _ = buf.Close() })
 
 		return cmd.Run(ctx)
@@ -239,7 +235,7 @@ func (conf *ArchLinux) GetPackageNames() []string {
 	return pkgs
 }
 
-func (conf *ArchLinux) InstallPackages() fun.Worker {
+func (conf *ArchLinux) InstallPackages() fnx.Worker {
 	return func(ctx context.Context) error {
 		return jasper.Context(ctx).
 			CreateCommand(ctx).

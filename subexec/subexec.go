@@ -9,7 +9,9 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/sardis/util"
 )
 
@@ -126,12 +128,12 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	//
 	// ⬇️ ingest the contents of the converted and reordered stream
 	// into the resolved slice
-	err := resolved.Populate(
+	err := resolved.AppendStream(
 		// use the .Index accessor to pull the groups out of the
 		// stream of sparse indexes of now merged groups ⬇️
-		fun.MakeConverter(dt.NewSlice(conf.Commands).Index).Stream(
+		fun.Convert(fnx.MakeConverter(dt.NewSlice(conf.Commands).Index)).Stream(
 			// ⬇️ convert it into the (sparse) indexes of merged groups ⬆
-			fun.MakeConverter(func(p dt.Pair[string, int]) int { return p.Value }).Stream(
+			fun.Convert(fnx.MakeConverter(func(p dt.Pair[string, int]) int { return p.Value })).Stream(
 				// ⬇️ take the (now ordered) pairs that we merged and ⬆
 				sparse.Stream(),
 			),
@@ -217,7 +219,7 @@ func (conf *Configuration) ExportGroupNames() dt.Slice[string] {
 }
 
 func (conf *Configuration) doExportGroupNames() []string {
-	return fun.NewGenerator(conf.ExportCommandGroups().Keys().Slice).Force().Resolve()
+	return ft.IgnoreSecond(risky.Block(conf.ExportCommandGroups().Keys().Slice))
 }
 
 func (conf *Configuration) doExportCommandGroups() map[string]Group {

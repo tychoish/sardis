@@ -7,6 +7,7 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/fnx"
 )
 
 type Configuration struct {
@@ -58,7 +59,7 @@ func (conf *Configuration) FindOne(name string) (*GitRepository, error) {
 func (conf *Configuration) Tags() dt.Slice[string] {
 	conf.rebuildIndexes()
 
-	return fun.NewGenerator(conf.caches.tags.Keys().Slice).Capture().Resolve()
+	return fnx.NewFuture(conf.caches.tags.Keys().Slice).Force().Resolve()
 }
 
 func (conf *Configuration) rebuildIndexes() {
@@ -78,7 +79,7 @@ func (conf *Configuration) rebuildIndexes() {
 
 		for _, tg := range rp.Tags {
 			rps := conf.caches.tags[tg]
-			rps.Add(rp.Name)
+			rps.Push(rp.Name)
 			conf.caches.tags[tg] = rps
 		}
 	}
@@ -95,14 +96,14 @@ func (conf *Configuration) FindAll(ids ...string) dt.Slice[GitRepository] {
 	for _, id := range ids {
 		if rp, ok := conf.caches.lookup[id]; ok {
 			if !seen.AddCheck(rp.Name) {
-				matching.Add(rp)
+				matching.Push(rp)
 			}
 			continue
 		}
 
 		for _, rtn := range conf.caches.tags[id] {
 			if !seen.AddCheck(rtn) && conf.caches.lookup.Check(rtn) {
-				matching.Add(conf.caches.lookup.Get(rtn))
+				matching.Push(conf.caches.lookup.Get(rtn))
 			}
 		}
 	}

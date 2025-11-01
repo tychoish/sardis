@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	jutil "github.com/tychoish/jasper/util"
 )
@@ -49,7 +50,7 @@ func GetDirectoryContents(path string) (*fun.Stream[string], error) {
 	if err != nil {
 		return nil, err
 	}
-	return fun.MakeGenerator(func() (string, error) {
+	return fun.MakeStream(fnx.MakeFuture(func() (string, error) {
 		dir, err := dir.ReadDir(1)
 		if err != nil {
 			return "", err
@@ -58,7 +59,7 @@ func GetDirectoryContents(path string) (*fun.Stream[string], error) {
 		fun.Invariant.Ok(len(dir) == 1, "impossible return value from ReadDir")
 
 		return filepath.Join(path, dir[0].Name()), nil
-	}).Stream(), nil
+	})), nil
 }
 
 func TryCollapseHomeDir(in string) string {

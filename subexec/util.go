@@ -8,6 +8,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -19,20 +20,20 @@ type Utilities struct{}
 
 var TOOLS Utilities = struct{}{}
 
-func (Utilities) Converter() fun.Converter[Command, fun.Worker] { return TOOLS.CommandToWorker }
-func (Utilities) CommandToWorker(_ context.Context, c Command) (fun.Worker, error) {
+func (Utilities) Converter() fnx.Converter[Command, fnx.Worker] { return TOOLS.CommandToWorker }
+func (Utilities) CommandToWorker(_ context.Context, c Command) (fnx.Worker, error) {
 	return c.Worker(), nil
 }
 
-func (Utilities) WorkerHandler() fun.Handler[fun.Worker] {
-	return func(ctx context.Context, wf fun.Worker) error { return wf.Run(ctx) }
+func (Utilities) WorkerHandler() fnx.Handler[fnx.Worker] {
+	return func(ctx context.Context, wf fnx.Worker) error { return wf.Run(ctx) }
 }
 
-func (Utilities) CommandPool(st *fun.Stream[Command]) fun.Worker {
-	return TOOLS.WorkerPool(TOOLS.Converter().Stream(st))
+func (Utilities) CommandPool(st *fun.Stream[Command]) fnx.Worker {
+	return TOOLS.WorkerPool(fun.Convert(TOOLS.Converter()).Stream(st))
 }
 
-func (Utilities) WorkerPool(st *fun.Stream[fun.Worker]) fun.Worker {
+func (Utilities) WorkerPool(st *fun.Stream[fnx.Worker]) fnx.Worker {
 	return st.Parallel(
 		TOOLS.WorkerHandler(),
 		fun.WorkerGroupConfContinueOnError(),

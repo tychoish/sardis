@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -35,7 +35,7 @@ type Command struct {
 
 	// if possible call the operation rather
 	// than execing the commands
-	WorkerDefinition fun.Worker `bson:"-" json:"-" yaml:"-"`
+	WorkerDefinition fnx.Worker `bson:"-" json:"-" yaml:"-"`
 	unaliasedName    string
 }
 
@@ -44,7 +44,7 @@ func (conf *Command) FQN() string {
 	return util.DotJoin(conf.GroupCategory, conf.GroupName, conf.NamePrime())
 }
 
-func (conf *Command) Worker() fun.Worker {
+func (conf *Command) Worker() fnx.Worker {
 	if conf.WorkerDefinition != nil {
 		return conf.WorkerDefinition
 	}
@@ -84,14 +84,9 @@ func (conf *Command) Worker() fun.Worker {
 				return true
 			}).
 			// END jasper command definition
-			Worker().
-			// START fun.Worker operation handling/orchestrating
-			PreHook(func(context.Context) {
-				proclog.Infoln("----------------", nonce, "---", jobID, "--->")
-			}).
-			Operation(ec.Push).
-			WithErrorHook(func() error {
-				err := ec.Resolve()
+			PostHook(func(err error) error {
+				ec.Push(err)
+				err = ec.Resolve()
 
 				defer util.DropErrorOnDefer(buf.Close)
 				msg := message.BuildPair().
@@ -123,6 +118,10 @@ func (conf *Command) Worker() fun.Worker {
 				}
 				desktop.Notice(message.Whenln(ft.Ref(conf.Notify), conf.Name, "completed"))
 				return nil
+			}).
+			Worker().
+			PreHook(func(context.Context) {
+				proclog.Infoln("----------------", nonce, "---", jobID, "--->")
 			}).Run(ctx)
 	}
 }

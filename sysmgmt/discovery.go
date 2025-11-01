@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/libfun"
 	"github.com/tychoish/sardis/util"
@@ -44,9 +45,9 @@ func (disco *LinkDiscovery) Validate() error {
 		disco.SearchPaths = append(disco.SearchPaths, util.GetHomeDir())
 	}
 
-	disco.SearchPaths = fun.NewGenerator(dt.NewSlice(disco.SearchPaths).Stream().Transform(fun.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
-	disco.IgnorePathPrefixes = fun.NewGenerator(dt.NewSlice(disco.IgnorePathPrefixes).Stream().Transform(fun.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
-	disco.IgnoreTargetPrefixes = fun.NewGenerator(dt.NewSlice(disco.IgnoreTargetPrefixes).Stream().Transform(fun.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
+	disco.SearchPaths = fnx.NewFuture(dt.NewSlice(disco.SearchPaths).Stream().Transform(fnx.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
+	disco.IgnorePathPrefixes = fnx.NewFuture(dt.NewSlice(disco.IgnorePathPrefixes).Stream().Transform(fnx.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
+	disco.IgnoreTargetPrefixes = fnx.NewFuture(dt.NewSlice(disco.IgnoreTargetPrefixes).Stream().Transform(fnx.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
 
 	for idx := range disco.SearchPaths {
 		path := disco.SearchPaths[idx]
@@ -61,14 +62,14 @@ func (disco *LinkDiscovery) ShouldSkipMissingTargets() bool  { return ft.Ref(dis
 func (disco *LinkDiscovery) ShouldSkipResolvedTargets() bool { return ft.Ref(disco.SkipMissingTargets) }
 
 func (disco *LinkDiscovery) FindLinks() *fun.Stream[*LinkDefinition] {
-	return fun.MakeConverter(func(in dt.Tuple[string, string]) *LinkDefinition {
+	return fun.Convert(fnx.MakeConverter(func(in dt.Tuple[string, string]) *LinkDefinition {
 		return &LinkDefinition{
 			Name:        strings.TrimLeft(strings.ReplaceAll(in.One, string(filepath.Separator), "-"), "- _."),
 			Target:      in.One,
 			Path:        in.Two,
 			RequireSudo: strings.HasPrefix(in.Two, disco.Runtime.hostname),
 		}
-	}).Stream(fun.MergeStreams(fun.MakeConverter(func(path string) *fun.Stream[dt.Tuple[string, string]] {
+	})).Stream(fun.MergeStreams(fun.Convert(fnx.MakeConverter(func(path string) *fun.Stream[dt.Tuple[string, string]] {
 		return libfun.WalkDirIterator(path, func(p string, dir fs.DirEntry) (*dt.Tuple[string, string], error) {
 			// Check if the file is a symbolic link
 			if dir.Type()&fs.ModeSymlink != 0 {
@@ -94,7 +95,7 @@ func (disco *LinkDiscovery) FindLinks() *fun.Stream[*LinkDefinition] {
 
 			return nil, nil
 		})
-	}).Stream(fun.SliceStream(disco.SearchPaths)))).Filter(func(link *LinkDefinition) bool {
+	})).Stream(fun.SliceStream(disco.SearchPaths)))).Filter(func(link *LinkDefinition) bool {
 		for ignore := range slices.Values(disco.IgnorePathPrefixes) {
 			if strings.HasPrefix(link.Path, ignore) {
 				return false

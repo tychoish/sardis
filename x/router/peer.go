@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/pubsub"
 )
 
@@ -48,7 +49,7 @@ type Router[T any] struct {
 	store adt.Map[string, peer[T]]
 
 	connErrorPeers pubsub.Deque[disconnectedPeer[T]]
-	wg             fun.WaitGroup
+	wg             fnx.WaitGroup
 }
 
 type disconnectedPeer[T any] struct {

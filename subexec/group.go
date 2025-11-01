@@ -63,7 +63,7 @@ func (cg *Group) Selectors() []string {
 		set.Add(cmd.Name)
 	}
 
-	return fun.NewGenerator(set.Stream().Slice).Force().Resolve()
+	return set.Slice()
 }
 
 func (cg *Group) Validate() error {
@@ -91,7 +91,7 @@ func (cg *Group) Validate() error {
 
 	}
 
-	ec.When(cg.Name == "", ers.Error("command group must have name"))
+	ec.If(cg.Name == "", ers.Error("command group must have name"))
 
 	for idx := range cg.Commands {
 		cmd := cg.Commands[idx]
@@ -192,8 +192,8 @@ func FilterCommands(cmds dt.Slice[Command], args []string) (dt.Slice[Command], e
 	// if we didn't find all that we were looking for?
 	if ops.Len() != len(out) {
 		return nil, fmt.Errorf("found %d [%s] ops, of %d [%s] arguments",
-			len(out), strings.Join(fun.NewGenerator(seen.Stream().Slice).Force().Resolve(), ", "),
-			ops.Len(), strings.Join(fun.NewGenerator(ops.Stream().Slice).Force().Resolve(), ", "),
+			len(out), strings.Join(seen.Slice(), ", "),
+			ops.Len(), strings.Join(ops.Slice(), ", "),
 		)
 	}
 
@@ -207,7 +207,7 @@ func RunCommands(ctx context.Context, cmds dt.Slice[Command]) error {
 		return ers.Wrapf(ft.Ptr(cmds[0]).Worker().Run(ctx), "running command %q", cmds[0])
 	case size < runtime.NumCPU():
 		return ers.Wrapf(
-			fun.MAKE.WorkerPool(TOOLS.Converter().Stream(cmds.Stream())).Run(ctx),
+			fun.MAKE.WorkerPool(fun.Convert(TOOLS.Converter()).Stream(cmds.Stream())).Run(ctx),
 			"running small %d batch  of commands %s", size, cmds,
 		)
 	default:

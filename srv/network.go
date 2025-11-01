@@ -48,13 +48,13 @@ func (n *Network) ByName(name string) (*HostDefinition, error) {
 func (h *HostDefinition) Validate() error {
 	ec := &erc.Collector{}
 
-	ec.When(h.Name == "", ers.Error("cannot have an empty name for a host"))
-	ec.When(h.Hostname == "", ers.Error("cannot have an empty host name"))
-	ec.When(h.Port == 0, ers.Error("must specify a non-zero port number for a host"))
-	ec.When(!slices.Contains([]string{"ssh", "jasper"}, h.Protocol), ers.Error("host protocol must be ssh or jasper"))
+	ec.If(h.Name == "", ers.Error("cannot have an empty name for a host"))
+	ec.If(h.Hostname == "", ers.Error("cannot have an empty host name"))
+	ec.If(h.Port == 0, ers.Error("must specify a non-zero port number for a host"))
+	ec.If(!slices.Contains([]string{"ssh", "jasper"}, h.Protocol), ers.Error("host protocol must be ssh or jasper"))
 
 	if h.Protocol == "ssh" {
-		ec.When(h.User == "", ers.Error("must specify user for ssh hosts"))
+		ec.If(h.User == "", ers.Error("must specify user for ssh hosts"))
 	}
 
 	return ec.Resolve()

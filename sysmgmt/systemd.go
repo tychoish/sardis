@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -47,7 +47,7 @@ func (conf *SystemdConfiguration) Validate() error {
 
 func (c *SystemdService) Validate() error {
 	catcher := &erc.Collector{}
-	catcher.When(c.Name == "", ers.Error("must specify service name"))
+	catcher.If(c.Name == "", ers.Error("must specify service name"))
 	catcher.Whenf(c.Unit == "", "cannot specify empty unit for %q", c.Name)
 	catcher.Whenf((c.User && c.System) || (!c.User && !c.System),
 		"must specify either user or service for %q", c.Name)
@@ -56,7 +56,7 @@ func (c *SystemdService) Validate() error {
 	return catcher.Resolve()
 }
 
-func (conf *SystemdService) Worker() fun.Worker {
+func (conf *SystemdService) Worker() fnx.Worker {
 	const opName = "sytemd-service-setup"
 
 	return func(ctx context.Context) error {
@@ -135,7 +135,7 @@ func (conf *SystemdConfiguration) TaskGroups() dt.Slice[subexec.Group] {
 			command = "sudo systemctl"
 		}
 
-		groups.Add(subexec.Group{
+		groups.Push(subexec.Group{
 			Category:      "systemd",
 			Name:          service.Name,
 			Notify:        ft.Ptr(true),

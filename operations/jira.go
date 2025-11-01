@@ -67,7 +67,7 @@ func bulkCreateTickets() *cmdr.Commander {
 				msg.SetPriority(data.Priority)
 				msgs[idx] = msg
 				if !msg.Loggable() {
-					ec.Add(fmt.Errorf("invalid/unlogable message at index %d, '%s'", idx, msg.String()))
+					ec.Push(fmt.Errorf("invalid/unlogable message at index %d, '%s'", idx, msg.String()))
 				}
 			}
 

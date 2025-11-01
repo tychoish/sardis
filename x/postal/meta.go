@@ -27,8 +27,8 @@ const (
 
 func (s Schema) Validate() error {
 	ec := &erc.Collector{}
-	ec.When(s.Version < 0, ers.New("schema version must not be negative"))
-	ec.When(s.Type < "", ers.New("message type must be specified"))
+	ec.If(s.Version < 0, ers.New("schema version must not be negative"))
+	ec.If(s.Type < "", ers.New("message type must be specified"))
 
 	return ec.Resolve()
 }

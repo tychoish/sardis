@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -95,19 +95,19 @@ func (conf *LinkConfiguration) expand() error {
 		lnk.Target = strings.ReplaceAll(lnk.Target, "{{hostname}}", hostname)
 
 		if lnk.Target, err = homedir.Expand(lnk.Target); err != nil {
-			ec.Add(err)
+			ec.Push(err)
 			continue
 		}
 
 		if lnk.Path, err = homedir.Expand(lnk.Path); err != nil {
-			ec.Add(err)
+			ec.Push(err)
 			continue
 		}
 
 		if lnk.DirectoryContents {
 			files, err := os.ReadDir(lnk.Target)
 			if err != nil {
-				ec.Add(err)
+				ec.Push(err)
 				continue
 			}
 
@@ -130,7 +130,7 @@ func (conf *LinkConfiguration) expand() error {
 	return ec.Resolve()
 }
 
-func (lnd *LinkDefinition) CreateLinkJob() fun.Worker {
+func (lnd *LinkDefinition) CreateLinkJob() fnx.Worker {
 	return func(ctx context.Context) (err error) {
 		ec := &erc.Collector{}
 		defer func() { err = ec.Resolve() }()
@@ -156,17 +156,17 @@ func (lnd *LinkDefinition) CreateLinkJob() fun.Worker {
 			var target string
 			target, err = filepath.EvalSymlinks(lnd.Path)
 			if err != nil {
-				ec.Add(err)
+				ec.Push(err)
 				return
 			}
 
 			if target != lnd.Target {
 				if lnd.RequireSudo {
-					ec.Add(jpm.CreateCommand(ctx).Sudo(true).
+					ec.Push(jpm.CreateCommand(ctx).Sudo(true).
 						SetCombinedSender(level.Info, grip.Sender()).
 						AppendArgs("rm", dst).Run(ctx))
 				} else {
-					ec.Add(os.Remove(dst))
+					ec.Push(os.Remove(dst))
 				}
 
 				grip.Info(message.Fields{
@@ -193,14 +193,14 @@ func (lnd *LinkDefinition) CreateLinkJob() fun.Worker {
 
 			cmd.AppendArgs("ln", "-s", lnd.Target, lnd.Path)
 
-			ec.Add(cmd.Run(ctx))
+			ec.Push(cmd.Run(ctx))
 
 		} else {
 			if _, err := os.Stat(linkDir); os.IsNotExist(err) {
-				ec.Add(os.MkdirAll(linkDir, 0o755))
+				ec.Push(os.MkdirAll(linkDir, 0o755))
 			}
 
-			ec.Add(os.Symlink(lnd.Target, lnd.Path))
+			ec.Push(os.Symlink(lnd.Target, lnd.Path))
 		}
 
 		grip.Info(message.Fields{

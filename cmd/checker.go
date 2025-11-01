@@ -27,16 +27,16 @@ func main() {
 	fmt.Println(util.MakeSparse(util.DotSplit("  ")))
 
 	l := NewList("one", "two", "three")
-	l.Add("four")
+	l.Push("four")
 	fmt.Println(l, l.Len())
 	alter(l)
-	l.Add("seven")
+	l.Push("seven")
 	fmt.Println(l, l.Len())
 }
 
 func alter(ls *ListNS[string]) {
 	fmt.Println("alter -->")
-	ls.Add("seven")
+	ls.Push("seven")
 	fmt.Println(ls, ls.Len())
 	fmt.Println("<-- alter")
 }

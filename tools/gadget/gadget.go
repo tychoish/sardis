@@ -20,6 +20,7 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/risky"
@@ -53,8 +54,8 @@ func (opts *Options) Validate() (err error) {
 
 	ec := &erc.Collector{}
 
-	ec.When(opts.Workers < 1, ers.Error("gadget options cannot specify 0 or fewer workers"))
-	ec.When(opts.Timeout < time.Second, ers.Error("timeout should be at least a second"))
+	ec.If(opts.Workers < 1, ers.Error("gadget options cannot specify 0 or fewer workers"))
+	ec.If(opts.Timeout < time.Second, ers.Error("timeout should be at least a second"))
 	ec.Whenf(strings.HasSuffix(opts.RootPath, "..."), "root path [%s] should not have ...", opts.RootPath)
 
 	ec.Whenf(opts.Recursive && (opts.PackagePath != "" && opts.PackagePath != "./" && opts.PackagePath != "..."),
@@ -76,7 +77,7 @@ func (opts *Options) Validate() (err error) {
 	}
 
 	if !filepath.IsAbs(opts.RootPath) {
-		opts.RootPath = risky.Try(filepath.Abs, opts.RootPath)
+		opts.RootPath = risky.Apply(filepath.Abs, opts.RootPath)
 	}
 
 	if opts.ReportCoverage {
@@ -118,7 +119,7 @@ func RunTests(ctx context.Context, opts Options) error {
 	jpm := jasper.Context(ctx)
 	ec := &erc.Collector{}
 
-	main := pubsub.NewUnlimitedQueue[fun.Worker]()
+	main := pubsub.NewUnlimitedQueue[fnx.Worker]()
 	pool := srv.WorkerPool(main, fun.WorkerGroupConfSet(&fun.WorkerGroupConf{
 		NumWorkers:      opts.Workers,
 		ContinueOnError: true,
@@ -132,7 +133,7 @@ func RunTests(ctx context.Context, opts Options) error {
 	out.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
 	if !opts.CompileOnly && !opts.SkipLint {
-		ec.Add(main.Add(func(ctx context.Context) error {
+		ec.Push(main.Add(func(ctx context.Context) error {
 			name := filepath.Base(opts.RootPath)
 			startLint := time.Now()
 			err := jpm.CreateCommand(ctx).
@@ -159,7 +160,7 @@ func RunTests(ctx context.Context, opts Options) error {
 
 	count := 0
 	mods := &adt.Map[string, *Module]{}
-	moditer := fun.Converter[string, *Module](func(ctx context.Context, mpath string) (*Module, error) {
+	moditer := fun.Convert(func(ctx context.Context, mpath string) (*Module, error) {
 		if count != 0 && !opts.Recursive {
 			return nil, fmt.Errorf("module at %q is within %q but recursive mode is not enabled",
 				mpath, opts.RootPath)
@@ -176,9 +177,9 @@ func RunTests(ctx context.Context, opts Options) error {
 
 	reports := &adt.Map[string, testReport]{}
 
-	pkgiter := fun.MergeStreams(fun.MakeConverter(func(m *Module) *fun.Stream[PackageInfo] { return fun.SliceStream(m.Packages) }).Stream(moditer))
+	pkgiter := fun.MergeStreams(fun.Convert(fnx.MakeConverter(func(m *Module) *fun.Stream[PackageInfo] { return fun.SliceStream(m.Packages) })).Stream(moditer))
 
-	fun.MakeConverter(func(pkg PackageInfo) fun.Worker {
+	fun.Convert(fnx.MakeConverter(func(pkg PackageInfo) fnx.Worker {
 		return func(ctx context.Context) error {
 			if reports.Check(pkg.PackageName) {
 				grip.Errorln("duplicate", pkg.PackageName)
@@ -218,7 +219,7 @@ func RunTests(ctx context.Context, opts Options) error {
 			args = append(args, opts.GoTestArgs...)
 
 			testStart := time.Now()
-			catch.Add(jpm.CreateCommand(ctx).
+			catch.Push(jpm.CreateCommand(ctx).
 				ID(fmt.Sprint("test.", pkg.PackageName)).
 				Directory(pkg.LocalDirectory).
 				AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
@@ -254,7 +255,7 @@ func RunTests(ctx context.Context, opts Options) error {
 						AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
 						AppendArgs("go", "tool", "cover", "-html", coverout, "-o", fmt.Sprintf("coverage-%s.html", filepath.Base(result.Info.LocalDirectory))).
 						Run(ctx), "coverage html for %s", result.Package))
-					ec.Add(jpm.CreateCommand(ctx).
+					ec.Push(jpm.CreateCommand(ctx).
 						ID(fmt.Sprint("coverage.report", result.Package)).
 						Directory(result.Info.LocalDirectory).
 						AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
@@ -268,10 +269,10 @@ func RunTests(ctx context.Context, opts Options) error {
 
 			return catch.Resolve()
 		}
-	}).Stream(pkgiter).ReadAll(fun.MakeHandler(main.Add).Capture()).Operation(ec.Push).Run(ctx)
+	})).Stream(pkgiter).ReadAll(fnx.MakeHandler(main.Add)).Operation(ec.Push).Run(ctx)
 
-	ec.Add(main.Close())
-	ec.Add(pool.Worker().Run(ctx))
+	ec.Push(main.Close())
+	ec.Push(pool.Worker().Run(ctx))
 
 	return ec.Resolve()
 }
@@ -331,7 +332,7 @@ func testOutputFilter(
 	return func(m message.Composer) (_ string, err error) {
 		defer func() {
 			ec := &erc.Collector{}
-			ec.Add(err)
+			ec.Push(err)
 			ec.Recover()
 			err = ec.Resolve()
 		}()
@@ -421,7 +422,7 @@ func report(
 	iter := fun.MAKE.Lines(strings.NewReader(coverage))
 	table := tabby.New()
 	replacer := strings.NewReplacer(tr.Package, pfx)
-	err = erc.Join(err, iter.ReadAll(func(in string) {
+	err = erc.Join(err, iter.ReadAll(fnx.FromHandler(func(in string) {
 		cols := strings.Fields(replacer.Replace(in))
 		if cols[0] == "total:" {
 			// we read this out of the go.test line
@@ -439,7 +440,7 @@ func report(
 		cols[0] = strings.TrimPrefix(cols[0], "/")
 
 		table.AddLine(cols[0], cols[1], cols[2])
-	}).Run(ctx))
+	})).Run(ctx))
 
 	msg := grip.Build().PairBuilder()
 	msg.Pair("pkg", mod.PackageName)

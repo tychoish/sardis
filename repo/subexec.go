@@ -5,6 +5,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/sardis/subexec"
 )
@@ -107,17 +108,17 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 				continue
 			}
 
-			batch.Add(repo)
+			batch.Push(repo)
 		}
 
 		pull.Commands = append(pull.Commands, subexec.Command{
 			Name:     tag,
 			SortHint: -4,
 			WorkerDefinition: func(ctx context.Context) error {
-				return fun.MakeConverter(func(r GitRepository) fun.Worker {
+				return fun.Convert(fnx.MakeConverter(func(r GitRepository) fnx.Worker {
 					return r.FetchJob()
-				}).Stream(batch.Stream()).Parallel(
-					func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+				})).Stream(batch.Stream()).Parallel(
+					func(ctx context.Context, op fnx.Worker) error { return op(ctx) },
 					fun.WorkerGroupConfContinueOnError(),
 					fun.WorkerGroupConfWorkerPerCPU(),
 				).Run(ctx)
@@ -128,10 +129,10 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 			Name:     tag,
 			SortHint: 8,
 			WorkerDefinition: func(ctx context.Context) error {
-				return fun.MakeConverter(func(r GitRepository) fun.Worker {
+				return fun.Convert(fnx.MakeConverter(func(r GitRepository) fnx.Worker {
 					return r.UpdateJob()
-				}).Stream(batch.Stream()).Parallel(
-					func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+				})).Stream(batch.Stream()).Parallel(
+					func(ctx context.Context, op fnx.Worker) error { return op(ctx) },
 					fun.WorkerGroupConfContinueOnError(),
 					fun.WorkerGroupConfWorkerPerCPU(),
 				).Run(ctx)

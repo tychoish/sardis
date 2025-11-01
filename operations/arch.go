@@ -6,6 +6,7 @@ import (
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
@@ -31,10 +32,10 @@ func fetchAur() *cmdr.Commander {
 		SetUsage("download source to build directory"),
 		nameFlagName, func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf.System.Arch
-			return fun.MakeConverter(func(name string) fun.Worker {
+			return fun.Convert(fnx.MakeConverter(func(name string) fnx.Worker {
 				return conf.FetchPackageFromAUR(name, true)
-			}).Stream(fun.SliceStream(args.arg)).Parallel(
-				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+			})).Stream(fun.SliceStream(args.arg)).Parallel(
+				func(ctx context.Context, op fnx.Worker) error { return op(ctx) },
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfWorkerPerCPU(),
 			).Run(ctx)
@@ -48,10 +49,10 @@ func buildPkg() *cmdr.Commander {
 		nameFlagName, func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf.System.Arch
 
-			return fun.MakeConverter(func(name string) fun.Worker {
+			return fun.Convert(fnx.MakeConverter(func(name string) fnx.Worker {
 				return conf.BuildPackageInABS(name)
-			}).Stream(fun.SliceStream(args.arg)).Parallel(
-				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+			})).Stream(fun.SliceStream(args.arg)).Parallel(
+				func(ctx context.Context, op fnx.Worker) error { return op(ctx) },
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfWorkerPerCPU(),
 			).Run(ctx)
@@ -65,10 +66,10 @@ func installAur() *cmdr.Commander {
 		nameFlagName, func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf.System.Arch
 
-			return fun.MakeConverter(func(name string) fun.Worker {
+			return fun.Convert(fnx.MakeConverter(func(name string) fnx.Worker {
 				return conf.FetchPackageFromAUR(name, true).Join(conf.BuildPackageInABS(name))
-			}).Stream(fun.SliceStream(args.arg)).Parallel(
-				func(ctx context.Context, op fun.Worker) error { return op(ctx) },
+			})).Stream(fun.SliceStream(args.arg)).Parallel(
+				func(ctx context.Context, op fnx.Worker) error { return op(ctx) },
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfWorkerPerCPU(),
 			).Run(ctx)

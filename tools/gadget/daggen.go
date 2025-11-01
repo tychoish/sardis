@@ -16,6 +16,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/grip"
@@ -74,16 +75,16 @@ func (p Packages) IndexByPackageName() dt.Map[string, PackageInfo] {
 
 func (p Packages) ConvertPathsToPackages(iter *fun.Stream[string]) *fun.Stream[string] {
 	index := p.IndexByLocalDirectory()
-	return fun.MakeConverter(func(path string) string {
+	return fun.Convert(fnx.MakeConverter(func(path string) string {
 		return index[path].PackageName
-	}).Stream(iter)
+	})).Stream(iter)
 }
 
 func (p Packages) ConvertPackagesToPaths(iter *fun.Stream[string]) *fun.Stream[string] {
 	index := p.IndexByPackageName()
-	return fun.MakeConverter(func(path string) string {
+	return fun.Convert(fnx.MakeConverter(func(path string) string {
 		return index[path].LocalDirectory
-	}).Stream(iter)
+	})).Stream(iter)
 }
 
 func (p Packages) Graph() *dt.Pairs[string, []string] {
@@ -184,7 +185,7 @@ func Collect(ctx context.Context, path string) (*Module, error) {
 
 			for depPkgIter.Next(ctx) {
 				dpkg := depPkgIter.Value()
-				pkgs.AppendStream(fun.MakeConverter(func(p *types.Package) string { return p.Path() }).Stream(filterLocal(f.Module.Path, dpkg.Imports())))
+				pkgs.AppendStream(fun.Convert(fnx.MakeConverter(func(p *types.Package) string { return p.Path() })).Stream(filterLocal(f.Module.Path, dpkg.Imports())))
 			}
 
 			info.Dependencies = ft.Must(pkgs.Stream().Slice(ctx))

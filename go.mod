@@ -1,6 +1,6 @@
 module github.com/tychoish/sardis
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
@@ -14,24 +14,24 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nwidger/jsoncolor v0.3.2
 	github.com/shirou/gopsutil v3.21.11+incompatible
-	github.com/tychoish/birch v0.3.0
-	github.com/tychoish/cmdr v0.4.0
-	github.com/tychoish/fun v0.12.0
+	github.com/tychoish/birch v0.3.1
+	github.com/tychoish/cmdr v0.4.1
+	github.com/tychoish/fun v0.13.0
 	github.com/tychoish/godmenu v0.2.2
-	github.com/tychoish/grip v0.4.0
+	github.com/tychoish/grip v0.4.1
 	github.com/tychoish/grip/x/desktop v0.0.0-20250626175245-f5276066a1e9
 	github.com/tychoish/grip/x/jira v0.0.0-20250626173215-d516ec138ab2
 	github.com/tychoish/grip/x/system v0.0.0-20250626175245-f5276066a1e9
-	github.com/tychoish/grip/x/telegram v0.0.0-20250727175141-b1156f1fda1f
+	github.com/tychoish/grip/x/telegram v0.0.0-20251029084153-b8853b7f1aae
 	github.com/tychoish/grip/x/twitter v0.0.0-20250626175245-f5276066a1e9
 	github.com/tychoish/grip/x/xmpp v0.0.0-20250626175245-f5276066a1e9
-	github.com/tychoish/jasper v0.1.3-0.20250713002007-d673ada4fd85
-	github.com/tychoish/jasper/x/cli v0.0.0-20250712191228-9a0a31d519ad
-	github.com/tychoish/jasper/x/track v0.0.0-20250712195804-18ceb2ba20a3
-	github.com/tychoish/libfun v0.0.0-20250712200500-93c467b8e7b9
-	github.com/urfave/cli/v2 v2.25.3
+	github.com/tychoish/jasper v0.1.3
+	github.com/tychoish/jasper/x/cli v0.0.0-20251029030949-6c07b06c1b1d
+	github.com/tychoish/jasper/x/track v0.0.0-20251029030949-6c07b06c1b1d
+	github.com/tychoish/libfun v0.0.0-20251029082330-5389c48f58ef
+	github.com/urfave/cli/v2 v2.27.7
 	go.mongodb.org/mongo-driver v1.11.6
-	golang.org/x/tools v0.34.0
+	golang.org/x/tools v0.36.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -50,9 +50,9 @@ require (
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/cloudflare/circl v1.1.0 // indirect
-	github.com/containerd/cgroups/v3 v3.0.1 // indirect
-	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+	github.com/containerd/cgroups/v3 v3.1.0 // indirect
+	github.com/coreos/go-systemd/v22 v22.6.0 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/dghubble/go-twitter v0.0.0-20221104224141-912508c3888b // indirect
 	github.com/dghubble/oauth1 v0.7.3 // indirect
 	github.com/dghubble/sling v1.4.2 // indirect
@@ -72,13 +72,12 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
-	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/mux v1.8.0 // indirect
+	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jackmordaunt/icns/v3 v3.0.1 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
@@ -89,34 +88,35 @@ require (
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mholt/archiver v3.1.1+incompatible // indirect
+	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/montanaflynn/stats v0.6.3 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/nwaples/rardecode v1.1.3 // indirect
-	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
+	github.com/opencontainers/runtime-spec v1.2.1 // indirect
 	github.com/phyber/negroni-gzip v1.0.0 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/rs/cors v1.8.3 // indirect
+	github.com/rs/cors v1.11.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sergeymakinen/go-bmp v1.0.0 // indirect
 	github.com/sergeymakinen/go-ico v1.0.0-beta.0 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	github.com/tadvi/systray v0.0.0-20190226123456-11a2b8fa57af // indirect
-	github.com/tklauser/go-sysconf v0.3.11 // indirect
-	github.com/tklauser/numcpus v0.6.0 // indirect
+	github.com/tklauser/go-sysconf v0.3.15 // indirect
+	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
-	github.com/tychoish/birch/x/ftdc v0.0.0-20250610225000-f5dba0d9b062 // indirect
+	github.com/tychoish/birch/x/ftdc v0.0.0-20251029024444-91e948b0e397 // indirect
 	github.com/tychoish/birch/x/mrpc v0.0.0-20250610225000-f5dba0d9b062 // indirect
-	github.com/tychoish/gimlet v0.0.0-20250611125935-c7dc51701c88 // indirect
-	github.com/tychoish/grip/x/metrics v0.0.0-20250608160243-37fab929fbd2 // indirect
+	github.com/tychoish/gimlet v0.0.0-20251028182000-6a35909ebafc // indirect
+	github.com/tychoish/grip/x/metrics v0.0.0-20251029025449-1ae82bef74a7 // indirect
 	github.com/tychoish/grip/x/splunk v0.0.0-20250608160243-37fab929fbd2 // indirect
-	github.com/tychoish/jasper/x/remote v0.0.0-20250712195804-18ceb2ba20a3 // indirect
-	github.com/tychoish/jasper/x/splunk v0.0.0-20250712195804-18ceb2ba20a3 // indirect
+	github.com/tychoish/jasper/x/remote v0.0.0-20251029030949-6c07b06c1b1d // indirect
+	github.com/tychoish/jasper/x/splunk v0.0.0-20251029030949-6c07b06c1b1d // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect
@@ -126,21 +126,19 @@ require (
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/xmppo/go-xmpp v0.2.15 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
+	github.com/xrash/smetrics v0.0.0-20250705151800-55b8f293f342 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
-	github.com/yusufpapurcu/wmi v1.2.2 // indirect
-	golang.org/x/crypto v0.39.0 // indirect
-	golang.org/x/mod v0.25.0 // indirect
-	golang.org/x/net v0.41.0 // indirect
-	golang.org/x/oauth2 v0.6.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/term v0.33.0 // indirect
-	golang.org/x/text v0.27.0 // indirect
-	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
-	google.golang.org/grpc v1.54.0 // indirect
-	google.golang.org/protobuf v1.30.0 // indirect
+	github.com/yusufpapurcu/wmi v1.2.4 // indirect
+	golang.org/x/crypto v0.42.0 // indirect
+	golang.org/x/mod v0.27.0 // indirect
+	golang.org/x/net v0.44.0 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
+	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/sys v0.37.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8 // indirect
+	google.golang.org/grpc v1.76.0 // indirect
+	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

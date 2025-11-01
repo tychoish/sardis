@@ -6,6 +6,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/srv"
@@ -130,10 +131,10 @@ func NewDispatcher(conf Config) *Dispatcher {
 // method must return true before you can use the service.
 func (r *Dispatcher) Service() *srv.Service { return r.orchestrator.Service() }
 
-// Ready produces a fun.Operation that blocks until the dispatcher's
+// Ready produces a fnx.Operation that blocks until the dispatcher's
 // service is ready and running (or the context passed to the wait
 // function is canceled.)
-func (r *Dispatcher) Ready() fun.Operation {
+func (r *Dispatcher) Ready() fnx.Operation {
 	return fun.BlockingReceive(r.isRunning).Ignore
 }
 
@@ -271,11 +272,11 @@ func (r *Dispatcher) doIntercept(ctx context.Context, key Protocol, rr *Response
 		iter := icept.StreamFront()
 		for iter.Next(ctx) {
 			if err = iter.Value()(ctx, rr); err != nil {
-				ec.Add(err)
+				ec.Push(err)
 				break
 			}
 		}
-		ec.Add(iter.Close())
+		ec.Push(iter.Close())
 	}
 
 	return nil
@@ -290,11 +291,11 @@ func (r *Dispatcher) doMiddleware(ctx context.Context, key Protocol, req *Messag
 		iter := mw.StreamFront()
 		for iter.Next(ctx) {
 			if err := iter.Value()(ctx, req); err != nil {
-				ec.Add(err)
+				ec.Push(err)
 				break
 			}
 		}
-		ec.Add(iter.Close())
+		ec.Push(iter.Close())
 	}
 	return nil
 }
@@ -305,13 +306,13 @@ func (r *Dispatcher) doHandler(ctx context.Context, key Protocol, req Message) (
 	defer ec.Recover()
 
 	h, ok := r.handlers.Load(key)
-	ec.When(!ok, ErrNoHandler)
+	ec.If(!ok, ErrNoHandler)
 
 	if ok {
 		var err error
 		resp, err = h(ctx, req)
-		ec.Add(err)
-		ec.Add(resp.Error)
+		ec.Push(err)
+		ec.Push(resp.Error)
 	}
 	return
 }

@@ -264,8 +264,8 @@ func WithRemoteNotify(ctx context.Context, conf *Configuration) (out context.Con
 
 		srv.AddCleanup(ctx, func(ctx context.Context) error {
 			catcher := &erc.Collector{}
-			catcher.Add(sender.Flush(ctx))
-			catcher.Add(sender.Close())
+			catcher.Push(sender.Flush(ctx))
+			catcher.Push(sender.Close())
 			return ers.Wrapf(catcher.Resolve(), "telegram [%s]", conf.Telegram.Name)
 		})
 

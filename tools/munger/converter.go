@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -30,16 +31,16 @@ type BlogPost struct {
 }
 
 func (p *BlogPost) WriteTo(buf *bufio.Writer) error {
-	return fun.MakeWorker(func() error { return ft.IgnoreFirst(buf.WriteString("---\n")) }).Join(
-		fun.MakeWorker(func() error {
+	return fnx.MakeWorker(func() error { return ft.IgnoreFirst(buf.WriteString("---\n")) }).Join(
+		fnx.MakeWorker(func() error {
 			out, err := yaml.Marshal(p.Metadata)
 			if err != nil {
 				return err
 			}
 			return ft.IgnoreFirst(buf.Write(out))
 		}),
-		fun.MakeWorker(func() error { return ft.IgnoreFirst(buf.WriteString("---\n\n")) }),
-		fun.MakeWorker(func() error { return ft.IgnoreFirst(buf.WriteString(p.Body)) }),
+		fnx.MakeWorker(func() error { return ft.IgnoreFirst(buf.WriteString("---\n\n")) }),
+		fnx.MakeWorker(func() error { return ft.IgnoreFirst(buf.WriteString(p.Body)) }),
 	).Wait()
 }
 
@@ -105,7 +106,7 @@ func CollectFiles(rootPath string) *fun.Stream[BlogPost] {
 }
 
 func ConvertSite(ctx context.Context, path string) error {
-	return CollectFiles(path).BufferParallel(runtime.NumCPU()).Parallel(fun.NewHandler(func(ctx context.Context, p BlogPost) error {
+	return CollectFiles(path).BufferParallel(runtime.NumCPU()).Parallel(fnx.NewHandler(func(ctx context.Context, p BlogPost) error {
 		var stdoutBuf bytes.Buffer
 		var stderrBuf bytes.Buffer
 

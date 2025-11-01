@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/fnx"
 )
 
-type Job interface{ Resolve() fun.Worker }
+type Job interface{ Resolve() fnx.Worker }
 
 type Registry struct {
 	Codecs    CodecStore
@@ -67,7 +67,7 @@ type Envelope struct {
 
 type Message []byte
 
-func (e *Envelope) Worker() fun.Worker { return e.cache.Resolve() }
+func (e *Envelope) Worker() fnx.Worker { return e.cache.Resolve() }
 
 func (e *Envelope) MarshalText() ([]byte, error) {
 	return e.marshal(SerializationRepresentationText)

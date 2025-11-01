@@ -9,6 +9,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -38,9 +39,9 @@ func GoGenerate(
 	var numPackages int
 	for idx, group := range args.Spec.Order {
 		// TOOD: does this actually do anything?
-		fun.MakeConverter(func(in string) string {
+		fun.Convert(fnx.MakeConverter(func(in string) string {
 			return strings.Replace(index[in].LocalDirectory, args.Spec.Path, ".", 1)
-		}).Stream(fun.SliceStream(group))
+		})).Stream(fun.SliceStream(group))
 
 		numPackages += len(group)
 

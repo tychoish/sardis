@@ -20,27 +20,16 @@ type Utilities struct{}
 
 var TOOLS Utilities = struct{}{}
 
-func (Utilities) Converter() fnx.Converter[Command, fnx.Worker] { return TOOLS.CommandToWorker }
+func (Utilities) WorkerPool(st *fun.Stream[fnx.Worker]) fnx.Worker { return fun.MAKE.WorkerPool(st) }
+func (Utilities) Converter() fnx.Converter[Command, fnx.Worker]    { return TOOLS.CommandToWorker }
+
 func (Utilities) CommandToWorker(_ context.Context, c Command) (fnx.Worker, error) {
 	return c.Worker(), nil
 }
 
-func (Utilities) WorkerHandler() fnx.Handler[fnx.Worker] {
-	return func(ctx context.Context, wf fnx.Worker) error { return wf.Run(ctx) }
-}
-
 func (Utilities) CommandPool(st *fun.Stream[Command]) fnx.Worker {
-	return TOOLS.WorkerPool(fun.Convert(TOOLS.Converter()).Stream(st))
+	return fun.MAKE.WorkerPool(fun.Convert(TOOLS.CommandToWorker).Stream(st))
 }
-
-func (Utilities) WorkerPool(st *fun.Stream[fnx.Worker]) fnx.Worker {
-	return st.Parallel(
-		TOOLS.WorkerHandler(),
-		fun.WorkerGroupConfContinueOnError(),
-		fun.WorkerGroupConfWorkerPerCPU(),
-	)
-}
-
 type Logging string
 
 const (

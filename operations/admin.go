@@ -5,16 +5,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"slices"
-	"strconv"
 
 	"github.com/cheynewallace/tabby"
 	"github.com/mattn/go-isatty"
+	"github.com/tychoish/birch/jsonx"
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
@@ -24,6 +26,7 @@ import (
 	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/sysmgmt"
 	"github.com/tychoish/sardis/util"
+	"gopkg.in/yaml.v2"
 )
 
 func Admin() *cmdr.Commander {
@@ -78,45 +81,64 @@ func linkOp() *cmdr.Commander {
 		SetUsage("setup all configured links").
 		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				links := fun.SliceStream(conf.System.Links.Links)
-
-				jobs := fun.Convert(fnx.MakeConverter(func(c sysmgmt.LinkDefinition) fnx.Worker { return c.CreateLinkJob() })).Stream(links)
-
-				return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
+				return subexec.TOOLS.WorkerPool(fun.Convert(fnx.MakeConverter(func(c sysmgmt.LinkDefinition) fnx.Worker {
+					return c.CreateLinkJob()
+				})).Stream(
+					fun.SliceStream(conf.System.Links.Links),
+				))
 			}).
 			Add).
 		Subcommanders(addOpCommand(cmdr.MakeCommander().
 			SetName("discover").
 			Aliases("disco", "disc").SetUsage("discover"),
-			"path", func(ctx context.Context, args *withConf[string]) error {
+			"format", func(ctx context.Context, args *withConf[string]) error {
 				if args.conf.System.Links.Discovery == nil {
 					return errors.New("discovery config not defined")
 				}
-
-				if args.arg != "" {
-					args.conf.System.Links.Discovery.SearchPaths = append(args.conf.System.Links.Discovery.SearchPaths, util.TryExpandHomeDir(args.arg))
-				}
-
-				if err := args.conf.System.Links.Validate(); err != nil {
-					return err
-				}
-
-				var idx int
-
 				ec := &erc.Collector{}
-				table := tabby.New()
-				table.AddHeader("Index", "Target", "Path")
 
-				args.conf.System.Links.Discovery.FindLinks().ReadAll(fnx.FromHandler(func(d *sysmgmt.LinkDefinition) {
-					table.AddLine(
-						strconv.Itoa(idx),
-						// ft.IfElse(d.RequireSudo, "sudo", "-"),
-						util.TryCollapseHomeDir(d.Target),
-						util.TryCollapseHomeDir(d.Path),
-					)
-					idx++
-				})).Operation(ec.Push).Run(ctx)
-				table.Print()
+				switch args.arg {
+				case "JSON", "json":
+					buf := bufio.NewWriter(os.Stdout)
+					args.conf.System.Links.Discovery.FindLinks().ReadAll(fnx.FromHandler(func(d *sysmgmt.LinkDefinition) {
+						ec.Push(ft.IgnoreFirst(buf.Write(ft.IgnoreSecond(jsonx.DC.Elements(
+							jsonx.EC.String("path", d.Path),
+							jsonx.EC.String("target", d.Target),
+						).MarshalJSON()))))
+						ec.Push(buf.WriteByte('\n'))
+					})).Operation(ec.Push).Run(ctx)
+					ec.Push(buf.Flush())
+				case "line", "ln":
+					buf := bufio.NewWriter(os.Stdout)
+					args.conf.System.Links.Discovery.FindLinks().ReadAll(func(ctx context.Context, d *sysmgmt.LinkDefinition) error {
+						return ft.IgnoreFirst(fmt.Fprintln(buf, d.Path, "->", d.Target))
+					}).Operation(ec.Push).Run(ctx)
+					ec.Push(buf.Flush())
+				case "yaml", "export":
+					buf := bufio.NewWriter(os.Stdout)
+					enc := yaml.NewEncoder(buf)
+
+					args.conf.System.Links.Discovery.FindLinks().ReadAll(func(ctx context.Context, d *sysmgmt.LinkDefinition) error {
+						return enc.Encode(d)
+					}).Operation(ec.Push).Run(ctx)
+
+					ec.Push(enc.Close())
+					ec.Push(buf.Flush())
+				case "table":
+					fallthrough
+				default:
+					table := tabby.New()
+					table.AddHeader("Path", "", "Target")
+
+					args.conf.System.Links.Discovery.FindLinks().ReadAll(fnx.FromHandler(func(d *sysmgmt.LinkDefinition) {
+						table.AddLine(
+							util.TryCollapseHomeDir(d.Path),
+							"=>",
+							util.TryCollapseHomeDir(d.Target),
+						)
+					})).Operation(ec.Push).Run(ctx)
+					table.Print()
+				}
 
 				return ec.Resolve()
 			}))

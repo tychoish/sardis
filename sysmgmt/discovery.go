@@ -2,6 +2,7 @@ package sysmgmt
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -14,17 +15,15 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/message"
 	"github.com/tychoish/libfun"
 	"github.com/tychoish/sardis/util"
 )
 
 type LinkDiscovery struct {
 	// SearchPaths are a a list of paths/trees where the links contained within are (potentially?) managed.
-	SearchPaths          dt.Slice[string] `bson:"search" json:"search" yaml:"search"`
-	IgnorePathPrefixes   dt.Slice[string] `bson:"ignore_path_prefixes" json:"ignore_path_prefixes" yaml:"ignore_path_prefixes"`
-	IgnoreTargetPrefixes dt.Slice[string] `bson:"ignore_target_prefixes" json:"ignore_target_prefixes" yaml:"ignore_target_prefixes"`
+	SearchPaths          []string `bson:"search" json:"search" yaml:"search"`
+	IgnorePathPrefixes   []string `bson:"ignore_path_prefixes" json:"ignore_path_prefixes" yaml:"ignore_path_prefixes"`
+	IgnoreTargetPrefixes []string `bson:"ignore_target_prefixes" json:"ignore_target_prefixes" yaml:"ignore_target_prefixes"`
 
 	SkipMissingTargets  *bool `bson:"skip_missing_targets" json:"skip_missing_targets" yaml:"skip_missing_targets"`
 	SkipResolvedTargets *bool `bson:"skip_resolved_targets" json:"skip_resolved_targets" yaml:"skip_resolved_targets"`
@@ -48,9 +47,9 @@ func (disco *LinkDiscovery) Validate() (err error) {
 		disco.SearchPaths = append(disco.SearchPaths, util.GetHomeDir())
 	}
 
-	disco.SearchPaths = fnx.NewFuture(disco.SearchPaths.Stream().Transform(fnx.MakeConverter(util.TryExpandHomeDir)).Slice).Resolve()
-	disco.IgnorePathPrefixes = fnx.NewFuture(disco.IgnorePathPrefixes.Stream().Transform(fnx.MakeConverter(util.TryExpandHomeDir)).Slice).Resolve()
-	disco.IgnoreTargetPrefixes = fnx.NewFuture(disco.IgnoreTargetPrefixes.Stream().Transform(fnx.MakeConverter(util.TryExpandHomeDir)).Slice).Resolve()
+	disco.SearchPaths = fnx.NewFuture(dt.NewSlice(disco.SearchPaths).Stream().Transform(fnx.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
+	disco.IgnorePathPrefixes = fnx.NewFuture(dt.NewSlice(disco.IgnorePathPrefixes).Stream().Transform(fnx.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
+	disco.IgnoreTargetPrefixes = fnx.NewFuture(dt.NewSlice(disco.IgnoreTargetPrefixes).Stream().Transform(fnx.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
 
 	for idx := range disco.SearchPaths {
 		path := disco.SearchPaths[idx]
@@ -72,10 +71,6 @@ func (disco *LinkDiscovery) ShouldSkipResolvedTargets() bool {
 }
 
 func hasAnyPrefix(str string, prefixes []string) bool {
-	if len(prefixes) == 0 {
-		return false
-	}
-
 	for pf := range slices.Values(prefixes) {
 		if strings.HasPrefix(str, pf) {
 			return true
@@ -99,38 +94,45 @@ func (disco *LinkDiscovery) FindLinks() *fun.Stream[*LinkDefinition] {
 			SkipPermissionErrors: true,
 			IgnoreMode:           ft.Ptr(fs.ModeDir),
 		}, func(p string, dir fs.DirEntry) (*dt.Tuple[string, string], error) {
-			p = tryAbsPath(filepath.Join(path, p))
-
-			if dir.Type()&fs.ModeSymlink == 0 {
-				return nil, nil
-			}
-
+			p = tryAbsPath(p)
 			if hasAnyPrefix(p, disco.IgnorePathPrefixes) {
-				if dir.Type()&fs.ModeDir != 0 {
+				if dir.IsDir() {
 					return nil, fs.SkipDir
 				}
 				return nil, nil
 			}
 
-			target, err := os.Readlink(p)
-			switch {
-			case err == nil:
+			if dir.Type()&fs.ModeSymlink != 0 {
+				target, err := os.Readlink(p)
+				if err != nil {
+					if errors.Is(err, fs.ErrPermission) {
+						return nil, nil
+					}
+					return nil, fmt.Errorf("error reading symbolic link %s: %w", path, err)
+				}
 				target = tryAbsPath(target)
-				if hasAnyPrefix(target, disco.IgnoreTargetPrefixes) {
+
+				switch {
+				case hasAnyPrefix(target, disco.IgnoreTargetPrefixes):
+					return nil, nil
+				case hasAnyPrefix(path, disco.IgnorePathPrefixes):
+					return nil, nil
+
+				}
+
+				exists := util.FileExists(target)
+				switch {
+				case exists && disco.ShouldSkipResolvedTargets():
+					return nil, nil
+				case ft.Not(exists) && disco.ShouldSkipMissingTargets():
 					return nil, nil
 				}
-			case errors.Is(err, fs.ErrPermission):
-				return nil, nil
-			case err != nil:
-				grip.Debug(message.Fields{
-					"link":   p,
-					"target": target,
-					"err":    err,
-				})
-				return nil, nil
+
+				return ft.Ptr(dt.MakeTuple(target, p)), nil
+
 			}
-			grip.Info(message.Fields{"link": p, "target": target})
-			return ft.Ptr(dt.MakeTuple(target, p)), nil
+
+			return nil, nil
 		})
 	})).Stream(fun.SliceStream(disco.SearchPaths))))
 }

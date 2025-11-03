@@ -85,7 +85,7 @@ func linkOp() *cmdr.Commander {
 					return c.CreateLinkJob()
 				})).Stream(
 					fun.SliceStream(conf.System.Links.Links),
-				))
+				)).Run(ctx)
 			}).
 			Add).
 		Subcommanders(addOpCommand(cmdr.MakeCommander().

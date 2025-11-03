@@ -2,7 +2,6 @@ package sysmgmt
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -15,6 +14,8 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/message"
 	"github.com/tychoish/libfun"
 	"github.com/tychoish/sardis/util"
 )
@@ -71,6 +72,10 @@ func (disco *LinkDiscovery) ShouldSkipResolvedTargets() bool {
 }
 
 func hasAnyPrefix(str string, prefixes []string) bool {
+	if len(prefixes) == 0 {
+		return false
+	}
+
 	for pf := range slices.Values(prefixes) {
 		if strings.HasPrefix(str, pf) {
 			return true
@@ -96,48 +101,36 @@ func (disco *LinkDiscovery) FindLinks() *fun.Stream[*LinkDefinition] {
 		}, func(p string, dir fs.DirEntry) (*dt.Tuple[string, string], error) {
 			p = tryAbsPath(filepath.Join(path, p))
 
-			if hasAnyPrefix(p, disco.IgnorePathPrefixes) {
-				if dir.IsDir() {
-					return nil, fs.SkipDir
-				}
+			if dir.Type()&fs.ModeSymlink == 0 {
 				return nil, nil
 			}
-			if dir.Type() != fs.ModeSymlink {
+
+			if hasAnyPrefix(p, disco.IgnorePathPrefixes) {
+				if dir.Type()&fs.ModeDir != 0 {
+					return nil, fs.SkipDir
+				}
 				return nil, nil
 			}
 
 			target, err := os.Readlink(p)
 			switch {
 			case err == nil:
-				return ft.Ptr(dt.MakeTuple(tryAbsPath(target), p)), nil
+				target = tryAbsPath(target)
+				if hasAnyPrefix(target, disco.IgnoreTargetPrefixes) {
+					return nil, nil
+				}
 			case errors.Is(err, fs.ErrPermission):
 				return nil, nil
-			default:
-				return nil, fmt.Errorf("error reading symbolic link %s: %w", p, err)
+			case err != nil:
+				grip.Debug(message.Fields{
+					"link":   p,
+					"target": target,
+					"err":    err,
+				})
+				return nil, nil
 			}
+			grip.Info(message.Fields{"link": p, "target": target})
+			return ft.Ptr(dt.MakeTuple(target, p)), nil
 		})
-	})).Stream(fun.SliceStream(disco.SearchPaths))).
-		Filter(func(p *dt.Tuple[string, string]) bool {
-			switch {
-			case len(disco.IgnorePathPrefixes) == 0 && len(disco.IgnoreTargetPrefixes) == 0:
-				return true
-			case hasAnyPrefix(p.One, disco.IgnoreTargetPrefixes):
-				return false
-			case hasAnyPrefix(p.Two, disco.IgnorePathPrefixes):
-				return false
-			default:
-				return true
-			}
-		}).
-		Filter(func(p *dt.Tuple[string, string]) bool {
-			exists := util.FileExists(p.One)
-			switch {
-			case exists && disco.ShouldSkipResolvedTargets():
-				return false
-			case ft.Not(exists) && disco.ShouldSkipMissingTargets():
-				return false
-			default:
-				return true
-			}
-		}))
+	})).Stream(fun.SliceStream(disco.SearchPaths))))
 }

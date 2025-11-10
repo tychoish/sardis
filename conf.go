@@ -91,6 +91,11 @@ func readConfiguration(fn string) (*Configuration, error) {
 		panic("this should be impossible")
 	}
 
+	// hack
+	for idx := range out.System.Links.Links {
+		out.System.Links.Links[idx].Defined = true
+	}
+
 	out.originalPath = fn
 	return out, nil
 }

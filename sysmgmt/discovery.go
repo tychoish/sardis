@@ -79,22 +79,13 @@ func hasAnyPrefix(str string, prefixes []string) bool {
 	return false
 }
 
-func (disco *LinkDiscovery) FindLinks() *fun.Stream[*LinkDefinition] {
-	return fun.Convert(fnx.MakeConverter(func(in dt.Tuple[string, string]) *LinkDefinition {
-		return &LinkDefinition{
-			Name:   strings.TrimLeft(strings.ReplaceAll(in.One, string(filepath.Separator), "-"), "- _."),
-			Target: in.One,
-			Path:   in.Two,
-			// RequireSudo: strings.HasPrefix(in.Two, disco.Runtime.hostname),
-		}
-	})).Stream(fun.MergeStreams(fun.Convert(fnx.MakeConverter(func(path string) *fun.Stream[dt.Tuple[string, string]] {
-		path = tryAbsPath(path)
+func (disco *LinkDiscovery) FindLinks() *fun.Stream[LinkDefinition] {
+	return fun.MergeStreams(fun.Convert(fnx.MakeConverter(func(path string) *fun.Stream[LinkDefinition] {
 		return libfun.FsWalkStream(libfun.FsWalkOptions{
 			Path:                 path,
 			SkipPermissionErrors: true,
 			IgnoreMode:           ft.Ptr(fs.ModeDir),
-		}, func(p string, dir fs.DirEntry) (*dt.Tuple[string, string], error) {
-			p = tryAbsPath(p)
+		}, func(p string, dir fs.DirEntry) (*LinkDefinition, error) {
 			if hasAnyPrefix(p, disco.IgnorePathPrefixes) {
 				if dir.IsDir() {
 					return nil, fs.SkipDir
@@ -102,37 +93,37 @@ func (disco *LinkDiscovery) FindLinks() *fun.Stream[*LinkDefinition] {
 				return nil, nil
 			}
 
-			if dir.Type()&fs.ModeSymlink != 0 {
-				target, err := os.Readlink(p)
-				if err != nil {
-					if errors.Is(err, fs.ErrPermission) {
-						return nil, nil
-					}
-					return nil, fmt.Errorf("error reading symbolic link %s: %w", path, err)
-				}
-				target = tryAbsPath(target)
-
-				switch {
-				case hasAnyPrefix(target, disco.IgnoreTargetPrefixes):
-					return nil, nil
-				case hasAnyPrefix(path, disco.IgnorePathPrefixes):
-					return nil, nil
-
-				}
-
-				exists := util.FileExists(target)
-				switch {
-				case exists && disco.ShouldSkipResolvedTargets():
-					return nil, nil
-				case ft.Not(exists) && disco.ShouldSkipMissingTargets():
-					return nil, nil
-				}
-
-				return ft.Ptr(dt.MakeTuple(target, p)), nil
-
+			if dir.Type()&fs.ModeSymlink == 0 {
+				return nil, nil
 			}
 
-			return nil, nil
+			target, err := os.Readlink(p)
+			if err != nil {
+				if errors.Is(err, fs.ErrPermission) {
+					return nil, nil
+				}
+				return nil, fmt.Errorf("error reading symbolic link %s: %w", path, err)
+			}
+
+			target = tryAbsPath(target)
+			exists := util.FileExists(target)
+
+			switch {
+			case exists && disco.ShouldSkipResolvedTargets():
+				return nil, nil
+			case ft.Not(exists) && disco.ShouldSkipMissingTargets():
+				return nil, nil
+			case hasAnyPrefix(target, disco.IgnoreTargetPrefixes):
+				return nil, nil
+			}
+
+			return &LinkDefinition{
+				Name:         strings.TrimLeft(strings.ReplaceAll(target, string(filepath.Separator), "-"), "- _."),
+				Target:       target,
+				Path:         p,
+				PathExists:   util.FileExists(p),
+				TargetExists: exists,
+			}, nil
 		})
-	})).Stream(fun.SliceStream(disco.SearchPaths))))
+	})).Stream(fun.SliceStream(disco.SearchPaths)))
 }

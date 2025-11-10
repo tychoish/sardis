@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
@@ -38,6 +40,22 @@ type LinkDefinition struct {
 	Update            bool   `bson:"update" json:"update" yaml:"update"`
 	DirectoryContents bool   `bson:"directory_contents" json:"directory_contents" yaml:"directory_contents"`
 	RequireSudo       bool   `bson:"sudo" json:"sudo" yaml:"sudo"`
+
+	Defined      bool `bson:"defined,omitempty" json:"defined,omitempty" yaml:"defined,omitempty"`
+	PathExists   bool `bson:"path_exists,omitempty" json:"path_exists,omitempty" yaml:"path_exists,omitempty"`
+	TargetExists bool `bson:"target_exists,omitempty" json:"target_exists,omitempty" yaml:"target_exists,omitempty"`
+}
+
+func (conf *LinkConfiguration) Resolve() dt.Map[string, LinkDefinition] {
+	out := dt.NewMap(make(map[string]LinkDefinition, len(conf.Links)))
+	for link := range slices.Values(conf.Links) {
+		out.Store(link.Path, link)
+	}
+	return out
+}
+
+func (lnd LinkDefinition) LessThan(other LinkDefinition) bool {
+	return lnd.Path < other.Path || (!lnd.PathExists && other.PathExists) || (!lnd.TargetExists && other.TargetExists)
 }
 
 func (conf *LinkConfiguration) Validate() error {

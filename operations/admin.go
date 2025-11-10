@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"os"
 	"slices"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/tychoish/birch/jsonx"
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
@@ -90,37 +93,56 @@ func linkOp() *cmdr.Commander {
 			Add).
 		Subcommanders(addOpCommand(cmdr.MakeCommander().
 			SetName("discover").
-			Aliases("disco", "disc").SetUsage("discover"),
-			"format", func(ctx context.Context, args *withConf[string]) error {
+			Aliases("disco", "disc").
+			SetUsage("discover"),
+			"format", func(ctx context.Context, args *withConf[[]string]) error {
 				if args.conf.System.Links.Discovery == nil {
 					return errors.New("discovery config not defined")
 				}
 				ec := &erc.Collector{}
 
-				switch args.arg {
-				case "JSON", "json":
+				lookup := args.conf.System.Links.Resolve()
+
+				format := args.arg[0]
+
+				switch format {
+				case "JSON", "json", "js", "j":
 					buf := bufio.NewWriter(os.Stdout)
-					args.conf.System.Links.Discovery.FindLinks().ReadAll(fnx.FromHandler(func(d *sysmgmt.LinkDefinition) {
-						ec.Push(ft.IgnoreFirst(buf.Write(ft.IgnoreSecond(jsonx.DC.Elements(
-							jsonx.EC.String("path", d.Path),
-							jsonx.EC.String("target", d.Target),
-						).MarshalJSON()))))
-						ec.Push(buf.WriteByte('\n'))
-					})).Operation(ec.Push).Run(ctx)
+
+					args.conf.System.Links.Discovery.
+						FindLinks().
+						ReadAll(fnx.FromHandler(func(d sysmgmt.LinkDefinition) {
+							ec.Push(ft.IgnoreFirst(buf.Write(ft.IgnoreSecond(jsonx.DC.Elements(
+								jsonx.EC.String("path", d.Path),
+								jsonx.EC.String("target", d.Target),
+								jsonx.EC.Boolean("defined", lookup.Check(d.Path)),
+								jsonx.EC.Boolean("target_exists", d.TargetExists),
+								jsonx.EC.Boolean("path_exists", d.PathExists),
+							).MarshalJSON()))))
+							ec.Push(buf.WriteByte('\n'))
+						})).Operation(ec.Push).Run(ctx)
+
 					ec.Push(buf.Flush())
 				case "line", "ln":
 					buf := bufio.NewWriter(os.Stdout)
-					args.conf.System.Links.Discovery.FindLinks().ReadAll(func(ctx context.Context, d *sysmgmt.LinkDefinition) error {
-						return ft.IgnoreFirst(fmt.Fprintln(buf, d.Path, "->", d.Target))
-					}).Operation(ec.Push).Run(ctx)
+
+					args.conf.System.Links.Discovery.
+						FindLinks().
+						ReadAll(func(ctx context.Context, d sysmgmt.LinkDefinition) error {
+							return ft.IgnoreFirst(fmt.Fprintln(buf, d.Path, "->", d.Target))
+						}).Operation(ec.Push).Run(ctx)
+
 					ec.Push(buf.Flush())
-				case "yaml", "export":
+				case "YAML", "yaml", "yml", "y", "export":
 					buf := bufio.NewWriter(os.Stdout)
 					enc := yaml.NewEncoder(buf)
 
-					args.conf.System.Links.Discovery.FindLinks().ReadAll(func(ctx context.Context, d *sysmgmt.LinkDefinition) error {
-						return enc.Encode(d)
-					}).Operation(ec.Push).Run(ctx)
+					args.conf.System.Links.Discovery.
+						FindLinks().
+						ReadAll(func(ctx context.Context, d sysmgmt.LinkDefinition) error {
+							d.Defined = lookup.Check(d.Path)
+							return enc.Encode(d)
+						}).Operation(ec.Push).Run(ctx)
 
 					ec.Push(enc.Close())
 					ec.Push(buf.Flush())
@@ -128,20 +150,33 @@ func linkOp() *cmdr.Commander {
 					fallthrough
 				default:
 					table := tabby.New()
-					table.AddHeader("Path", "", "Target")
+					table.AddHeader("Path", "Target", "Exists", "Defined")
 
-					args.conf.System.Links.Discovery.FindLinks().ReadAll(fnx.FromHandler(func(d *sysmgmt.LinkDefinition) {
+					items := dt.StreamList(args.conf.System.Links.Discovery.FindLinks())
+					items.SortMerge(cmp.LessThanCustom)
+
+					items.StreamFront().ReadAll(fnx.FromHandler(func(d sysmgmt.LinkDefinition) {
 						table.AddLine(
 							util.TryCollapseHomeDir(d.Path),
-							"=>",
 							util.TryCollapseHomeDir(d.Target),
+							renderBool(d.TargetExists),
+							renderBool(lookup.Check(d.Path)),
 						)
 					})).Operation(ec.Push).Run(ctx)
+
 					table.Print()
 				}
 
 				return ec.Resolve()
 			}))
+}
+
+func renderBool(in bool) string {
+	if in {
+		return "t"
+	} else {
+		return "f"
+	}
 }
 
 func configCheck() *cmdr.Commander {
@@ -192,4 +227,23 @@ func nightly() *cmdr.Commander {
 				fun.Convert(fnx.MakeConverter(func(c sysmgmt.SystemdService) fnx.Worker { return c.Worker() })).Stream(fun.SliceStream(conf.System.SystemD.Services)),
 			)).Run(ctx)
 		}).Add)
+}
+
+func Set[T comparable](it iter.Seq[T]) map[T]struct{} {
+	set := make(map[T]struct{})
+	for val := range it {
+		set[val] = struct{}{}
+	}
+	return set
+}
+
+func containsAny[T comparable](it iter.Seq[T], vals ...T) bool {
+	for value := range it {
+		for check := range slices.Values(vals) {
+			if value == check {
+				return true
+			}
+		}
+	}
+	return false
 }

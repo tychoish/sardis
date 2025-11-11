@@ -32,7 +32,6 @@ func (conf *Configuration) Join(mcf Configuration) {
 		conf.Links.Discovery.SkipMissingTargets = ft.Default(mcf.Links.Discovery.SkipMissingTargets, conf.Links.Discovery.SkipMissingTargets)
 	}
 
-	conf.Arch.AurPackages = append(conf.Arch.AurPackages, mcf.Arch.AurPackages...)
 	conf.Arch.Packages = append(conf.Arch.Packages, mcf.Arch.Packages...)
 	conf.GoPackages = append(conf.GoPackages, mcf.GoPackages...)
 	conf.Links.Links = append(conf.Links.Links, mcf.Links.Links...)

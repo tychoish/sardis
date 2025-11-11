@@ -5,6 +5,7 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/grip"
@@ -90,22 +91,27 @@ func setupArchLinux() *cmdr.Commander {
 			grip.Info(message.Fields{
 				"path":     arch.BuildPath,
 				"packages": len(arch.Packages),
-				"aur":      len(arch.AurPackages),
 			})
 
-			arch.InstallPackages().Operation(ec.Push).Run(ctx)
+			wpq := dt.List[fnx.Worker]{}
 
-			for _, pkg := range arch.AurPackages {
+			wpq.PushBack(arch.InstallPackages())
+
+			for _, pkg := range arch.Packages {
+				if pkg.State.InDistRepos {
+					continue
+				}
 				grip.Info(message.Fields{
 					"name":   pkg.Name,
-					"update": pkg.Update,
+					"update": pkg.ShouldUpdate,
 				})
 
-				arch.FetchPackageFromAUR(pkg.Name, pkg.Update).
-					Join(arch.BuildPackageInABS(pkg.Name)).
-					Operation(ec.Push).
-					Run(ctx)
+				wpq.PushBack(arch.FetchPackageFromAUR(pkg.Name, pkg.ShouldUpdate).
+					Join(arch.BuildPackageInABS(pkg.Name)))
+
 			}
+
+			fun.MAKE.WorkerPool(wpq.StreamFront()).Operation(ec.Push).Run(ctx)
 
 			return ec.Resolve()
 		}).Add)

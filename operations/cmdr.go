@@ -134,6 +134,7 @@ func Commander() *cmdr.Commander {
 			Jira(),
 			Notify(),
 			Repo(),
+			ExecCommand(),
 			RunCommand(),
 			Tweet(),
 			Utilities(),

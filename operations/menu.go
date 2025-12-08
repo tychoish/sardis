@@ -17,12 +17,15 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/global"
 	"github.com/tychoish/sardis/subexec"
+	"github.com/tychoish/sardis/tools/execpath"
 	"github.com/tychoish/sardis/util"
 )
 
@@ -103,6 +106,31 @@ func SearchMenu() *cmdr.Commander {
 			}
 
 			return buf.Flush()
+		},
+	)
+}
+
+func ExecCommand() *cmdr.Commander {
+	return addOpCommand(cmdr.MakeCommander().
+		SetName("exec").
+		SetUsage("list or run a command"),
+		"command", func(ctx context.Context, args *withConf[string]) error {
+			st, err := itertool.Uniq(execpath.FindAll(ctx)).Slice(ctx)
+
+			res, err := godmenu.Run(ctx,
+				godmenu.SetSelections(st),
+				godmenu.WithFlags(ft.Ptr(args.conf.Settings.DMenuFlags)),
+				godmenu.Prompt(fmt.Sprintf("%s exec ==>>", "sardis")),
+				godmenu.MenuLines(min(len(st), args.conf.Settings.DMenuFlags.Lines)),
+			)
+			if err != nil {
+				return err
+			}
+
+			if strings.Contains(res, " ") {
+				return jasper.Context(ctx).CreateCommand(ctx).ShellScript("bash", res).Run(ctx)
+			}
+			return jasper.Context(ctx).CreateCommand(ctx).Append(res).Run(ctx)
 		},
 	)
 }

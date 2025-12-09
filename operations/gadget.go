@@ -17,32 +17,31 @@ import (
 )
 
 func Gadget() *cmdr.Commander {
-	return addCommandWithConf(cmdr.MakeCommander().
+	return cmdr.MakeCommander().
 		SetName("gadget").
 		SetUsage(fmt.Sprint(
 			"runs go test (+lint +coverage) on a workspace ",
 			"all non-flag arguments are passed directly to go test",
 		)).
-		Flags(
-			cmdr.FlagBuilder("./").
-				SetName("module-path", "m").
-				SetUsage("path of top-level workpace for gadget to look for go.mod").
-				SetValidate(func(path string) error {
-					if path == "./" {
-						path = ft.Must(os.Getwd())
-					}
+		Flags(cmdr.FlagBuilder("./").
+			SetName("module-path", "m").
+			SetUsage("path of top-level workpace for gadget to look for go.mod").
+			SetValidate(func(path string) error {
+				if path == "./" {
+					path = ft.Must(os.Getwd())
+				}
 
-					if strings.HasSuffix(path, "...") {
-						grip.Warningln("module-path (working directory) should not use '...';",
-							"set go test path with '--path'")
-						return fmt.Errorf("module path %q should not have ... suffix", path)
-					}
-					if util.FileExists(util.TryExpandHomeDir(path)) {
-						return nil
-					}
-					grip.Warning(fmt.Errorf("%q does not exist", path))
+				if strings.HasSuffix(path, "...") {
+					grip.Warningln("module-path (working directory) should not use '...';",
+						"set go test path with '--path'")
+					return fmt.Errorf("module path %q should not have ... suffix", path)
+				}
+				if util.FileExists(util.TryExpandHomeDir(path)) {
 					return nil
-				}).Flag(),
+				}
+				grip.Warning(fmt.Errorf("%q does not exist", path))
+				return nil
+			}).Flag(),
 			cmdr.FlagBuilder("...").
 				SetName("path", "p").
 				SetUsage("path to pass to go test without leading slashes.").
@@ -71,28 +70,27 @@ func Gadget() *cmdr.Commander {
 				SetName("workers", "jobs", "j").
 				SetUsage("number of parallel workers").
 				Flag(),
-		),
-		func(cc *cli.Context) (*gadget.Options, error) {
-			opts := &gadget.Options{
-				Timeout:        cc.Duration("timeout"),
-				Recursive:      cc.Bool("recursive"),
-				PackagePath:    cc.String("path"),
-				RootPath:       cc.String("module-path"),
-				CompileOnly:    cc.Bool("build"),
-				SkipLint:       cc.Bool("skip-lint"),
-				ReportCoverage: cc.Bool("coverage"),
-				UseCache:       true,
-				GoTestArgs:     cc.Args().Slice(),
-				Workers:        cc.Int("workers"),
-			}
+		).
+		With(cmdr.SpecBuilder(
+			func(_ context.Context, cc *cli.Context) (gadget.Options, error) {
+				opts := gadget.Options{
+					Timeout:        cc.Duration("timeout"),
+					Recursive:      cc.Bool("recursive"),
+					PackagePath:    cc.String("path"),
+					RootPath:       cc.String("module-path"),
+					CompileOnly:    cc.Bool("build"),
+					SkipLint:       cc.Bool("skip-lint"),
+					ReportCoverage: cc.Bool("coverage"),
+					UseCache:       true,
+					GoTestArgs:     cc.Args().Slice(),
+					Workers:        cc.Int("workers"),
+				}
 
-			if err := opts.Validate(); err != nil {
-				return nil, err
-			}
+				if err := opts.Validate(); err != nil {
+					return gadget.Options{}, err
+				}
 
-			return opts, nil
-		},
-		func(ctx context.Context, opts *withConf[*gadget.Options]) error {
-			return gadget.RunTests(ctx, *opts.arg)
-		})
+				return opts, nil
+			},
+		).SetAction(gadget.RunTests).Add)
 }

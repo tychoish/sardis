@@ -31,8 +31,8 @@ import (
 - [ ] TODO <cmdr> move to v3 of the cli lib
 - [ ] TODO <cmdr> do something with argflags.
 - [ ] TODO <cmdr> cmdr.Action adapter for fun.Worker/fnx.Operation
-- [ ] TODO <fun> finish fn.Converter[T, O] and fn.Filter[T]
-- [ ] TOOD [fun] WaitGroup should have and Add method that is an fn.Handler for workers/ops
+- [x] TODO <fun> finish fn.Converter[T, O] and fn.Filter[T]
+- [X] TOOD [fun] WaitGroup should have and Add method that is an fn.Handler for workers/ops
 */
 
 func StringSpecBuilder(flagName string, defaultValue *string) *cmdr.OperationSpec[string] {
@@ -57,7 +57,10 @@ func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configu
 	if sardis.HasAppConfiguration(ctx) {
 		return sardis.AppConfiguration(ctx), nil
 	}
+	return LoadConfiguration(cc)
+}
 
+func LoadConfiguration(cc *cli.Context) (*sardis.Configuration, error) {
 	conf, err := sardis.LoadConfiguration(cc.String("conf"))
 	if err != nil {
 		return nil, err

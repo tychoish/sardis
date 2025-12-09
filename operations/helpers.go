@@ -2,7 +2,6 @@ package operations
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strconv"
 
@@ -24,24 +23,18 @@ type withConf[T any] struct {
 	arg  T
 }
 
-func addCommandWithConf[T any](
+func addOpCommand[T cmdr.FlagTypes](
 	cmd *cmdr.Commander,
-	setup func(*cli.Context) (T, error),
-	op func(context.Context, *withConf[T]) error,
+	name string,
+	op func(ctx context.Context, args *withConf[T]) error,
 ) *cmdr.Commander {
-	return cmd.With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (*withConf[T], error) {
-		conf, err := ResolveConfiguration(ctx, cc)
-		if err != nil {
-			return nil, err
-		}
-
-		arg, err := setup(cc)
-		if err != nil {
-			return nil, err
-		}
-
-		return &withConf[T]{conf: conf, arg: arg}, nil
-	}).SetMiddleware(func(ctx context.Context, args *withConf[T]) context.Context {
+	return cmd.Flags(cmdr.FlagBuilder(false).
+		SetName("annotate").
+		SetUsage("enable additional annotations").
+		Flag(),
+	).With(cmdr.SpecBuilder(
+		withConfBuilderSpec[T](name),
+	).SetMiddleware(func(ctx context.Context, args *withConf[T]) context.Context {
 		ctx = sardis.WithConfiguration(ctx, args.conf)
 		ctx = subexec.WithJasper(ctx, &args.conf.Operations)
 		ctx = srv.WithAppLogger(ctx, args.conf.Settings.Logging)
@@ -50,76 +43,74 @@ func addCommandWithConf[T any](
 	}).SetAction(op).Add)
 }
 
-func addOpCommand[T cmdr.FlagTypes](
-	cmd *cmdr.Commander,
-	name string,
-	op func(ctx context.Context, args *withConf[T]) error,
-) *cmdr.Commander {
-	var zero T
+func withConfBuilderSpec[T cmdr.FlagTypes](name string) cmdr.Hook[*withConf[T]] {
+	return func(ctx context.Context, cc *cli.Context) (*withConf[T], error) {
+		conf, err := ResolveConfiguration(ctx, cc)
+		if err != nil {
+			return nil, err
+		}
 
-	return addCommandWithConf(cmd.
-		Flags(
-			cmdr.FlagBuilder(false).
-				SetName("annotate").
-				SetUsage("enable additional annotations").
-				Flag(),
-			(&cmdr.FlagOptions[T]{}).
-				SetName(name).
-				SetUsage(fmt.Sprintf("specify one or more %s", name)).
-				Flag()),
-		func(cc *cli.Context) (T, error) {
-			arg := cmdr.GetFlag[T](cc, name)
+		arg, err := embeddedFlag[T](name, cc)
+		if err != nil {
+			return nil, err
+		}
 
-			if !cc.IsSet(name) {
-				switch any(zero).(type) {
-				case []string:
-					arg = any(append(any(arg).([]string), cc.Args().Slice()...)).(T)
-				case string:
-					arg = any(cc.Args().First()).(T)
-				case int:
-					val, err := strconv.ParseInt(cc.Args().First(), 0, 64)
-					if err == nil {
-						arg = any(int(any(val).(int64))).(T)
-					}
-				case int64:
-					val, err := strconv.ParseInt(cc.Args().First(), 0, 64)
-					if err == nil {
-						arg = any(val).(T)
-					}
-				case uint:
-					val, err := strconv.ParseUint(cc.Args().First(), 0, 64)
-					if err == nil {
-						arg = any(uint(any(val).(uint64))).(T)
-					}
-				case uint64:
-					val, err := strconv.ParseUint(cc.Args().First(), 0, 64)
-					if err == nil {
-						arg = any(val).(T)
-					}
-				case float64:
-					val, err := strconv.ParseFloat(cc.Args().First(), 64)
-					if err == nil {
-						arg = any(val).(T)
-					}
-				case []int:
-					for _, it := range cc.Args().Slice() {
-						val, err := strconv.ParseInt(it, 0, 64)
-						if err == nil {
-							arg = any(append(any(val).([]int), int(any(arg).(int64)))).(T)
-						}
-					}
-				case []int64:
-					for _, it := range cc.Args().Slice() {
-						val, err := strconv.ParseInt(it, 0, 64)
-						if err == nil {
-							arg = any(append(any(val).([]int64), any(val).(int64))).(T)
-						}
-					}
+		return &withConf[T]{conf: conf, arg: arg}, nil
+	}
+}
+
+func embeddedFlag[T cmdr.FlagTypes](name string, cc *cli.Context) (zero T, _ error) {
+	arg := cmdr.GetFlag[T](cc, name)
+
+	if !cc.IsSet(name) {
+		switch any(zero).(type) {
+		case int:
+			val, err := strconv.ParseInt(cc.Args().First(), 0, 64)
+			if err == nil {
+				arg = any(int(any(val).(int64))).(T)
+			}
+		case int64:
+			val, err := strconv.ParseInt(cc.Args().First(), 0, 64)
+			if err == nil {
+				arg = any(val).(T)
+			}
+		case uint:
+			val, err := strconv.ParseUint(cc.Args().First(), 0, 64)
+			if err == nil {
+				arg = any(uint(any(val).(uint64))).(T)
+			}
+		case uint64:
+			val, err := strconv.ParseUint(cc.Args().First(), 0, 64)
+			if err == nil {
+				arg = any(val).(T)
+			}
+		case float64:
+			val, err := strconv.ParseFloat(cc.Args().First(), 64)
+			if err == nil {
+				arg = any(val).(T)
+			}
+		case string:
+			arg = any(cc.Args().First()).(T)
+		case []string:
+			arg = any(append(any(arg).([]string), cc.Args().Slice()...)).(T)
+		case []int:
+			for _, it := range cc.Args().Slice() {
+				val, err := strconv.ParseInt(it, 0, 64)
+				if err == nil {
+					arg = any(append(any(val).([]int), int(any(arg).(int64)))).(T)
 				}
 			}
+		case []int64:
+			for _, it := range cc.Args().Slice() {
+				val, err := strconv.ParseInt(it, 0, 64)
+				if err == nil {
+					arg = any(append(any(val).([]int64), any(val).(int64))).(T)
+				}
+			}
+		}
+	}
 
-			return arg, nil
-		}, op)
+	return arg, nil
 }
 
 type OperationRuntimeInfo struct {

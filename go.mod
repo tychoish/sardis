@@ -16,7 +16,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/tychoish/birch v0.3.1
 	github.com/tychoish/cmdr v0.4.1
-	github.com/tychoish/fun v0.13.0
+	github.com/tychoish/fun v0.13.1
 	github.com/tychoish/godmenu v0.2.2
 	github.com/tychoish/grip v0.4.1
 	github.com/tychoish/grip/x/desktop v0.0.0-20250626175245-f5276066a1e9

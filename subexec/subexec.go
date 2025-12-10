@@ -21,8 +21,8 @@ type Configuration struct {
 	Settings struct {
 		SSHAgentSocketPath    string `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
 		AlacrittySocketPath   string `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
-		IncludeLocalSHH       bool   `bson:"include_local_ssh" json:"include_local_ssh" yaml:"include_local_ssh"`
-		AllowUndefinedSockets bool   `bson:"allow_undefined_sockets" json:"allow_undefined_sockets" yaml:"allow_undefined_sockets"`
+		IncludeLocalSHH       *bool  `bson:"include_local_ssh" json:"include_local_ssh" yaml:"include_local_ssh"`
+		AllowUndefinedSockets *bool  `bson:"allow_undefined_sockets" json:"allow_undefined_sockets" yaml:"allow_undefined_sockets"`
 	} `bson:"settings" json:"settings" yaml:"settings"`
 
 	caches struct {
@@ -39,6 +39,11 @@ func (conf *Configuration) AlacrittySocket() string { return conf.caches.alacrit
 func (conf *Configuration) SSHAgentSocket() string  { return conf.caches.sshAgentPath.Resolve() }
 
 func (conf *Configuration) Join(mcf *Configuration) {
+	conf.Settings.AlacrittySocketPath = ft.Default(mcf.Settings.AlacrittySocketPath, conf.Settings.AlacrittySocketPath)
+	conf.Settings.SSHAgentSocketPath = ft.Default(mcf.Settings.SSHAgentSocketPath, conf.Settings.SSHAgentSocketPath)
+	conf.Settings.IncludeLocalSHH = ft.Default(mcf.Settings.IncludeLocalSHH, conf.Settings.IncludeLocalSHH)
+	conf.Settings.AllowUndefinedSockets = ft.Default(mcf.Settings.AllowUndefinedSockets, conf.Settings.AllowUndefinedSockets)
+
 	conf.Commands = append(conf.Commands, mcf.Commands...)
 }
 
@@ -59,7 +64,7 @@ func (conf *Configuration) doValidate() error {
 		switch {
 		case err == nil:
 			return path
-		case conf.Settings.AllowUndefinedSockets:
+		case ft.Ref(conf.Settings.AllowUndefinedSockets):
 			return ""
 		default:
 			fun.Invariant.Must(err)
@@ -76,7 +81,7 @@ func (conf *Configuration) doValidate() error {
 		switch {
 		case err == nil:
 			return path
-		case conf.Settings.AllowUndefinedSockets:
+		case ft.Ref(conf.Settings.AllowUndefinedSockets):
 			return ""
 		default:
 			fun.Invariant.Must(err)
@@ -97,7 +102,7 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	withAliases := make([]Group, 0, len(conf.Commands)+len(conf.Commands)/2+1)
 	for idx := range conf.Commands {
 		cg := conf.Commands[idx]
-		if cg.Host != nil && !conf.Settings.IncludeLocalSHH {
+		if cg.Host != nil && ft.Not(ft.Ref(conf.Settings.IncludeLocalSHH)) {
 			chost := ft.Ref(cg.Host)
 			if chost != "" && chost == hostname {
 				continue
@@ -217,7 +222,7 @@ func (conf *Configuration) doExportAllCommands() dt.Slice[Command] {
 
 	for _, grp := range conf.Commands {
 		hn, ok := ft.RefOk(grp.Host)
-		if ok && hn != "" && hn == host && !conf.Settings.IncludeLocalSHH {
+		if ok && hn != "" && hn == host && ft.Not(ft.Ref(conf.Settings.IncludeLocalSHH)) {
 			continue
 		}
 
@@ -249,7 +254,7 @@ func (conf *Configuration) doExportCommandGroups() map[string]Group {
 	for idx := range conf.Commands {
 		group := conf.Commands[idx]
 		hn, ok := ft.RefOk(group.Host)
-		if ok && hn != "" && hn == hostname && !conf.Settings.IncludeLocalSHH {
+		if ok && hn != "" && hn == hostname && ft.Not(ft.Ref(conf.Settings.IncludeLocalSHH)) {
 			continue
 		}
 

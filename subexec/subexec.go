@@ -19,9 +19,10 @@ type Configuration struct {
 	Commands dt.Slice[Group] `bson:"groups" json:"groups" yaml:"groups"`
 
 	Settings struct {
-		SSHAgentSocketPath  string `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
-		AlacrittySocketPath string `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
-		IncludeLocalSHH     bool   `bson:"include_local_ssh" json:"include_local_ssh" yaml:"include_local_ssh"`
+		SSHAgentSocketPath    string `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
+		AlacrittySocketPath   string `bson:"alacritty_socket_path" json:"alacritty_socket_path" yaml:"alacritty_socket_path"`
+		IncludeLocalSHH       bool   `bson:"include_local_ssh" json:"include_local_ssh" yaml:"include_local_ssh"`
+		AllowUndefinedSockets bool   `bson:"allow_undefined_sockets" json:"allow_undefined_sockets" yaml:"allow_undefined_sockets"`
 	} `bson:"settings" json:"settings" yaml:"settings"`
 
 	caches struct {
@@ -54,14 +55,34 @@ func (conf *Configuration) doValidate() error {
 		if conf.Settings.AlacrittySocketPath != "" {
 			return conf.Settings.AlacrittySocketPath
 		}
-		return ft.Must(util.GetAlacrittySocketPath())
+		path, err := util.GetAlacrittySocketPath()
+		switch {
+		case err == nil:
+			return path
+		case conf.Settings.AllowUndefinedSockets:
+			return ""
+		default:
+			fun.Invariant.Must(err)
+		}
+		// unreachable
+		return ""
 	})
 
 	conf.caches.sshAgentPath.Set(func() string {
 		if conf.Settings.SSHAgentSocketPath != "" {
 			return conf.Settings.SSHAgentSocketPath
 		}
-		return ft.Must(util.GetSSHAgentPath())
+		path, err := util.GetSSHAgentPath()
+		switch {
+		case err == nil:
+			return path
+		case conf.Settings.AllowUndefinedSockets:
+			return ""
+		default:
+			fun.Invariant.Must(err)
+		}
+		// unreachable
+		return ""
 	})
 
 	return ec.Resolve()

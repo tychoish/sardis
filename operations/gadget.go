@@ -10,7 +10,9 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
+	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis/tools/gadget"
 	"github.com/tychoish/sardis/util"
 	"github.com/urfave/cli/v2"
@@ -71,6 +73,11 @@ func Gadget() *cmdr.Commander {
 				SetUsage("number of parallel workers").
 				Flag(),
 		).
+		Middleware(func(ctx context.Context) context.Context {
+			jpm := jasper.NewManager(jasper.ManagerOptionSetSynchronized())
+			srv.AddCleanup(ctx, jpm.Close)
+			return jasper.WithManager(ctx, jpm)
+		}).
 		With(cmdr.SpecBuilder(
 			func(_ context.Context, cc *cli.Context) (gadget.Options, error) {
 				opts := gadget.Options{

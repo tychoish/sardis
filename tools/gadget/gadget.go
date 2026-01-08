@@ -271,7 +271,10 @@ func RunTests(ctx context.Context, opts Options) error {
 		}
 	})).Stream(pkgiter).ReadAll(fnx.MakeHandler(main.Add)).Operation(ec.Push).Run(ctx)
 
-	ec.Push(main.Close())
+	wait, err := main.Wait(ctx)
+	ec.Push(err)
+	ec.Push(wait.WithRecover().Run(ctx))
+	ec.Push(main.Shutdown(ctx))
 	ec.Push(pool.Worker().Run(ctx))
 
 	return ec.Resolve()

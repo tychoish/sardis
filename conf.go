@@ -66,7 +66,7 @@ func readConfiguration(fn string) (*Configuration, error) {
 
 	fnout := &ConfigurationFile{}
 	if err := util.UnmarshalFile(fn, fnout); err != nil {
-		return nil, fmt.Errorf("file %s was not parsable: %w", err)
+		return nil, fmt.Errorf("file %s was not parsable: %w", fn, err)
 	}
 	var out *Configuration
 	hostname := util.GetHostname()

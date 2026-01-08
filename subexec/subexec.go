@@ -171,41 +171,32 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 
 	resolved.ReadAll(func(grp Group) {
 		slices.SortStableFunc(grp.Commands, func(lhv, rhv Command) int {
-			if c := stdcmp.Compare(rhv.SortHint, lhv.SortHint); c != 0 {
-				return c
-			}
-			return stdcmp.Compare(lhv.Name, rhv.Name)
+			return ft.DefaultFuture(
+				stdcmp.Compare(rhv.SortHint, lhv.SortHint),
+				func() int { return stdcmp.Compare(lhv.Name, rhv.Name) },
+			)
 		})
 	})
 
 	slices.SortStableFunc(resolved, func(lhv, rhv Group) int {
-		if lhv.Host != rhv.Host && (lhv.Host != nil || rhv.Host != nil) {
+		switch {
+		case lhv.Host != rhv.Host && (lhv.Host != nil || rhv.Host != nil):
 			return stdcmp.Compare(ft.Ref(lhv.Host), ft.Ref(rhv.Host))
-		}
-		if lhv.Synthetic != rhv.Synthetic {
-			if lhv.Synthetic {
-				return 1
-			}
-
-			return -1
-		}
-		if lhv.SortHint != rhv.SortHint {
+		case lhv.Synthetic != rhv.Synthetic:
+			return ft.IfElse(lhv.Synthetic, 1, -1)
+		case lhv.SortHint != rhv.SortHint:
 			return stdcmp.Compare(rhv.SortHint, lhv.SortHint)
-		}
-		if lhv.Category != rhv.Category {
+		case lhv.Category != rhv.Category:
 			return stdcmp.Compare(lhv.Category, rhv.Category)
-		}
-		if lhv.Name != rhv.Name {
+		case lhv.Name != rhv.Name:
 			return stdcmp.Compare(lhv.Name, rhv.Name)
-		}
-		if lhv.CmdNamePrefix != rhv.CmdNamePrefix {
+		case lhv.CmdNamePrefix != rhv.CmdNamePrefix:
 			return stdcmp.Compare(lhv.CmdNamePrefix, rhv.CmdNamePrefix)
-		}
-		if len(lhv.Commands) != len(rhv.Commands) {
+		case len(lhv.Commands) != len(rhv.Commands):
 			return stdcmp.Compare(len(lhv.Commands), len(rhv.Commands))
+		default:
+			return 0
 		}
-
-		return 0
 	})
 
 	conf.Commands = resolved

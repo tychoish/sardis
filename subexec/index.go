@@ -136,7 +136,7 @@ func (n *Node) Resolve() iter.Seq[Command] {
 	return func(yield func(Command) bool) {
 		for elem := queue.PopFront(); elem.Ok(); elem = queue.PopFront() {
 			node := elem.Value()
-			if node.command != nil && !yield(stw.Deref(node.command)) {
+			if node.command != nil && !yield(stw.DerefZ(node.command)) {
 				return
 			}
 			for k := range node.children {

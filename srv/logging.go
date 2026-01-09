@@ -49,19 +49,19 @@ func (ls *LoggingSettings) Join(mc *LoggingSettings) {
 }
 
 func (ls *LoggingSettings) DisableLoggingToStandardOutput() bool {
-	return ls.DisableStandardOutput != nil && stw.Deref(ls.DisableStandardOutput)
+	return ls.DisableStandardOutput != nil && stw.DerefZ(ls.DisableStandardOutput)
 }
 
 func (ls *LoggingSettings) DisableLoggingToSyslog() bool {
-	return ls.DisableSyslog != nil && stw.Deref(ls.DisableSyslog)
+	return ls.DisableSyslog != nil && stw.DerefZ(ls.DisableSyslog)
 }
 
 func (ls *LoggingSettings) EnableJSONFormattingForLogOutput() bool {
-	return ls.EnableJSONFormating != nil && stw.Deref(ls.EnableJSONFormating)
+	return ls.EnableJSONFormating != nil && stw.DerefZ(ls.EnableJSONFormating)
 }
 
 func (ls *LoggingSettings) EnableJSONColorFormattingForLogOutput() bool {
-	return ls.EnableJSONColorFormatting != nil && stw.Deref(ls.EnableJSONColorFormatting)
+	return ls.EnableJSONColorFormatting != nil && stw.DerefZ(ls.EnableJSONColorFormatting)
 }
 
 type NotifySettings struct {
@@ -82,7 +82,7 @@ func (conf *NotifySettings) Join(mc *NotifySettings) {
 	conf.Disabled = util.Default(mc.Disabled, conf.Disabled)
 }
 
-func (conf *NotifySettings) Enabled() bool { return conf.Disabled == nil || !stw.Deref(conf.Disabled) }
+func (conf *NotifySettings) Enabled() bool { return conf.Disabled == nil || !stw.DerefZ(conf.Disabled) }
 
 func (conf *NotifySettings) Validate() error {
 	if conf == nil || (conf.Target == "" && os.Getenv("SARDIS_NOTIFY_TARGET") == "") {

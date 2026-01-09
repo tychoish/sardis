@@ -49,7 +49,7 @@ func StringSpecBuilder(flagName string, defaultValue *string) *cmdr.OperationSpe
 			return "", fmt.Errorf("%q is a required flag, and was missing", flagName)
 		}
 
-		return stw.Deref(defaultValue), nil
+		return stw.DerefZ(defaultValue), nil
 	})
 }
 

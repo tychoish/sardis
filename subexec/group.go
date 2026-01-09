@@ -126,7 +126,7 @@ func (cg *Group) Validate() error {
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.category}}", cg.Category)
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", cg.Name)
-			cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", stw.Deref(cg.Host))
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", stw.DerefZ(cg.Host))
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", cg.CmdNamePrefix)
 		}
 
@@ -134,7 +134,7 @@ func (cg *Group) Validate() error {
 			if cc := cmd.Commands[idx]; strings.Contains(cc, "{{") && strings.Contains(cc, "}}") {
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
-				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{host}}", stw.Deref(cg.Host))
+				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{host}}", stw.DerefZ(cg.Host))
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", cg.Name)
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.category}}", cg.Category)
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{prefix}}", cg.Name)

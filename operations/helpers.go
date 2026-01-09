@@ -10,6 +10,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
@@ -34,6 +35,7 @@ func addOpCommand[T cmdr.FlagTypes](
 	).With(cmdr.SpecBuilder(
 		withConfBuilderSpec[T](name),
 	).SetMiddleware(func(ctx context.Context, args *withConf[T]) context.Context {
+		erc.InvariantOk(args != nil, "must have non-nil args")
 		ctx = sardis.WithConfiguration(ctx, args.conf)
 		ctx = subexec.WithJasper(ctx, &args.conf.Operations)
 		ctx = srv.WithAppLogger(ctx, args.conf.Settings.Logging)

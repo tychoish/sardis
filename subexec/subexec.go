@@ -60,7 +60,7 @@ func (conf *Configuration) doValidate() error {
 		switch {
 		case err == nil:
 			return path
-		case stw.Deref(conf.Settings.AllowUndefinedSockets):
+		case stw.DerefZ(conf.Settings.AllowUndefinedSockets):
 			return ""
 		default:
 			erc.Invariant(err)
@@ -77,7 +77,7 @@ func (conf *Configuration) doValidate() error {
 		switch {
 		case err == nil:
 			return path
-		case stw.Deref(conf.Settings.AllowUndefinedSockets):
+		case stw.DerefZ(conf.Settings.AllowUndefinedSockets):
 			return ""
 		default:
 			erc.Invariant(err)
@@ -98,8 +98,8 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	withAliases := make([]Group, 0, len(conf.Commands)+len(conf.Commands)/2+1)
 	for idx := range conf.Commands {
 		cg := conf.Commands[idx]
-		if cg.Host != nil && !stw.Deref(conf.Settings.IncludeLocalSHH) {
-			chost := stw.Deref(cg.Host)
+		if cg.Host != nil && !stw.DerefZ(conf.Settings.IncludeLocalSHH) {
+			chost := stw.DerefZ(cg.Host)
 			if chost != "" && chost == hostname {
 				continue
 			}
@@ -171,7 +171,7 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	slices.SortStableFunc(resolved, func(lhv, rhv Group) int {
 		switch {
 		case lhv.Host != rhv.Host && (lhv.Host != nil || rhv.Host != nil):
-			return stdcmp.Compare(stw.Deref(lhv.Host), stw.Deref(rhv.Host))
+			return stdcmp.Compare(stw.DerefZ(lhv.Host), stw.DerefZ(rhv.Host))
 		case lhv.Synthetic != rhv.Synthetic:
 			if lhv.Synthetic {
 				return 1
@@ -206,7 +206,7 @@ func (conf *Configuration) doExportAllCommands() stw.Slice[Command] {
 
 	for _, grp := range conf.Commands {
 		hn, ok := stw.DerefOk(grp.Host)
-		if ok && hn != "" && hn == host && !stw.Deref(conf.Settings.IncludeLocalSHH) {
+		if ok && hn != "" && hn == host && !stw.DerefZ(conf.Settings.IncludeLocalSHH) {
 			continue
 		}
 
@@ -238,7 +238,7 @@ func (conf *Configuration) doExportCommandGroups() map[string]Group {
 	for idx := range conf.Commands {
 		group := conf.Commands[idx]
 		hn, ok := stw.DerefOk(group.Host)
-		if ok && hn != "" && hn == hostname && !stw.Deref(conf.Settings.IncludeLocalSHH) {
+		if ok && hn != "" && hn == hostname && !stw.DerefZ(conf.Settings.IncludeLocalSHH) {
 			continue
 		}
 

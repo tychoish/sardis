@@ -50,8 +50,7 @@ func (conf *Configuration) ResolveCommands(args []string) (*CommandListStage, er
 	switch len(args) {
 	case 0:
 		cmds := conf.ExportAllCommands()
-		slices.AppendSeq(
-			output.Selections,
+		output.Selections = irt.Collect(
 			irt.Convert(
 				irt.Slice(cmds),
 				func(cmd Command) string { return cmd.NamePrime() },

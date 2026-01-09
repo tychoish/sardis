@@ -72,11 +72,11 @@ func (disco *LinkDiscovery) Validate() (err error) {
 }
 
 func (disco *LinkDiscovery) ShouldSkipMissingTargets() bool {
-	return stw.Deref(disco.SkipMissingTargets)
+	return stw.DerefZ(disco.SkipMissingTargets)
 }
 
 func (disco *LinkDiscovery) ShouldSkipResolvedTargets() bool {
-	return stw.Deref(disco.SkipResolvedTargets)
+	return stw.DerefZ(disco.SkipResolvedTargets)
 }
 
 func hasAnyPrefix(str string, prefixes []string) bool {

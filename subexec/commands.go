@@ -63,7 +63,7 @@ func (conf *Command) Worker() fnx.Worker {
 			AddEnv(global.EnvVarSardisLogQuietStdOut, "true").
 			SetOutputSender(level.Info, buf).
 			SetErrorSender(level.Error, buf).
-			Background(stw.Deref(conf.Background)).
+			Background(stw.DerefZ(conf.Background)).
 			Append(conf.Command).
 			Append(conf.Commands...).
 			Prerequisite(func() bool {
@@ -115,7 +115,7 @@ func (conf *Command) Worker() fnx.Worker {
 				} else if conf.Logs.Full() {
 					grip.Info(buf.String())
 				}
-				desktop.Notice(message.Whenln(stw.Deref(conf.Notify), conf.Name, "completed"))
+				desktop.Notice(message.Whenln(stw.DerefZ(conf.Notify), conf.Name, "completed"))
 				return nil
 			}).
 			Worker().

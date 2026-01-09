@@ -38,6 +38,8 @@ require (
 
 replace github.com/tychoish/fun => ../fun/
 
+replace github.com/tychoish/cmdr => ../cmdr/
+
 replace github.com/tychoish/grip => ../grip/
 
 replace github.com/tychoish/birch => ../birch/

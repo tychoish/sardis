@@ -4,19 +4,15 @@ import (
 	stdcmp "cmp"
 	"slices"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/risky"
+	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/sardis/util"
 )
 
 type Configuration struct {
-	Commands dt.Slice[Group] `bson:"groups" json:"groups" yaml:"groups"`
+	Commands stw.Slice[Group] `bson:"groups" json:"groups" yaml:"groups"`
 
 	Settings struct {
 		SSHAgentSocketPath    string `bson:"ssh_agent_socket_path" json:"ssh_agent_socket_path" yaml:"ssh_agent_socket_path"`
@@ -27,7 +23,7 @@ type Configuration struct {
 
 	caches struct {
 		commandGroups       adt.Once[map[string]Group]
-		allCommdands        adt.Once[dt.Slice[Command]]
+		allCommdands        adt.Once[stw.Slice[Command]]
 		comandGroupNames    adt.Once[[]string]
 		validation          adt.Once[error]
 		sshAgentPath        adt.Once[string]
@@ -39,10 +35,10 @@ func (conf *Configuration) AlacrittySocket() string { return conf.caches.alacrit
 func (conf *Configuration) SSHAgentSocket() string  { return conf.caches.sshAgentPath.Resolve() }
 
 func (conf *Configuration) Join(mcf *Configuration) {
-	conf.Settings.AlacrittySocketPath = ft.Default(mcf.Settings.AlacrittySocketPath, conf.Settings.AlacrittySocketPath)
-	conf.Settings.SSHAgentSocketPath = ft.Default(mcf.Settings.SSHAgentSocketPath, conf.Settings.SSHAgentSocketPath)
-	conf.Settings.IncludeLocalSHH = ft.Default(mcf.Settings.IncludeLocalSHH, conf.Settings.IncludeLocalSHH)
-	conf.Settings.AllowUndefinedSockets = ft.Default(mcf.Settings.AllowUndefinedSockets, conf.Settings.AllowUndefinedSockets)
+	conf.Settings.AlacrittySocketPath = util.Default(mcf.Settings.AlacrittySocketPath, conf.Settings.AlacrittySocketPath)
+	conf.Settings.SSHAgentSocketPath = util.Default(mcf.Settings.SSHAgentSocketPath, conf.Settings.SSHAgentSocketPath)
+	conf.Settings.IncludeLocalSHH = util.Default(mcf.Settings.IncludeLocalSHH, conf.Settings.IncludeLocalSHH)
+	conf.Settings.AllowUndefinedSockets = util.Default(mcf.Settings.AllowUndefinedSockets, conf.Settings.AllowUndefinedSockets)
 
 	conf.Commands = append(conf.Commands, mcf.Commands...)
 }
@@ -64,10 +60,10 @@ func (conf *Configuration) doValidate() error {
 		switch {
 		case err == nil:
 			return path
-		case ft.Ref(conf.Settings.AllowUndefinedSockets):
+		case stw.Deref(conf.Settings.AllowUndefinedSockets):
 			return ""
 		default:
-			fun.Invariant.Must(err)
+			erc.Invariant(err)
 		}
 		// unreachable
 		return ""
@@ -81,10 +77,10 @@ func (conf *Configuration) doValidate() error {
 		switch {
 		case err == nil:
 			return path
-		case ft.Ref(conf.Settings.AllowUndefinedSockets):
+		case stw.Deref(conf.Settings.AllowUndefinedSockets):
 			return ""
 		default:
-			fun.Invariant.Must(err)
+			erc.Invariant(err)
 		}
 		// unreachable
 		return ""
@@ -102,8 +98,8 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	withAliases := make([]Group, 0, len(conf.Commands)+len(conf.Commands)/2+1)
 	for idx := range conf.Commands {
 		cg := conf.Commands[idx]
-		if cg.Host != nil && ft.Not(ft.Ref(conf.Settings.IncludeLocalSHH)) {
-			chost := ft.Ref(cg.Host)
+		if cg.Host != nil && !stw.Deref(conf.Settings.IncludeLocalSHH) {
+			chost := stw.Deref(cg.Host)
 			if chost != "" && chost == hostname {
 				continue
 			}
@@ -142,48 +138,45 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	}
 
 	// get map of names -> indexes as an ordered sequence
-	sparse := dt.NewMap(index).Pairs()
+	sparse := irt.Collect(irt.KVjoin(irt.Map(index)))
 
 	// reorder it because it came off of a default map in random order
-	sparse.SortQuick(cmp.LessThanConverter(func(p dt.Pair[string, int]) int { return p.Value }))
+	slices.SortStableFunc(sparse, irt.KVcmpSecond)
 
-	// make an output structure
-	resolved := dt.NewSlice(make([]Group, 0, len(index)))
-
-	// read the resolution inside out...
-	//
-	// ⬇️ ingest the contents of the converted and reordered stream
-	// into the resolved slice
-	err := resolved.AppendStream(
-		// use the .Index accessor to pull the groups out of the
-		// stream of sparse indexes of now merged groups ⬇️
-		fun.Convert(fnx.MakeConverter(dt.NewSlice(conf.Commands).Index)).Stream(
-			// ⬇️ convert it into the (sparse) indexes of merged groups ⬆
-			fun.Convert(fnx.MakeConverter(func(p dt.Pair[string, int]) int { return p.Value })).Stream(
-				// ⬇️ take the (now ordered) pairs that we merged and ⬆
-				sparse.Stream(),
+	resolved := irt.Collect(
+		irt.ForEach(
+			// resolve the merged groups
+			irt.Convert(
+				// the value in the sparse map are the indexes of the merged groups
+				irt.Second(irt.KVsplit(irt.Slice(sparse))),
+				// use the .Index accessor to pull the groups out of the
+				// stream of sparse indexes of now merged groups ⬇️
+				conf.Commands.Index,
 			),
+			func(grp Group) {
+				slices.SortStableFunc(
+					grp.Commands,
+					func(lhv, rhv Command) (cc int) {
+						cc = stdcmp.Compare(rhv.SortHint, lhv.SortHint)
+						if cc == 0 {
+							return stdcmp.Compare(lhv.Name, rhv.Name)
+						}
+						return cc
+					},
+				)
+			},
 		),
-	).Wait()
-	if err != nil {
-		return err
-	}
-
-	resolved.ReadAll(func(grp Group) {
-		slices.SortStableFunc(grp.Commands, func(lhv, rhv Command) int {
-			return ft.DefaultFuture(
-				stdcmp.Compare(rhv.SortHint, lhv.SortHint),
-				func() int { return stdcmp.Compare(lhv.Name, rhv.Name) },
-			)
-		})
-	})
+	)
 
 	slices.SortStableFunc(resolved, func(lhv, rhv Group) int {
 		switch {
 		case lhv.Host != rhv.Host && (lhv.Host != nil || rhv.Host != nil):
-			return stdcmp.Compare(ft.Ref(lhv.Host), ft.Ref(rhv.Host))
+			return stdcmp.Compare(stw.Deref(lhv.Host), stw.Deref(rhv.Host))
 		case lhv.Synthetic != rhv.Synthetic:
-			return ft.IfElse(lhv.Synthetic, 1, -1)
+			if lhv.Synthetic {
+				return 1
+			}
+			return -1
 		case lhv.SortHint != rhv.SortHint:
 			return stdcmp.Compare(rhv.SortHint, lhv.SortHint)
 		case lhv.Category != rhv.Category:
@@ -203,17 +196,17 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 	return nil
 }
 
-func (conf *Configuration) ExportAllCommands() dt.Slice[Command] {
+func (conf *Configuration) ExportAllCommands() stw.Slice[Command] {
 	return conf.caches.allCommdands.Call(conf.doExportAllCommands)
 }
 
-func (conf *Configuration) doExportAllCommands() dt.Slice[Command] {
-	out := dt.NewSlice([]Command{})
+func (conf *Configuration) doExportAllCommands() stw.Slice[Command] {
+	out := make([]Command, 0, len(conf.Commands)*4)
 	host := util.GetHostname()
 
 	for _, grp := range conf.Commands {
-		hn, ok := ft.RefOk(grp.Host)
-		if ok && hn != "" && hn == host && ft.Not(ft.Ref(conf.Settings.IncludeLocalSHH)) {
+		hn, ok := stw.DerefOk(grp.Host)
+		if ok && hn != "" && hn == host && !stw.Deref(conf.Settings.IncludeLocalSHH) {
 			continue
 		}
 
@@ -227,16 +220,16 @@ func (conf *Configuration) doExportAllCommands() dt.Slice[Command] {
 	return out
 }
 
-func (conf *Configuration) ExportCommandGroups() dt.Map[string, Group] {
+func (conf *Configuration) ExportCommandGroups() stw.Map[string, Group] {
 	return conf.caches.commandGroups.Call(conf.doExportCommandGroups)
 }
 
-func (conf *Configuration) ExportGroupNames() dt.Slice[string] {
+func (conf *Configuration) ExportGroupNames() stw.Slice[string] {
 	return conf.caches.comandGroupNames.Call(conf.doExportGroupNames)
 }
 
 func (conf *Configuration) doExportGroupNames() []string {
-	return ft.IgnoreSecond(risky.Block(conf.ExportCommandGroups().Keys().Slice))
+	return irt.Collect(conf.ExportCommandGroups().Keys())
 }
 
 func (conf *Configuration) doExportCommandGroups() map[string]Group {
@@ -244,8 +237,8 @@ func (conf *Configuration) doExportCommandGroups() map[string]Group {
 	hostname := util.GetHostname()
 	for idx := range conf.Commands {
 		group := conf.Commands[idx]
-		hn, ok := ft.RefOk(group.Host)
-		if ok && hn != "" && hn == hostname && ft.Not(ft.Ref(conf.Settings.IncludeLocalSHH)) {
+		hn, ok := stw.DerefOk(group.Host)
+		if ok && hn != "" && hn == hostname && !stw.Deref(conf.Settings.IncludeLocalSHH) {
 			continue
 		}
 

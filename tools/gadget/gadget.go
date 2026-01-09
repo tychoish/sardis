@@ -1,6 +1,7 @@
 package gadget
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -15,16 +16,15 @@ import (
 
 	"github.com/cheynewallace/tabby"
 
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/pubsub"
-	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/srv"
+	"github.com/tychoish/fun/stw"
+	"github.com/tychoish/fun/wpa"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -61,7 +61,9 @@ func (opts *Options) Validate() (err error) {
 	ec.Whenf(opts.Recursive && (opts.PackagePath != "" && opts.PackagePath != "./" && opts.PackagePath != "..."),
 		"recursive gadget calls must not specify a limiting path %q", opts.PackagePath)
 
-	fun.Invariant.Must(ec.Resolve())
+	if err := ec.Resolve(); err != nil {
+		return err
+	}
 
 	if strings.HasPrefix(opts.PackagePath, "./") {
 		switch len(opts.PackagePath) {
@@ -77,7 +79,9 @@ func (opts *Options) Validate() (err error) {
 	}
 
 	if !filepath.IsAbs(opts.RootPath) {
-		opts.RootPath = risky.Apply(filepath.Abs, opts.RootPath)
+		if absPath, err := filepath.Abs(opts.RootPath); err == nil {
+			opts.RootPath = absPath
+		}
 	}
 
 	if opts.ReportCoverage {
@@ -91,15 +95,17 @@ func RunTests(ctx context.Context, opts Options) error {
 	start := time.Now()
 	defer func() {
 		grip.Build().Level(level.Info).
-			Pair("app", "gadget").
-			Pair("op", "run-tests").
-			Pair("workers", opts.Workers).
-			Pair("dur", time.Since(start)).
+			Fields(message.Fields{
+				"app":     "gadget",
+				"op":      "run-tests",
+				"workers": opts.Workers,
+				"dur":     time.Since(start),
+			}).
 			Send()
 	}()
 
 	var seenOne bool
-	iter := libfun.WalkDirIterator(opts.RootPath, func(path string, d fs.DirEntry) (*string, error) {
+	iter, closer := libfun.WalkDirIterator(opts.RootPath, func(path string, d fs.DirEntry) (*string, error) {
 		name := d.Name()
 		if d.Type().IsDir() && name == ".git" {
 			return nil, fs.SkipDir
@@ -110,17 +116,18 @@ func RunTests(ctx context.Context, opts Options) error {
 		}
 		if !seenOne || seenOne && opts.Recursive {
 			seenOne = true
-			return ft.Ptr(filepath.Dir(path)), nil
+			return stw.Ptr(filepath.Dir(path)), nil
 		}
 
 		// for non-recursive cases, abort early.
 		return nil, fs.SkipAll
 	})
+	defer func() { _ = closer() }()
 	jpm := jasper.Context(ctx)
 	ec := &erc.Collector{}
 
 	main := pubsub.NewUnlimitedQueue[fnx.Worker]()
-	pool := srv.WorkerPool(main, fun.WorkerGroupConfSet(&fun.WorkerGroupConf{
+	pool := srv.WorkerPool(main, wpa.WorkerGroupConfSet(&wpa.WorkerGroupConf{
 		NumWorkers:      opts.Workers,
 		ContinueOnError: true,
 	}))
@@ -133,7 +140,7 @@ func RunTests(ctx context.Context, opts Options) error {
 	out.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
 	if !opts.CompileOnly && !opts.SkipLint {
-		ec.Push(main.Add(func(ctx context.Context) error {
+		ec.Push(main.Push(func(ctx context.Context) error {
 			name := filepath.Base(opts.RootPath)
 			startLint := time.Now()
 			err := jpm.CreateCommand(ctx).
@@ -148,10 +155,10 @@ func RunTests(ctx context.Context, opts Options) error {
 			dur := time.Since(startLint)
 
 			grip.Build().Level(level.Info).
-				Pair("project", name).
-				Pair("op", "lint").
-				Pair("ok", err == nil).
-				Pair("dur", dur).
+				KV("project", name).
+				KV("op", "lint").
+				KV("ok", err == nil).
+				KV("dur", dur).
 				Send()
 
 			return ers.Wrapf(err, "lint errors for %q", opts.RootPath)
@@ -159,122 +166,123 @@ func RunTests(ctx context.Context, opts Options) error {
 	}
 
 	count := 0
-	mods := &adt.Map[string, *Module]{}
-	moditer := fun.Convert(func(ctx context.Context, mpath string) (*Module, error) {
+	mods := &stw.Map[string, *Module]{}
+	reports := &stw.Map[string, testReport]{}
+
+	// Convert module paths to modules, then flatten to packages, then to workers
+	for mpath := range iter {
 		if count != 0 && !opts.Recursive {
-			return nil, fmt.Errorf("module at %q is within %q but recursive mode is not enabled",
+			return fmt.Errorf("module at %q is within %q but recursive mode is not enabled",
 				mpath, opts.RootPath)
 		}
 		count++
 		mod, err := Collect(ctx, mpath)
+		if err != nil {
+			ec.Push(err)
+			continue
+		}
 		mods.Store(mpath, mod)
-		return mod, err
-	}).Stream(iter)
 
-	if opts.Recursive {
-		moditer = moditer.BufferParallel(max(4, max(1, opts.Workers/2)))
-	}
-
-	reports := &adt.Map[string, testReport]{}
-
-	pkgiter := fun.MergeStreams(fun.Convert(fnx.MakeConverter(func(m *Module) *fun.Stream[PackageInfo] { return fun.SliceStream(m.Packages) })).Stream(moditer))
-
-	fun.Convert(fnx.MakeConverter(func(pkg PackageInfo) fnx.Worker {
-		return func(ctx context.Context) error {
-			if reports.Check(pkg.PackageName) {
+		// Process each package in the module
+		for _, pkg := range mod.Packages {
+			pkg := pkg // capture for closure
+			ec.Push(main.Push(func(ctx context.Context) error {
+				if reports.Check(pkg.PackageName) {
 				grip.Errorln("duplicate", pkg.PackageName)
 				return nil
 			}
-			grip.Build().Level(level.Debug).
-				Pair("pkg", pkg.PackageName).
-				Pair("op", "populate").
-				Pair("mod", pkg.ModuleName).
-				Pair("path", pkg.LocalDirectory).
-				Send()
+				grip.Build().Level(level.Debug).
+					Fields(message.Fields{
+						"pkg":  pkg.PackageName,
+						"op":   "populate",
+						"mod":  pkg.ModuleName,
+						"path": pkg.LocalDirectory,
+					}).
+					Send()
 
-			catch := &erc.Collector{}
+				catch := &erc.Collector{}
 
-			testOut := send.MakeWriter(send.MakePlain())
-			testOut.SetPriority(grip.Sender().Priority())
-			testOut.SetFormatter(testOutputFilter(opts, reports, pkg))
-			testOut.SetErrorHandler(func(err error) { grip.ErrorWhen(!errors.Is(err, io.EOF), err) })
-			args := []string{
-				"go", "test", "-race",
-				fmt.Sprintf("-parallel=%d", min(4, opts.Workers/2)),
-				fmt.Sprintf("-timeout=%s", opts.Timeout),
-			}
+				testOut := send.MakeWriter(send.MakePlain())
+				testOut.SetPriority(grip.Sender().Priority())
+				testOut.SetFormatter(testOutputFilter(opts, reports, pkg))
+				testOut.SetErrorHandler(func(err error) { grip.ErrorWhen(!errors.Is(err, io.EOF), err) })
+				args := []string{
+					"go", "test", "-race",
+					fmt.Sprintf("-parallel=%d", min(4, opts.Workers/2)),
+					fmt.Sprintf("-timeout=%s", opts.Timeout),
+				}
 
-			switch {
-			case opts.CompileOnly:
-				args = append(args, "-run=noop")
-			case opts.ReportCoverage:
-				args = append(args, fmt.Sprintf("-coverprofile=%s", filepath.Join(pkg.LocalDirectory, "coverage.out")))
-			case opts.UseCache:
-				// nothing
-			default:
-				return fmt.Errorf("must configure coverage, cache, or compile-only")
-			}
+				switch {
+				case opts.CompileOnly:
+					args = append(args, "-run=noop")
+				case opts.ReportCoverage:
+					args = append(args, fmt.Sprintf("-coverprofile=%s", filepath.Join(pkg.LocalDirectory, "coverage.out")))
+				case opts.UseCache:
+					// nothing
+				default:
+					return fmt.Errorf("must configure coverage, cache, or compile-only")
+				}
 
-			args = append(args, pkg.LocalDirectory)
-			args = append(args, opts.GoTestArgs...)
+				args = append(args, pkg.LocalDirectory)
+				args = append(args, opts.GoTestArgs...)
 
-			testStart := time.Now()
-			catch.Push(jpm.CreateCommand(ctx).
+				testStart := time.Now()
+				catch.Push(jpm.CreateCommand(ctx).
 				ID(fmt.Sprint("test.", pkg.PackageName)).
 				Directory(pkg.LocalDirectory).
 				AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
 				SetOutputSender(level.Info, testOut).
 				SetErrorSender(level.Error, testOut).
-				PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
-				Add(args).
-				Run(ctx))
-			dur := time.Since(testStart)
+					PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
+					Add(args).
+					Run(ctx))
+				dur := time.Since(testStart)
 
-			grip.Build().Level(level.Debug).
-				Pair("pkg", pkg.PackageName).
-				Pair("op", "test").
-				Pair("ok", catch.Ok()).
-				Pair("dur", dur).
-				Send()
+				grip.Build().Level(level.Debug).
+					Fields(message.Fields{
+						"pkg": pkg.PackageName,
+						"op":  "test",
+						"ok":  catch.Ok(),
+						"dur": dur,
+					}).
+					Send()
 
-			if result, ok := reports.Load(pkg.PackageName); ok {
-				var buf bytes.Buffer
-				sender := send.MakeBytesBuffer(&buf)
-				sender.SetPriority(level.Info)
-				sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
+				if result, ok := reports.Load(pkg.PackageName); ok {
+					var buf bytes.Buffer
+					sender := send.MakeBytesBuffer(&buf)
+					sender.SetPriority(level.Info)
+					sender.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
-				if opts.ReportCoverage {
-					sender.SetName("coverage.report")
-					coverout := filepath.Join(result.Info.LocalDirectory, "coverage.out")
-					grip.Warning(ers.Wrapf(jpm.CreateCommand(ctx).
-						ID(fmt.Sprint("coverage.html.", result.Package)).
-						Directory(result.Info.LocalDirectory).
-						PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
-						SetOutputSender(level.Debug, out).
-						SetErrorSender(level.Error, out).
-						AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
-						AppendArgs("go", "tool", "cover", "-html", coverout, "-o", fmt.Sprintf("coverage-%s.html", filepath.Base(result.Info.LocalDirectory))).
-						Run(ctx), "coverage html for %s", result.Package))
-					ec.Push(jpm.CreateCommand(ctx).
-						ID(fmt.Sprint("coverage.report", result.Package)).
-						Directory(result.Info.LocalDirectory).
-						AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
-						SetErrorSender(level.Error, out).
-						SetOutputSender(level.Info, sender).
-						AppendArgs("go", "tool", "cover", "-func", coverout).
-						Run(ctx))
+					if opts.ReportCoverage {
+						sender.SetName("coverage.report")
+						coverout := filepath.Join(result.Info.LocalDirectory, "coverage.out")
+						grip.Warning(ers.Wrapf(jpm.CreateCommand(ctx).
+							ID(fmt.Sprint("coverage.html.", result.Package)).
+							Directory(result.Info.LocalDirectory).
+							PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
+							SetOutputSender(level.Debug, out).
+							SetErrorSender(level.Error, out).
+							AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
+							AppendArgs("go", "tool", "cover", "-html", coverout, "-o", fmt.Sprintf("coverage-%s.html", filepath.Base(result.Info.LocalDirectory))).
+							Run(ctx), "coverage html for %s", result.Package))
+						ec.Push(jpm.CreateCommand(ctx).
+							ID(fmt.Sprint("coverage.report", result.Package)).
+							Directory(result.Info.LocalDirectory).
+							AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
+							SetErrorSender(level.Error, out).
+							SetOutputSender(level.Info, sender).
+							AppendArgs("go", "tool", "cover", "-func", coverout).
+							Run(ctx))
+					}
+					report(ctx, result.Info, reports.Get(result.Info.PackageName), strings.TrimSpace(buf.String()), time.Since(start), catch.Resolve())
 				}
-				report(ctx, result.Info, reports.Get(result.Info.PackageName), strings.TrimSpace(buf.String()), time.Since(start), catch.Resolve())
-			}
 
-			return catch.Resolve()
+				return catch.Resolve()
+			}))
 		}
-	})).Stream(pkgiter).ReadAll(fnx.MakeHandler(main.Add)).Operation(ec.Push).Run(ctx)
+	}
 
-	wait, err := main.Wait(ctx)
-	ec.Push(err)
-	ec.Push(wait.WithRecover().Run(ctx))
-	ec.Push(main.Shutdown(ctx))
+	ec.Push(main.Close())
 	ec.Push(pool.Worker().Run(ctx))
 
 	return ec.Resolve()
@@ -301,27 +309,37 @@ func (tr testReport) Message() message.Composer {
 
 	// TODO: could move coverage or duration (plus padding?) to
 	// the beginning of the line so it works better as columns
-	pairs := &dt.Pairs[string, any]{}
-	pairs.Add("pkg", tr.Package)
+	pairs := &dt.List[irt.KV[string, any]]{}
+	pairs.PushBack(irt.KV[string, any]{Key: "pkg", Value: tr.Package})
 	if tr.MissingTests {
 		priority = level.Warning
-		pairs.Add("state", "untested")
+		pairs.PushBack(irt.KV[string, any]{Key: "state", Value: "untested"})
 	} else {
 		priority = level.Info
 		if tr.Cached {
-			pairs.Add("cached", true)
+			pairs.PushBack(irt.KV[string, any]{Key: "cached", Value: true})
 		}
 		if tr.CoverageEnabled {
 			if tr.FullyCovered {
-				pairs.Add("covered", true)
+				pairs.PushBack(irt.KV[string, any]{Key: "covered", Value: true})
 			} else {
-				pairs.Add("covered", tr.Coverage)
+				pairs.PushBack(irt.KV[string, any]{Key: "covered", Value: tr.Coverage})
 			}
 		}
 	}
-	pairs.Add("dur", tr.Duration.Round(time.Millisecond))
+	pairs.PushBack(irt.KV[string, any]{Key: "dur", Value: tr.Duration.Round(time.Millisecond)})
 
-	out := message.MakePairs(pairs)
+	pairSeq := func(yield func(string, any) bool) {
+		elem := pairs.Front()
+		for elem != nil {
+			kv := elem.Value()
+			if !yield(kv.Key, kv.Value) {
+				return
+			}
+			elem = elem.Next()
+		}
+	}
+	out := message.MakePairs(pairSeq)
 	out.SetPriority(priority)
 
 	return out
@@ -329,7 +347,7 @@ func (tr testReport) Message() message.Composer {
 
 func testOutputFilter(
 	opts Options,
-	mp *adt.Map[string, testReport],
+	mp *stw.Map[string, testReport],
 	info PackageInfo,
 ) send.MessageFormatter {
 	return func(m message.Composer) (_ string, err error) {
@@ -352,10 +370,10 @@ func testOutputFilter(
 				CoverageEnabled: opts.ReportCoverage,
 			}
 			if !report.Cached {
-				report.Duration = ft.Must(time.ParseDuration(parts[2]))
+				report.Duration = erc.Must(time.ParseDuration(parts[2]))
 			}
 			if opts.ReportCoverage {
-				report.Coverage = Percent(ft.Must(strconv.ParseFloat(parts[4][:len(parts[4])-1], 64)))
+				report.Coverage = Percent(erc.Must(strconv.ParseFloat(parts[4][:len(parts[4])-1], 64)))
 				if report.Coverage == 100 {
 					report.FullyCovered = true
 				}
@@ -408,7 +426,7 @@ func report(
 	runtime time.Duration,
 	err error,
 ) {
-	pwd := ft.Must(os.Getwd())
+	pwd := erc.Must(os.Getwd())
 	pfx := mod.LocalDirectory
 	if pwd == pfx {
 		pfx = ""
@@ -422,10 +440,11 @@ func report(
 	)
 	count := 0
 
-	iter := fun.MAKE.Lines(strings.NewReader(coverage))
 	table := tabby.New()
 	replacer := strings.NewReplacer(tr.Package, pfx)
-	err = erc.Join(err, iter.ReadAll(fnx.FromHandler(func(in string) {
+	scanner := bufio.NewScanner(strings.NewReader(coverage))
+	for scanner.Scan() {
+		in := scanner.Text()
 		cols := strings.Fields(replacer.Replace(in))
 		if cols[0] == "total:" {
 			// we read this out of the go.test line
@@ -443,7 +462,10 @@ func report(
 		cols[0] = strings.TrimPrefix(cols[0], "/")
 
 		table.AddLine(cols[0], cols[1], cols[2])
-	})).Run(ctx))
+	}
+	if scanErr := scanner.Err(); scanErr != nil {
+		err = erc.Join(err, scanErr)
+	}
 
 	msg := grip.Build().PairBuilder()
 	msg.Pair("pkg", mod.PackageName)

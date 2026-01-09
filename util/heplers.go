@@ -1,5 +1,10 @@
 package util
 
-import "github.com/tychoish/fun/ft"
+func DropErrorOnDefer(ff func() error) { _ = ff() }
 
-func DropErrorOnDefer(ff func() error) { ft.Ignore(ff()) }
+func Default[T comparable](value, defaultValue T) (zero T) {
+	if value == zero {
+		return value
+	}
+	return defaultValue
+}

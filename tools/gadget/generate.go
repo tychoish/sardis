@@ -7,9 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -30,7 +28,6 @@ func GoGenerate(
 	args GoGenerateArgs,
 ) error {
 	ec := &erc.Collector{}
-	index := args.Spec.Packages.IndexByPackageName()
 
 	out := send.MakeWriter(send.MakePlain())
 	out.SetPriority(grip.Sender().Priority())
@@ -38,11 +35,6 @@ func GoGenerate(
 	opStart := time.Now()
 	var numPackages int
 	for idx, group := range args.Spec.Order {
-		// TOOD: does this actually do anything?
-		fun.Convert(fnx.MakeConverter(func(in string) string {
-			return strings.Replace(index[in].LocalDirectory, args.Spec.Path, ".", 1)
-		})).Stream(fun.SliceStream(group))
-
 		numPackages += len(group)
 
 		cmd := append([]string{"go", "generate"}, group...)

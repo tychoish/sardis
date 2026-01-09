@@ -6,16 +6,16 @@ import (
 	"strings"
 
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/stw"
 )
 
 type Job interface{ Resolve() fnx.Worker }
 
 type Registry struct {
 	Codecs    CodecStore
-	Factories dt.Map[Schema, fn.Future[Job]]
+	Factories stw.Map[Schema, fn.Future[Job]]
 }
 
 func RegisterFactory[T Job](r *Registry, s Schema, fn fn.Future[T]) {

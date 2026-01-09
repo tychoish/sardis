@@ -7,32 +7,32 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/intish"
+	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
+	"github.com/tychoish/fun/wpa"
 	"github.com/tychoish/grip"
 	jutil "github.com/tychoish/jasper/util"
 	"github.com/tychoish/sardis/util"
 )
 
 type Group struct {
-	Category       string                 `bson:"category" json:"category" yaml:"category"`
-	Name           string                 `bson:"name" json:"name" yaml:"name"`
-	Aliases        []string               `bson:"aliases" json:"aliases" yaml:"aliases"`
-	Directory      string                 `bson:"directory" json:"directory" yaml:"directory"`
-	Environment    dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
-	CmdNamePrefix  string                 `bson:"command_name_prefix" json:"command_name_prefix" yaml:"command_name_prefix"`
-	Command        string                 `bson:"default_command" json:"default_command" yaml:"default_command"`
-	Notify         *bool                  `bson:"notify" json:"notify" yaml:"notify"`
-	Background     *bool                  `bson:"background" json:"background" yaml:"background"`
-	Host           *string                `bson:"host" json:"host" yaml:"host"`
-	Commands       dt.Slice[Command]      `bson:"commands" json:"commands" yaml:"commands"`
-	MenuSelections []string               `bson:"menu" json:"menu" yaml:"menu"`
-	SortHint       int                    `bson:"sort_hint" json:"sort_hint" yaml:"sort_hint"`
-	Synthetic      bool                   `bson:"-" json:"-" yaml:"-"`
+	Category       string                  `bson:"category" json:"category" yaml:"category"`
+	Name           string                  `bson:"name" json:"name" yaml:"name"`
+	Aliases        []string                `bson:"aliases" json:"aliases" yaml:"aliases"`
+	Directory      string                  `bson:"directory" json:"directory" yaml:"directory"`
+	Environment    stw.Map[string, string] `bson:"env" json:"env" yaml:"env"`
+	CmdNamePrefix  string                  `bson:"command_name_prefix" json:"command_name_prefix" yaml:"command_name_prefix"`
+	Command        string                  `bson:"default_command" json:"default_command" yaml:"default_command"`
+	Notify         *bool                   `bson:"notify" json:"notify" yaml:"notify"`
+	Background     *bool                   `bson:"background" json:"background" yaml:"background"`
+	Host           *string                 `bson:"host" json:"host" yaml:"host"`
+	Commands       stw.Slice[Command]      `bson:"commands" json:"commands" yaml:"commands"`
+	MenuSelections []string                `bson:"menu" json:"menu" yaml:"menu"`
+	SortHint       int                     `bson:"sort_hint" json:"sort_hint" yaml:"sort_hint"`
+	Synthetic      bool                    `bson:"-" json:"-" yaml:"-"`
 }
 
 func (cg *Group) ResolvedCategory() string {
@@ -45,7 +45,7 @@ func (cg *Group) ID() string       { return util.DotJoinParts(cg.IDPath()) }
 func (cg *Group) IDPath() []string { return []string{cg.Category, cg.Name, cg.CmdNamePrefix} }
 
 func (cg *Group) NamesAtIndex(idx int) []string {
-	fun.Invariant.Ok(idx >= 0 && idx < len(cg.Commands), "command out of bounds", cg.Name)
+	erc.InvariantOk(idx >= 0 && idx < len(cg.Commands), "command out of bounds", cg.Name)
 	ops := []string{}
 
 	for _, grp := range append([]string{cg.Name}, cg.Aliases...) {
@@ -56,14 +56,13 @@ func (cg *Group) NamesAtIndex(idx int) []string {
 }
 
 func (cg *Group) Selectors() []string {
-	set := &dt.Set[string]{}
-	set.Order()
+	set := &dt.OrderedSet[string]{}
 
 	for cmd := range slices.Values(cg.Commands) {
 		set.Add(cmd.Name)
 	}
 
-	return set.Slice()
+	return irt.Collect(set.Iterator())
 }
 
 func (cg *Group) Validate() error {
@@ -97,37 +96,37 @@ func (cg *Group) Validate() error {
 		cmd := cg.Commands[idx]
 		cmd.GroupCategory = cg.Category
 		cmd.GroupName = cg.Name
-		cmd.Notify = ft.Default(cmd.Notify, cg.Notify)
-		cmd.Background = ft.Default(cmd.Background, cg.Background)
-		cmd.Directory = jutil.TryExpandHomedir(ft.Default(cmd.Directory, home))
+		cmd.Notify = util.Default(cmd.Notify, cg.Notify)
+		cmd.Background = util.Default(cmd.Background, cg.Background)
+		cmd.Directory = jutil.TryExpandHomedir(util.Default(cmd.Directory, home))
 
 		ec.Whenf(cmd.Name == "", "command in group [%s](%d) must have a name", cg.Name, idx)
 		ec.Whenf(cmd.Command == "" && cmd.OverrideDefault, "cannot override default without an override, in group [%s] command [%s] at index (%d)", cg.Name, cmd.Name, idx)
 
 		if cg.Environment != nil || cmd.Environment != nil {
-			env := dt.Map[string, string]{}
+			env := stw.Map[string, string]{}
 			if cg.Environment != nil {
-				env.ExtendWithStream(cg.Environment.Stream()).Ignore().Wait()
+				env.Extend(cg.Environment.Iterator())
 			}
 
 			if cmd.Environment != nil {
-				env.ExtendWithStream(cmd.Environment.Stream()).Ignore().Wait()
+				env.Extend(cmd.Environment.Iterator())
 			}
 
 			cmd.Environment = env
 		}
 
-		if ft.Not(cmd.OverrideDefault) {
-			cmd.Command = ft.Default(cmd.Command, cg.Command)
-			cmd.Command = ft.Default(cmd.Command, cmd.Name)
-			cmd.Command = ft.Default(strings.ReplaceAll(cg.Command, "{{command}}", cmd.Command), cmd.Command)
+		if !cmd.OverrideDefault {
+			cmd.Command = util.Default(cmd.Command, cg.Command)
+			cmd.Command = util.Default(cmd.Command, cmd.Name)
+			cmd.Command = util.Default(strings.ReplaceAll(cg.Command, "{{command}}", cmd.Command), cmd.Command)
 		}
 
 		if cc := cmd.Command; strings.Contains(cc, "{{") && strings.Contains(cc, "}}") {
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{name}}", cmd.Name)
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.category}}", cg.Category)
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", cg.Name)
-			cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", ft.Ref(cg.Host))
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", stw.Deref(cg.Host))
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", cg.CmdNamePrefix)
 		}
 
@@ -135,7 +134,7 @@ func (cg *Group) Validate() error {
 			if cc := cmd.Commands[idx]; strings.Contains(cc, "{{") && strings.Contains(cc, "}}") {
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{command}}", cmd.Command)
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{name}}", cmd.Name)
-				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{host}}", ft.Ref(cg.Host))
+				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{host}}", stw.Deref(cg.Host))
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", cg.Name)
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.category}}", cg.Category)
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{prefix}}", cg.Name)
@@ -165,13 +164,25 @@ func (cg *Group) doMerge(rhv Group) bool {
 	} else {
 		cg.Commands = append(rhv.Commands, cg.Commands...)
 	}
-	cg.SortHint = intish.AbsMax(cg.SortHint, rhv.SortHint)
+	// AbsMax: return the value with the larger absolute value
+	absA, absB := cg.SortHint, rhv.SortHint
+	if absA < 0 {
+		absA = -absA
+	}
+	if absB < 0 {
+		absB = -absB
+	}
+	if absA >= absB {
+		cg.SortHint = cg.SortHint
+	} else {
+		cg.SortHint = rhv.SortHint
+	}
 
 	return true
 }
 
-func FilterCommands(cmds dt.Slice[Command], args []string) (dt.Slice[Command], error) {
-	ops := dt.NewSetFromSlice(args)
+func FilterCommands(cmds stw.Slice[Command], args []string) (stw.Slice[Command], error) {
+	ops := dt.MakeSet(irt.Slice(args))
 	switch {
 	case len(cmds) == 0:
 		return nil, ers.New("cannot resolve commands without input commands")
@@ -181,36 +192,32 @@ func FilterCommands(cmds dt.Slice[Command], args []string) (dt.Slice[Command], e
 		return nil, fmt.Errorf("ambiguous input with %d duplicate items %s", ops.Len()-len(args), args)
 	}
 
-	seen := dt.Set[string]{}
-	seen.Order()
+	seen := dt.OrderedSet[string]{}
 
-	out := cmds.Filter(func(cmd Command) bool {
+	out := irt.Collect(irt.Keep(irt.Slice(cmds), func(cmd Command) bool {
 		name := cmd.NamePrime()
-		return ops.Check(name) && !seen.AddCheck(name)
-	})
+		return ops.Check(name) && !seen.Add(name)
+	}), 0, len(cmds))
 
 	// if we didn't find all that we were looking for?
 	if ops.Len() != len(out) {
 		return nil, fmt.Errorf("found %d [%s] ops, of %d [%s] arguments",
-			len(out), strings.Join(seen.Slice(), ", "),
-			ops.Len(), strings.Join(ops.Slice(), ", "),
+			len(out), strings.Join(irt.Collect(seen.Iterator()), ", "),
+			ops.Len(), strings.Join(irt.Collect(ops.Iterator()), ", "),
 		)
 	}
 
 	return out, nil
 }
 
-func RunCommands(ctx context.Context, cmds dt.Slice[Command]) error {
+func RunCommands(ctx context.Context, cmds stw.Slice[Command]) error {
 	size := cmds.Len()
 	switch {
 	case size == 1:
-		return ers.Wrapf(ft.Ptr(cmds[0]).Worker().Run(ctx), "running command %q", cmds[0])
+		return ers.Wrapf(stw.Ptr(cmds[0]).Worker().Run(ctx), "running command %q", cmds[0])
 	case size < runtime.NumCPU():
-		return ers.Wrapf(
-			fun.MAKE.WorkerPool(fun.Convert(TOOLS.Converter()).Stream(cmds.Stream())).Run(ctx),
-			"running small %d batch  of commands %s", size, cmds,
-		)
+		return ers.Wrapf(TOOLS.CommandPool(irt.Slice(cmds), wpa.WorkerGroupConfNumWorkers(size)).Run(ctx), "running %d batch of commands %s", size, cmds)
 	default:
-		return ers.Wrapf(TOOLS.CommandPool(cmds.Stream()).Run(ctx), "running  %d batch of commands %s", size, cmds)
+		return ers.Wrapf(TOOLS.CommandPool(irt.Slice(cmds)).Run(ctx), "running %d batch of commands %s", size, cmds)
 	}
 }

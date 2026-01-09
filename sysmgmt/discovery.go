@@ -4,17 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"iter"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/libfun"
 	"github.com/tychoish/sardis/util"
 )
@@ -35,7 +32,10 @@ type LinkDiscovery struct {
 
 func tryAbsPath(path string) string {
 	abs, err := filepath.Abs(path)
-	return ft.IfElse(ers.IsOk(err), abs, path)
+	if err != nil {
+		return abs
+	}
+	return path
 }
 
 func (disco *LinkDiscovery) Validate() (err error) {
@@ -47,9 +47,15 @@ func (disco *LinkDiscovery) Validate() (err error) {
 		disco.SearchPaths = append(disco.SearchPaths, util.GetHomeDir())
 	}
 
-	disco.SearchPaths = fnx.NewFuture(dt.NewSlice(disco.SearchPaths).Stream().Transform(fnx.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
-	disco.IgnorePathPrefixes = fnx.NewFuture(dt.NewSlice(disco.IgnorePathPrefixes).Stream().Transform(fnx.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
-	disco.IgnoreTargetPrefixes = fnx.NewFuture(dt.NewSlice(disco.IgnoreTargetPrefixes).Stream().Transform(fnx.MakeConverter(util.TryExpandHomeDir)).Slice).Force().Resolve()
+	for i := range disco.SearchPaths {
+		disco.SearchPaths[i] = util.TryExpandHomeDir(disco.SearchPaths[i])
+	}
+	for i := range disco.IgnorePathPrefixes {
+		disco.IgnorePathPrefixes[i] = util.TryExpandHomeDir(disco.IgnorePathPrefixes[i])
+	}
+	for i := range disco.IgnoreTargetPrefixes {
+		disco.IgnoreTargetPrefixes[i] = util.TryExpandHomeDir(disco.IgnoreTargetPrefixes[i])
+	}
 
 	for idx := range disco.SearchPaths {
 		path := disco.SearchPaths[idx]
@@ -64,10 +70,13 @@ func (disco *LinkDiscovery) Validate() (err error) {
 
 	return err
 }
-func (disco *LinkDiscovery) ShouldSkipMissingTargets() bool { return ft.Ref(disco.SkipMissingTargets) }
+
+func (disco *LinkDiscovery) ShouldSkipMissingTargets() bool {
+	return stw.Deref(disco.SkipMissingTargets)
+}
 
 func (disco *LinkDiscovery) ShouldSkipResolvedTargets() bool {
-	return ft.Ref(disco.SkipResolvedTargets)
+	return stw.Deref(disco.SkipResolvedTargets)
 }
 
 func hasAnyPrefix(str string, prefixes []string) bool {
@@ -79,51 +88,57 @@ func hasAnyPrefix(str string, prefixes []string) bool {
 	return false
 }
 
-func (disco *LinkDiscovery) FindLinks() *fun.Stream[LinkDefinition] {
-	return fun.MergeStreams(fun.Convert(fnx.MakeConverter(func(path string) *fun.Stream[LinkDefinition] {
-		return libfun.FsWalkStream(libfun.FsWalkOptions{
-			Path:                 path,
-			SkipPermissionErrors: true,
-			IgnoreMode:           ft.Ptr(fs.ModeDir),
-		}, func(p string, dir fs.DirEntry) (*LinkDefinition, error) {
-			if hasAnyPrefix(p, disco.IgnorePathPrefixes) {
-				if dir.IsDir() {
-					return nil, fs.SkipDir
-				}
-				return nil, nil
-			}
-
-			if dir.Type()&fs.ModeSymlink == 0 {
-				return nil, nil
-			}
-
-			target, err := os.Readlink(p)
-			if err != nil {
-				if errors.Is(err, fs.ErrPermission) {
+func (disco *LinkDiscovery) FindLinks() iter.Seq[LinkDefinition] {
+	return func(yield func(LinkDefinition) bool) {
+		for _, path := range disco.SearchPaths {
+			for link := range libfun.FsWalkStream(libfun.FsWalkOptions{
+				Path:                 path,
+				SkipPermissionErrors: true,
+				IgnoreMode:           stw.Ptr(fs.ModeDir),
+			}, func(p string, dir fs.DirEntry) (*LinkDefinition, error) {
+				if hasAnyPrefix(p, disco.IgnorePathPrefixes) {
+					if dir.IsDir() {
+						return nil, fs.SkipDir
+					}
 					return nil, nil
 				}
-				return nil, fmt.Errorf("error reading symbolic link %s: %w", path, err)
+
+				if dir.Type()&fs.ModeSymlink == 0 {
+					return nil, nil
+				}
+
+				target, err := os.Readlink(p)
+				if err != nil {
+					if errors.Is(err, fs.ErrPermission) {
+						return nil, nil
+					}
+					return nil, fmt.Errorf("error reading symbolic link %s: %w", path, err)
+				}
+
+				target = tryAbsPath(target)
+				exists := util.FileExists(target)
+
+				switch {
+				case exists && disco.ShouldSkipResolvedTargets():
+					return nil, nil
+				case !exists && disco.ShouldSkipMissingTargets():
+					return nil, nil
+				case hasAnyPrefix(target, disco.IgnoreTargetPrefixes):
+					return nil, nil
+				}
+
+				return &LinkDefinition{
+					Name:         strings.TrimLeft(strings.ReplaceAll(target, string(filepath.Separator), "-"), "- _."),
+					Target:       target,
+					Path:         p,
+					PathExists:   util.FileExists(p),
+					TargetExists: exists,
+				}, nil
+			}) {
+				if !yield(link) {
+					return
+				}
 			}
-
-			target = tryAbsPath(target)
-			exists := util.FileExists(target)
-
-			switch {
-			case exists && disco.ShouldSkipResolvedTargets():
-				return nil, nil
-			case ft.Not(exists) && disco.ShouldSkipMissingTargets():
-				return nil, nil
-			case hasAnyPrefix(target, disco.IgnoreTargetPrefixes):
-				return nil, nil
-			}
-
-			return &LinkDefinition{
-				Name:         strings.TrimLeft(strings.ReplaceAll(target, string(filepath.Separator), "-"), "- _."),
-				Target:       target,
-				Path:         p,
-				PathExists:   util.FileExists(p),
-				TargetExists: exists,
-			}, nil
-		})
-	})).Stream(fun.SliceStream(disco.SearchPaths)))
+		}
+	}
 }

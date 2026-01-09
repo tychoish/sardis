@@ -9,11 +9,11 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/srv"
+	"github.com/tychoish/fun/stw"
+	"github.com/tychoish/fun/wpa"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/sardis"
@@ -49,7 +49,7 @@ func StringSpecBuilder(flagName string, defaultValue *string) *cmdr.OperationSpe
 			return "", fmt.Errorf("%q is a required flag, and was missing", flagName)
 		}
 
-		return ft.Ref(defaultValue), nil
+		return stw.Deref(defaultValue), nil
 	})
 }
 
@@ -67,12 +67,12 @@ func LoadConfiguration(cc *cli.Context) (*sardis.Configuration, error) {
 	}
 
 	conf.Settings.Logging.Priority = level.FromString(cc.String("level"))
-	conf.Settings.Logging.DisableSyslog = ft.Ptr(cc.Bool("quietSyslog") || os.Getenv(global.EnvVarSardisLogQuietSyslog) != "")
-	conf.Settings.Logging.DisableStandardOutput = ft.Ptr(cc.Bool("quietStdOut") || os.Getenv(global.EnvVarSardisLogQuietStdOut) != "")
-	conf.Settings.Logging.EnableJSONFormating = ft.Ptr(cc.Bool("jsonLog") || os.Getenv(global.EnvVarSardisLogFormatJSON) != "")
-	conf.Settings.Logging.EnableJSONColorFormatting = ft.Ptr(cc.Bool("colorJsonLog") || os.Getenv(global.EnvVarSardisLogJSONColor) != "")
+	conf.Settings.Logging.DisableSyslog = stw.Ptr(cc.Bool("quietSyslog") || os.Getenv(global.EnvVarSardisLogQuietSyslog) != "")
+	conf.Settings.Logging.DisableStandardOutput = stw.Ptr(cc.Bool("quietStdOut") || os.Getenv(global.EnvVarSardisLogQuietStdOut) != "")
+	conf.Settings.Logging.EnableJSONFormating = stw.Ptr(cc.Bool("jsonLog") || os.Getenv(global.EnvVarSardisLogFormatJSON) != "")
+	conf.Settings.Logging.EnableJSONColorFormatting = stw.Ptr(cc.Bool("colorJsonLog") || os.Getenv(global.EnvVarSardisLogJSONColor) != "")
 	conf.Settings.Runtime.WithAnnotations = cc.Bool("annotate") || os.Getenv(global.EnvVarSardisAnnotate) != "" || conf.Settings.Runtime.AnnotationSeparator != ""
-	conf.Settings.Runtime.AnnotationSeparator = ft.Default(conf.Settings.Runtime.AnnotationSeparator, global.MenuCommanderDefaultAnnotationSeparator)
+	conf.Settings.Runtime.AnnotationSeparator = util.Default(conf.Settings.Runtime.AnnotationSeparator, global.MenuCommanderDefaultAnnotationSeparator)
 
 	return conf, nil
 }
@@ -120,9 +120,9 @@ func Commander() *cmdr.Commander {
 			return srv.SetWorkerPool(ctx,
 				global.ApplicationName,
 				pubsub.NewUnlimitedQueue[fnx.Worker](),
-				fun.WorkerGroupConfWorkerPerCPU(),
-				fun.WorkerGroupConfContinueOnError(),
-				fun.WorkerGroupConfContinueOnPanic(),
+				wpa.WorkerGroupConfWorkerPerCPU(),
+				wpa.WorkerGroupConfContinueOnError(),
+				wpa.WorkerGroupConfContinueOnPanic(),
 			)
 		}).
 		SetAction(func(ctx context.Context, cc *cli.Context) error {

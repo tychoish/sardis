@@ -9,7 +9,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/testt"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -34,7 +34,8 @@ func TestGraph(t *testing.T) {
 		indx := gone.Packages.IndexByPackageName()
 		for _, pkg := range gtwo.Packages {
 			other := indx.Get(pkg.PackageName)
-			check.NotError(t, ft.IgnoreFirst((Packages{pkg, other}).WriteTo(buf)))
+			_, err = (Packages{pkg, other}.WriteTo(buf))
+			check.NotError(t, err)
 			testt.Log(t, "-->>", buf.String(), "<<--")
 			buf.Reset()
 			if !indx.Check(pkg.PackageName) {
@@ -109,7 +110,7 @@ func TestGraph(t *testing.T) {
 							"didx": didx,
 						})
 						ps := Packages{pkg}
-						ft.Ignore(ft.IgnoreFirst(ps.WriteTo(send.MakeWriter(grip.Sender()))))
+						_, _ = ps.WriteTo(send.MakeWriter(grip.Sender()))
 						t.Fatal("missed dependency", edge, "<==", dep, seen.Len(), len(pkgs))
 					}
 				}
@@ -186,7 +187,7 @@ func TestGraph(t *testing.T) {
 				ID:           t.Name(),
 				Synchronized: true,
 				MaxProcs:     64,
-				Tracker:      ft.Must(track.New(t.Name())),
+				Tracker:      erc.Must(track.New(t.Name())),
 			}))
 
 			graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")

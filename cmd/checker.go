@@ -4,10 +4,11 @@ import (
 	"fmt"
 
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/sardis/util"
 )
 
-type ListNS[T any] struct{ dt.Slice[T] }
+type ListNS[T any] struct{ stw.Slice[T] }
 
 func NewList[T any](items ...T) *ListNS[T] {
 	return &ListNS[T]{dt.NewSlice(items)}

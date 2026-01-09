@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 )
@@ -57,13 +57,12 @@ func GetBuildOrder(ctx context.Context, path string) (*BuildOrder, error) {
 	next := []string{}
 	queue := &dt.List[string]{}
 
-	iter := nodes.Stream()
-	for iter.Next(ctx) {
-		item := iter.Value()
+	for elem := nodes.Front(); elem != nil; elem = elem.Next() {
+		item := elem.Value()
 		node := item.Key
 		edges := item.Value
 		info, ok := index[node]
-		fun.Invariant.Ok(ok, "bad index")
+		erc.InvariantOk(ok, "bad index")
 
 		if len(edges) == 0 && len(info.Dependencies) == 0 {
 			next = append(next, node)
@@ -72,7 +71,9 @@ func GetBuildOrder(ctx context.Context, path string) (*BuildOrder, error) {
 		}
 	}
 	sort.Strings(next)
-	seen.AppendStream(fun.SliceStream(next))
+	for _, n := range next {
+		seen.Add(n)
+	}
 	buildOrder = append(buildOrder, next)
 	next = nil
 	grip.Debug(message.Fields{
@@ -93,7 +94,9 @@ OUTER:
 		}
 		if runsSinceProgress == queue.Len() && len(next) > 0 {
 			sort.Strings(next)
-			seen.AppendStream(fun.SliceStream(next))
+			for _, n := range next {
+				seen.Add(n)
+			}
 			buildOrder = append(buildOrder, next)
 			next = nil
 			runsSinceProgress = 0
@@ -122,7 +125,7 @@ OUTER:
 		}
 
 		info, ok := index[node]
-		fun.Invariant.Ok(ok)
+		erc.InvariantOk(ok)
 
 		for _, dep := range info.Dependencies {
 			if !seen.Check(dep) {

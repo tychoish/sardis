@@ -7,10 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -20,18 +19,18 @@ import (
 )
 
 type Command struct {
-	Name            string                 `bson:"name" json:"name" yaml:"name"`
-	GroupName       string                 `bson:"-" json:"-" yaml:"-"`
-	GroupCategory   string                 `bson:"-" json:"-" yaml:"-"`
-	Directory       string                 `bson:"directory" json:"directory" yaml:"directory"`
-	Environment     dt.Map[string, string] `bson:"env" json:"env" yaml:"env"`
-	Command         string                 `bson:"command" json:"command" yaml:"command"`
-	Commands        []string               `bson:"commands" json:"commands" yaml:"commands"`
-	OverrideDefault bool                   `bson:"override_default" json:"override_default" yaml:"override_default"`
-	Notify          *bool                  `bson:"notify,omitempty" json:"notify,omitempty" yaml:"notify,omitempty"`
-	Background      *bool                  `bson:"background,omitempty" json:"background,omitempty" yaml:"background,omitempty"`
-	SortHint        int                    `bson:"sort_hint,omitempty" json:"sort_hint,omitempty" yaml:"sort_hint,omitempty"`
-	Logs            Logging                `bson:"logs" json:"logs" yaml:"logs"`
+	Name            string                  `bson:"name" json:"name" yaml:"name"`
+	GroupName       string                  `bson:"-" json:"-" yaml:"-"`
+	GroupCategory   string                  `bson:"-" json:"-" yaml:"-"`
+	Directory       string                  `bson:"directory" json:"directory" yaml:"directory"`
+	Environment     stw.Map[string, string] `bson:"env" json:"env" yaml:"env"`
+	Command         string                  `bson:"command" json:"command" yaml:"command"`
+	Commands        []string                `bson:"commands" json:"commands" yaml:"commands"`
+	OverrideDefault bool                    `bson:"override_default" json:"override_default" yaml:"override_default"`
+	Notify          *bool                   `bson:"notify,omitempty" json:"notify,omitempty" yaml:"notify,omitempty"`
+	Background      *bool                   `bson:"background,omitempty" json:"background,omitempty" yaml:"background,omitempty"`
+	SortHint        int                     `bson:"sort_hint,omitempty" json:"sort_hint,omitempty" yaml:"sort_hint,omitempty"`
+	Logs            Logging                 `bson:"logs" json:"logs" yaml:"logs"`
 
 	// if possible call the operation rather
 	// than execing the commands
@@ -39,7 +38,7 @@ type Command struct {
 	unaliasedName    string
 }
 
-func (conf *Command) NamePrime() string { return ft.Default(conf.unaliasedName, conf.Name) }
+func (conf *Command) NamePrime() string { return util.Default(conf.unaliasedName, conf.Name) }
 func (conf *Command) FQN() string {
 	return util.DotJoin(conf.GroupCategory, conf.GroupName, conf.NamePrime())
 }
@@ -64,7 +63,7 @@ func (conf *Command) Worker() fnx.Worker {
 			AddEnv(global.EnvVarSardisLogQuietStdOut, "true").
 			SetOutputSender(level.Info, buf).
 			SetErrorSender(level.Error, buf).
-			Background(ft.Ref(conf.Background)).
+			Background(stw.Deref(conf.Background)).
 			Append(conf.Command).
 			Append(conf.Commands...).
 			Prerequisite(func() bool {
@@ -116,7 +115,7 @@ func (conf *Command) Worker() fnx.Worker {
 				} else if conf.Logs.Full() {
 					grip.Info(buf.String())
 				}
-				desktop.Notice(message.Whenln(ft.Ref(conf.Notify), conf.Name, "completed"))
+				desktop.Notice(message.Whenln(stw.Deref(conf.Notify), conf.Name, "completed"))
 				return nil
 			}).
 			Worker().

@@ -1,17 +1,12 @@
 package sardis
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/sardis/repo"
 	"github.com/tychoish/sardis/srv"
@@ -103,7 +98,9 @@ func readConfiguration(fn string) (*Configuration, error) {
 func (conf *Configuration) Validate() error { return conf.caches.validation.Call(conf.doValidate) }
 func (conf *Configuration) doValidate() error {
 	grip.Debugf("validating %q", conf.originalPath)
-	conf.Settings = ft.DefaultNew(conf.Settings)
+	if conf.Settings == nil {
+		conf.Settings = new(srv.Configuration)
+	}
 
 	ec := &erc.Collector{}
 
@@ -125,12 +122,12 @@ func (conf *Configuration) expandOperations() error {
 		return errors.New("cannot generate operations more than once")
 	}
 
-	conf.Operations.Commands = dt.MergeSlices(
-		conf.Operations.Commands,
-		conf.Repos.ConcreteTaskGroups(),
-		conf.Repos.SyntheticTaskGroups(),
-		conf.System.SystemD.TaskGroups(),
-	)
+	conf.Operations.Commands = append(conf.Operations.Commands,
+		conf.Repos.ConcreteTaskGroups()...)
+	conf.Operations.Commands = append(conf.Operations.Commands,
+		conf.Repos.SyntheticTaskGroups()...)
+	conf.Operations.Commands = append(conf.Operations.Commands,
+		conf.System.SystemD.TaskGroups()...)
 	return nil
 }
 
@@ -141,27 +138,28 @@ func (conf *Configuration) expandLinkedFiles() error {
 	defer func() { conf.linkedFilesRead = true }()
 
 	conf.Migrate()
-	err := fun.Convert(fnx.MakeConverterErr(func(fn string) (*Configuration, error) {
+
+	ec := &erc.Collector{}
+	for _, fn := range conf.Settings.ConfigPaths {
+		fn = util.TryExpandHomeDir(fn)
 		grip.Debugf("reading linked config file %q", fn)
 		iconf, err := readConfiguration(fn)
 		switch {
 		case err != nil:
-			return nil, fmt.Errorf("problem reading linked config file %q: %w", fn, err)
+			ec.Push(fmt.Errorf("problem reading linked config file %q: %w", fn, err))
+			continue
 		case iconf == nil:
-			return nil, fmt.Errorf("nil configuration for %q", fn)
+			ec.Push(fmt.Errorf("nil configuration for %q", fn))
+			continue
 		case iconf.Settings != nil:
-			return nil, fmt.Errorf("nested file %q specified system configuration", fn)
+			ec.Push(fmt.Errorf("nested file %q specified system configuration", fn))
+			continue
 		default:
-			return iconf.Migrate(), nil
+			conf.Join(iconf.Migrate())
 		}
-	})).Stream(fun.SliceStream(conf.Settings.ConfigPaths).
-		Transform(fnx.MakeConverter(util.TryExpandHomeDir)),
-	).ReadAll(conf.doJoin).Wait()
-	if err != nil {
-		return err
 	}
 
-	return nil
+	return ec.Resolve()
 }
 
 func (conf *Configuration) Migrate() *Configuration {
@@ -202,10 +200,6 @@ func (conf *Configuration) Migrate() *Configuration {
 	return conf
 }
 
-func (conf *Configuration) doJoin(_ context.Context, mcf *Configuration) error {
-	conf.Join(mcf)
-	return nil
-}
 
 func (conf *Configuration) Join(mcf *Configuration) *Configuration {
 	if mcf == nil {

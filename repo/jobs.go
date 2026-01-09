@@ -13,12 +13,11 @@ import (
 	"time"
 
 	git "github.com/go-git/go-git/v5"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -252,7 +251,7 @@ func (conf *GitRepository) UpdateJob() fnx.Worker {
 			}
 
 			if changes, err := conf.HasChanges(); changes || err != nil {
-				grip.Warning(message.WrapError(err, dt.Map[string, any]{
+				grip.Warning(message.WrapError(err, stw.Map[string, any]{
 					"op": opName, "id": id, "operator": host,
 					"msg": "problem detecting changes in the repository, may be routine, recoverable",
 				}))
@@ -335,7 +334,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fnx.Worker {
 			SetErrorSender(level.Error, procbuf).
 			ID(buildID).
 			Directory(conf.Path).
-			AppendArgsWhen(ft.Not(isLocal), "ssh", host, fmt.Sprintf("cd %s && %s", conf.Path, fmt.Sprintf(syncCmdTemplate, buildID))).
+			AppendArgsWhen(!isLocal, "ssh", host, fmt.Sprintf("cd %s && %s", conf.Path, fmt.Sprintf(syncCmdTemplate, buildID))).
 			Append(conf.Pre...).
 			AppendArgs("git", "add", "-A").
 			Bash("git fetch origin && git rebase origin/$(git rev-parse --abbrev-ref HEAD)").
@@ -343,8 +342,8 @@ func (conf *GitRepository) SyncRemoteJob(host string) fnx.Worker {
 			AppendArgs("git", "add", "-A").
 			Bash(fmt.Sprintf("git commit -a -m 'update: (%s)' || true", buildID)).
 			AppendArgs("git", "push").
-			AppendArgsWhen(ft.Not(isLocal), "ssh", host, fmt.Sprintf("cd %s && %s", conf.Path, fmt.Sprintf(syncCmdTemplate, buildID))).
-			BashWhen(ft.Not(isLocal), "git fetch origin && git rebase origin/$(git rev-parse --abbrev-ref HEAD)").
+			AppendArgsWhen(!isLocal, "ssh", host, fmt.Sprintf("cd %s && %s", conf.Path, fmt.Sprintf(syncCmdTemplate, buildID))).
+			BashWhen(!isLocal, "git fetch origin && git rebase origin/$(git rev-parse --abbrev-ref HEAD)").
 			Append(conf.Post...).
 			Worker().
 			WithErrorFilter(func(err error) error {

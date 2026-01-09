@@ -5,11 +5,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"iter"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/opt"
+	"github.com/tychoish/fun/wpa"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -20,16 +24,17 @@ type Utilities struct{}
 
 var TOOLS Utilities = struct{}{}
 
-func (Utilities) WorkerPool(st *fun.Stream[fnx.Worker]) fnx.Worker { return fun.MAKE.WorkerPool(st) }
-func (Utilities) Converter() fnx.Converter[Command, fnx.Worker]    { return TOOLS.CommandToWorker }
-
-func (Utilities) CommandToWorker(_ context.Context, c Command) (fnx.Worker, error) {
-	return c.Worker(), nil
+func (Utilities) WorkerPool(st iter.Seq[fnx.Worker]) fnx.Worker { return wpa.RunWithPool(st) }
+func (Utilities) ToWorker(cmd Command) fnx.Worker               { return cmd.Worker() }
+func (Utilities) Converter() fn.Converter[Command, fnx.Worker]  { return TOOLS.ToWorker }
+func (Utilities) Handler() fnx.Handler[Command] {
+	return func(ctx context.Context, cmd Command) error { return cmd.Worker().Run(ctx) }
 }
 
-func (Utilities) CommandPool(st *fun.Stream[Command]) fnx.Worker {
-	return fun.MAKE.WorkerPool(fun.Convert(TOOLS.CommandToWorker).Stream(st))
+func (Utilities) CommandPool(st iter.Seq[Command], opts ...opt.Provider[*wpa.WorkerGroupConf]) fnx.Worker {
+	return wpa.RunWithPool(irt.Convert(st, TOOLS.ToWorker))
 }
+
 type Logging string
 
 const (
@@ -86,7 +91,7 @@ func (b *OutputBuf) Close() error {
 
 func (b *OutputBuf) Send(m message.Composer) {
 	if send.ShouldLog(b, m) {
-		fun.Invariant.Must(ft.IgnoreFirst(b.buffer.WriteString(m.String())))
-		fun.Invariant.Must(ft.IgnoreFirst(b.buffer.WriteString("\n")))
+		erc.Must(b.buffer.WriteString(m.String()))
+		erc.Must(b.buffer.WriteString("\n"))
 	}
 }

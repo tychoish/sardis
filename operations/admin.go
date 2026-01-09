@@ -14,18 +14,14 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/tychoish/birch/jsonx"
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/global"
-	"github.com/tychoish/sardis/repo"
 	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/sysmgmt"
 	"github.com/tychoish/sardis/util"
@@ -84,11 +80,14 @@ func linkOp() *cmdr.Commander {
 		SetUsage("setup all configured links").
 		With(StandardSardisOperationSpec().
 			SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-				return subexec.TOOLS.WorkerPool(fun.Convert(fnx.MakeConverter(func(c sysmgmt.LinkDefinition) fnx.Worker {
-					return c.CreateLinkJob()
-				})).Stream(
-					fun.SliceStream(conf.System.Links.Links),
-				)).Run(ctx)
+				workers := func(yield func(fnx.Worker) bool) {
+					for _, link := range conf.System.Links.Links {
+						if !yield(link.CreateLinkJob()) {
+							return
+						}
+					}
+				}
+				return subexec.TOOLS.WorkerPool(workers).Run(ctx)
 			}).
 			Add).
 		Subcommanders(addOpCommand(cmdr.MakeCommander().
@@ -109,40 +108,37 @@ func linkOp() *cmdr.Commander {
 				case "JSON", "json", "js", "j":
 					buf := bufio.NewWriter(os.Stdout)
 
-					args.conf.System.Links.Discovery.
-						FindLinks().
-						ReadAll(fnx.FromHandler(func(d sysmgmt.LinkDefinition) {
-							ec.Push(ft.IgnoreFirst(buf.Write(ft.IgnoreSecond(jsonx.DC.Elements(
-								jsonx.EC.String("path", d.Path),
-								jsonx.EC.String("target", d.Target),
-								jsonx.EC.Boolean("defined", lookup.Check(d.Path)),
-								jsonx.EC.Boolean("target_exists", d.TargetExists),
-								jsonx.EC.Boolean("path_exists", d.PathExists),
-							).MarshalJSON()))))
-							ec.Push(buf.WriteByte('\n'))
-						})).Operation(ec.Push).Run(ctx)
+					for d := range args.conf.System.Links.Discovery.FindLinks() {
+						erc.Must(buf.Write(erc.Must(jsonx.DC.Elements(
+							jsonx.EC.String("path", d.Path),
+							jsonx.EC.String("target", d.Target),
+							jsonx.EC.Boolean("defined", lookup.Check(d.Path)),
+							jsonx.EC.Boolean("target_exists", d.TargetExists),
+							jsonx.EC.Boolean("path_exists", d.PathExists),
+						).MarshalJSON())))
+						ec.Push(buf.WriteByte('\n'))
+					}
 
 					ec.Push(buf.Flush())
 				case "line", "ln":
 					buf := bufio.NewWriter(os.Stdout)
 
-					args.conf.System.Links.Discovery.
-						FindLinks().
-						ReadAll(func(ctx context.Context, d sysmgmt.LinkDefinition) error {
-							return ft.IgnoreFirst(fmt.Fprintln(buf, d.Path, "->", d.Target))
-						}).Operation(ec.Push).Run(ctx)
+					for d := range args.conf.System.Links.Discovery.FindLinks() {
+						_, err := fmt.Fprintln(buf, d.Path, "->", d.Target)
+						if err != nil {
+							ec.Push(err)
+						}
+					}
 
 					ec.Push(buf.Flush())
 				case "YAML", "yaml", "yml", "y", "export":
 					buf := bufio.NewWriter(os.Stdout)
 					enc := yaml.NewEncoder(buf)
 
-					args.conf.System.Links.Discovery.
-						FindLinks().
-						ReadAll(func(ctx context.Context, d sysmgmt.LinkDefinition) error {
-							d.Defined = lookup.Check(d.Path)
-							return enc.Encode(d)
-						}).Operation(ec.Push).Run(ctx)
+					for d := range args.conf.System.Links.Discovery.FindLinks() {
+						d.Defined = lookup.Check(d.Path)
+						ec.Push(enc.Encode(d))
+					}
 
 					ec.Push(enc.Close())
 					ec.Push(buf.Flush())
@@ -152,17 +148,25 @@ func linkOp() *cmdr.Commander {
 					table := tabby.New()
 					table.AddHeader("Path", "Target", "Exists", "Defined")
 
-					items := dt.StreamList(args.conf.System.Links.Discovery.FindLinks())
-					items.SortMerge(cmp.LessThanCustom)
+					items := irt.Collect(args.conf.System.Links.Discovery.FindLinks())
+					slices.SortFunc(items, func(a, b sysmgmt.LinkDefinition) int {
+						if a.LessThan(b) {
+							return -1
+						}
+						if b.LessThan(a) {
+							return 1
+						}
+						return 0
+					})
 
-					items.StreamFront().ReadAll(fnx.FromHandler(func(d sysmgmt.LinkDefinition) {
+					for _, d := range items {
 						table.AddLine(
 							util.TryCollapseHomeDir(d.Path),
 							util.TryCollapseHomeDir(d.Target),
 							renderBool(d.TargetExists),
 							renderBool(lookup.Check(d.Path)),
 						)
-					})).Operation(ec.Push).Run(ctx)
+					}
 
 					table.Print()
 				}
@@ -221,11 +225,24 @@ func nightly() *cmdr.Commander {
 		With(cmdr.SpecBuilder(
 			ResolveConfiguration,
 		).SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			return subexec.TOOLS.WorkerPool(fun.JoinStreams(
-				fun.Convert(fnx.MakeConverter(func(c sysmgmt.LinkDefinition) fnx.Worker { return c.CreateLinkJob() })).Stream(fun.SliceStream(conf.System.Links.Links)),
-				fun.Convert(fnx.MakeConverter(func(c repo.GitRepository) fnx.Worker { return c.CleanupJob() })).Stream(fun.SliceStream(conf.Repos.GitRepos)),
-				fun.Convert(fnx.MakeConverter(func(c sysmgmt.SystemdService) fnx.Worker { return c.Worker() })).Stream(fun.SliceStream(conf.System.SystemD.Services)),
-			)).Run(ctx)
+			workers := func(yield func(fnx.Worker) bool) {
+				for _, link := range conf.System.Links.Links {
+					if !yield(link.CreateLinkJob()) {
+						return
+					}
+				}
+				for _, repo := range conf.Repos.GitRepos {
+					if !yield(repo.CleanupJob()) {
+						return
+					}
+				}
+				for _, service := range conf.System.SystemD.Services {
+					if !yield(service.Worker()) {
+						return
+					}
+				}
+			}
+			return subexec.TOOLS.WorkerPool(workers).Run(ctx)
 		}).Add)
 }
 

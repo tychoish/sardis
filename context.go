@@ -3,8 +3,7 @@ package sardis
 import (
 	"context"
 
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/grip"
 )
 
@@ -37,15 +36,16 @@ func AppConfiguration(ctx context.Context) *Configuration {
 
 func MustAppConfiguration(ctx context.Context) *Configuration {
 	value := ctx.Value(confCtxKey)
-	fun.Invariant.IsFalse(ft.IsNil(value), "sardis configuration is not attached to the context")
+	erc.InvariantOk(value != nil, "sardis configuration is not attached to the context")
 
 	conf, ok := value.(*Configuration)
-	fun.Invariant.Ok(ok, "value", conf, "is a sardis app configuration type")
+	erc.InvariantOk(ok, "value", conf, "is a sardis app configuration type")
 
-	fun.Invariant.IsTrue(conf != nil, "cannot return a nil configuration")
+	erc.InvariantOk(conf != nil, "cannot return a nil configuration")
 	return conf
 }
 
-func HasAppConfiguration(ctx context.Context) bool {
-	return ft.IsType[*Configuration](ctx.Value(confCtxKey))
+func HasAppConfiguration(ctx context.Context) (ok bool) {
+	_, ok = ctx.Value(confCtxKey).(*Configuration)
+	return
 }

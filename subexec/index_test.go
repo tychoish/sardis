@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/erc"
 )
 
 func TestTree(t *testing.T) {
@@ -16,7 +16,7 @@ func TestTree(t *testing.T) {
 	}
 
 	node := NewCommandTree(cmds)
-	t.Log(string(ft.Must(json.MarshalIndent(node, "", "     "))))
+	t.Log(string(erc.Must(json.MarshalIndent(node, "", "     "))))
 
 	notFound := node.FindCommand("category.group.name")
 	if notFound != nil {

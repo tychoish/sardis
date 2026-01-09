@@ -7,9 +7,9 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/srv"
+	"github.com/tychoish/fun/stw"
 )
 
 // Config describes the behavior of the Dispatcher.
@@ -36,9 +36,9 @@ type Dispatcher struct {
 	// NewDispatcher constructor creates a noop observer.
 	ErrorObserver adt.Atomic[func(error)]
 
-	middleware  adt.Map[Protocol, *pubsub.Deque[Middleware]]
-	interceptor adt.Map[Protocol, *pubsub.Deque[Interceptor]]
-	handlers    adt.Map[Protocol, Handler]
+	middleware  astw.Map[Protocol, *pubsub.Deque[Middleware]]
+	interceptor astw.Map[Protocol, *pubsub.Deque[Interceptor]]
+	handlers    astw.Map[Protocol, Handler]
 
 	isRunning    chan struct{}
 	orchestrator srv.Orchestrator
@@ -82,21 +82,21 @@ func NewDispatcher(conf Config) *Dispatcher {
 	})
 
 	r.middleware.Default.SetConstructor(func() *pubsub.Deque[Middleware] {
-		return ft.Must(pubsub.NewDeque[Middleware](pubsub.DequeOptions{Unlimited: true}))
+		return erc.Must(pubsub.NewDeque[Middleware](pubsub.DequeOptions{Unlimited: true}))
 	})
 
 	r.interceptor.Default.SetConstructor(func() *pubsub.Deque[Interceptor] {
-		return ft.Must(pubsub.NewDeque[Interceptor](pubsub.DequeOptions{Unlimited: true}))
+		return erc.Must(pubsub.NewDeque[Interceptor](pubsub.DequeOptions{Unlimited: true}))
 	})
 
 	// impossible for this to error, because the capacity is
 	// always greater than 1, and this will always vialidate
-	r.pipe = ft.Must(pubsub.NewDeque[Message](pubsub.DequeOptions{Capacity: conf.Workers}))
+	r.pipe = erc.Must(pubsub.NewDeque[Message](pubsub.DequeOptions{Capacity: conf.Workers}))
 
 	if r.conf.Buffer <= 0 {
 		r.outgoing = pubsub.NewUnlimitedQueue[Response]()
 	} else {
-		r.outgoing = ft.Must(pubsub.NewQueue[Response](pubsub.QueueOptions{
+		r.outgoing = erc.Must(pubsub.NewQueue[Response](pubsub.QueueOptions{
 			SoftQuota:   r.conf.Buffer,
 			HardLimit:   r.conf.Buffer + r.conf.Workers,
 			BurstCredit: float64(r.conf.Workers + 1),
@@ -135,7 +135,7 @@ func (r *Dispatcher) Service() *srv.Service { return r.orchestrator.Service() }
 // service is ready and running (or the context passed to the wait
 // function is canceled.)
 func (r *Dispatcher) Ready() fnx.Operation {
-	return fun.BlockingReceive(r.isRunning).Ignore
+	return stw.ChanBlockingReceive(r.isRunning).Ignore
 }
 
 func (r *Dispatcher) AddMiddleware(key Protocol, it Middleware) error {
@@ -147,11 +147,14 @@ func (r *Dispatcher) AddInterceptor(key Protocol, it Interceptor) error {
 }
 
 func (r *Dispatcher) RegisterHandler(key Protocol, hfn Handler) bool {
-	return !key.IsZero() && r.handlers.EnsureStore(key, hfn) // short circuit
+	return !key.IsZero() && r.handlers.Set(key, hfn) // short circuit
 }
 
 func (r *Dispatcher) OverrideHandler(key Protocol, hfn Handler) {
-	ft.CallWhen(!key.IsZero(), func() { r.handlers.Store(key, hfn) })
+	if key.IsZero() {
+		return
+	}
+	r.handlers.Store(key, hfn)
 }
 
 // Stream returns a channel that processes
@@ -365,7 +368,7 @@ func (r *Dispatcher) registerProcessResponseService() error {
 						r.broker.Publish(ctx, rr)
 						return ctx.Err()
 					},
-					fun.WorkerGroupConfNumWorkers(r.conf.Workers),
+					wpa.WorkerGroupConfNumWorkers(r.conf.Workers),
 				).Run(ctx)
 			}
 		},
@@ -404,7 +407,7 @@ func (r *Dispatcher) registerMiddlwareService() error {
 					}
 					return r.outgoing.Add(resp)
 				},
-				fun.WorkerGroupConfNumWorkers(r.conf.Workers),
+				wpa.WorkerGroupConfNumWorkers(r.conf.Workers),
 			).Run(ctx)
 		},
 	})

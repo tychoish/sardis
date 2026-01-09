@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"sync/atomic"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/pubsub"
+	"github.com/tychoish/fun/stw"
 )
 
 // DialerFunc constructs a new connection. These functions can be
@@ -45,8 +47,8 @@ type Router[T any] struct {
 	outgoing pubsub.Deque[Envelope]
 	peerPipe pubsub.Queue[T]
 
-	peers adt.Map[string, Connection]
-	store adt.Map[string, peer[T]]
+	peers astw.Map[string, Connection]
+	store astw.Map[string, peer[T]]
 
 	connErrorPeers pubsub.Deque[disconnectedPeer[T]]
 	wg             fnx.WaitGroup
@@ -204,7 +206,7 @@ func (r *Router[T]) AddPeer(opt T) error { return r.peerPipe.Add(opt) }
 
 func (r *Router[T]) Send(ep Envelope) error { return r.outgoing.PushBack(ep) }
 
-func (r *Router[T]) Stream(ctx context.Context) *fun.Stream[Envelope] {
+func (r *Router[T]) Stream(ctx context.Context) iter.Seq[Envelope] {
 	sub := r.incoming.Subscribe(ctx)
 	defer r.incoming.Unsubscribe(ctx, sub)
 	return fun.ChannelStream(sub)
@@ -219,7 +221,7 @@ func (r *Router[T]) Exec(ctx context.Context, ep Envelope) (Envelope, error) {
 		return Envelope{}, err
 	}
 
-	pipe := fun.Blocking(sub).Receive()
+	pipe := stw.ChanBlocking(sub).Receive()
 	for {
 		rsp, err := pipe.Read(ctx)
 		if err != nil {

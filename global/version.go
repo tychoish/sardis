@@ -7,7 +7,8 @@ package global
 import (
 	"time"
 
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/sardis/util"
 )
 
 // BuildRevision stores the commit in the git repository at build time
@@ -16,8 +17,8 @@ var buildRevision = ""
 
 var buildTimeString = ""
 
-func BuildRevision() string { return ft.Default(buildRevision, "<UNKNOWN>") }
+func BuildRevision() string { return util.Default(buildRevision, "<UNKNOWN>") }
 
 func BuildTime() time.Time {
-	return ft.IgnoreSecond(time.Parse(time.DateTime, buildTimeString))
+	return erc.Must(time.Parse(time.DateTime, buildTimeString))
 }

@@ -13,11 +13,11 @@ import (
 	"github.com/cheynewallace/tabby"
 	fzf "github.com/koki-develop/go-fzf"
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/itertool"
+	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
@@ -61,10 +61,10 @@ func SearchMenu() *cmdr.Commander {
 		),
 		"name", func(ctx context.Context, args *withConf[[]string]) error {
 			if args.conf.Settings.Runtime.WithAnnotations {
-				fun.Invariant.Ok(len(args.conf.Settings.Runtime.AnnotationSeparator) > 0,
+				erc.InvariantOk(len(args.conf.Settings.Runtime.AnnotationSeparator) > 0,
 					"annotation separator must be defined as something other than the empty string.")
 
-				fun.Invariant.Ok(args.conf.Settings.Runtime.AnnotationSeparator != "\n",
+				erc.InvariantOk(args.conf.Settings.Runtime.AnnotationSeparator != "\n",
 					"annotation separator must be defined as something other than a newline character.")
 
 				for idx, op := range args.arg {
@@ -102,7 +102,7 @@ func SearchMenu() *cmdr.Commander {
 
 			buf := bufio.NewWriter(os.Stdout)
 			for _, op := range ops {
-				ft.Ignore(ft.Must(fmt.Fprintln(buf, op)))
+				erc.Must(fmt.Fprintln(buf, op))
 			}
 
 			return buf.Flush()
@@ -115,11 +115,12 @@ func ExecCommand() *cmdr.Commander {
 		SetName("exec").
 		SetUsage("list or run a command"),
 		"command", func(ctx context.Context, args *withConf[string]) error {
-			st, err := itertool.Uniq(execpath.FindAll(ctx)).Slice(ctx)
+			st := irt.Collect(irt.Unique(execpath.FindAll(ctx)))
+			var err error
 
 			res, err := godmenu.Run(ctx,
 				godmenu.SetSelections(st),
-				godmenu.WithFlags(ft.Ptr(args.conf.Settings.DMenuFlags)),
+				godmenu.WithFlags(stw.Ptr(args.conf.Settings.DMenuFlags)),
 				godmenu.Prompt(fmt.Sprintf("%s exec ==>>", "sardis")),
 				godmenu.MenuLines(min(len(st), args.conf.Settings.DMenuFlags.Lines)),
 			)
@@ -156,11 +157,11 @@ func searchCommand() *cmdr.Commander {
 				cmd := searchTree.Command()
 
 				// hopefully logging for this all goes to standard err and not stdout 😬
-				if err := subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{cmd})); err != nil {
+				if err := subexec.RunCommands(ctx, stw.SliceRefs([]*subexec.Command{cmd})); err != nil {
 					return fmt.Errorf("problem running command %s, %w; missed running children %s", cmd.Name, err, prefix)
 				}
 			case searchTree.HasCommand():
-				return subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()}))
+				return subexec.RunCommands(ctx, stw.SliceRefs([]*subexec.Command{searchTree.Command()}))
 			case !searchTree.HasChidren():
 				return fmt.Errorf("no further selections at %q", prefix)
 			}
@@ -171,7 +172,7 @@ func searchCommand() *cmdr.Commander {
 
 			buf := bufio.NewWriter(os.Stdout)
 			for op := range slices.Values(options) {
-				ft.Ignore(ft.Must(fmt.Fprintln(buf, util.DotJoin(prefix, op))))
+				erc.Must(fmt.Fprintln(buf, util.DotJoin(prefix, op)))
 			}
 
 			return buf.Flush()
@@ -221,8 +222,15 @@ func fuzzy() *cmdr.Commander {
 
 					return err
 				case stage.Selections != nil:
-					pv := util.DotJoinParts(prompt.Slice())
-					idxs, err := ft.Must(fzf.New(
+					promptSlice := irt.Collect(func(yield func(string) bool) {
+						for elem := prompt.Front(); elem != nil; elem = elem.Next() {
+							if !yield(elem.Value()) {
+								return
+							}
+						}
+					})
+					pv := util.DotJoinParts(promptSlice)
+					idxs, err := erc.Must(fzf.New(
 						fzf.WithPrompt(fmt.Sprintf("%s =>> ", pv)),
 						fzf.WithNoLimit(true),
 						fzf.WithCaseSensitive(false),
@@ -264,17 +272,17 @@ func fuzzySearch() *cmdr.Commander {
 				case searchTree == nil:
 					return fmt.Errorf("no command found at level %d, ", ct)
 				case searchTree.HasCommand() && searchTree.HasChidren():
-					if err := subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()})); err != nil {
+					if err := subexec.RunCommands(ctx, stw.SliceRefs([]*subexec.Command{searchTree.Command()})); err != nil {
 						return err
 					}
 				case searchTree.HasCommand():
-					return subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()}))
+					return subexec.RunCommands(ctx, stw.SliceRefs([]*subexec.Command{searchTree.Command()}))
 				case !searchTree.HasChidren():
 					return fmt.Errorf("no further selections at level %d", ct)
 				}
 
 				selections := searchTree.KeysAtLevel()
-				selected, err := ft.Must(fzf.New(
+				selected, err := erc.Must(fzf.New(
 					fzf.WithPrompt(fmt.Sprintf("%s.%s ==> ", util.GetHostname(), global.ApplicationName)),
 					fzf.WithNoLimit(true),
 					fzf.WithCaseSensitive(false),
@@ -289,7 +297,7 @@ func fuzzySearch() *cmdr.Commander {
 				for _, sidx := range selected {
 					id := selections[sidx]
 					sn := searchTree.NarrowTo(id)
-					fun.Invariant.Ok(sn != nil, "cannot resolve nil nodes in the search")
+					erc.InvariantOk(sn != nil, "cannot resolve nil nodes in the search")
 
 					cmds = append(cmds, sn.Command())
 					nextSearch.Extend(sn.Children())
@@ -332,8 +340,8 @@ func DMenu() *cmdr.Commander {
 				case stage.Selections != nil:
 					selected, err = godmenu.Run(ctx,
 						godmenu.SetSelections(stage.Selections),
-						godmenu.WithFlags(ft.Ptr(args.conf.Settings.DMenuFlags)),
-						godmenu.Prompt(fmt.Sprintf("%s ==>>", ft.Default(stage.NextLabel, "sardis"))),
+						godmenu.WithFlags(stw.Ptr(args.conf.Settings.DMenuFlags)),
+						godmenu.Prompt(fmt.Sprintf("%s ==>>", util.Default(stage.NextLabel, "sardis"))),
 						godmenu.MenuLines(min(len(stage.Selections), args.conf.Settings.DMenuFlags.Lines)),
 					)
 
@@ -371,17 +379,31 @@ func dmenuSearch() *cmdr.Commander {
 			for {
 				switch {
 				case searchTree == nil:
-					return fmt.Errorf("no command found named %s []", util.DotJoin(path.Slice()...))
+					pathSlice := irt.Collect(func(yield func(string) bool) {
+						for elem := path.Front(); elem != nil; elem = elem.Next() {
+							if !yield(elem.Value()) {
+								return
+							}
+						}
+					})
+					return fmt.Errorf("no command found named %s []", util.DotJoin(pathSlice...))
 				case searchTree.HasCommand() && searchTree.HasChidren():
 					if path.Len() > 0 && searchTree.ID() == path.Back().Value() {
-						if err := subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()})); err != nil {
+						if err := subexec.RunCommands(ctx, stw.SliceRefs([]*subexec.Command{searchTree.Command()})); err != nil {
 							return err
 						}
 					}
 				case searchTree.HasCommand():
-					return subexec.RunCommands(ctx, dt.SliceRefs([]*subexec.Command{searchTree.Command()}))
+					return subexec.RunCommands(ctx, stw.SliceRefs([]*subexec.Command{searchTree.Command()}))
 				case !searchTree.HasChidren():
-					return fmt.Errorf("no further selections at %s", util.DotJoin(path.Slice()...))
+					pathSlice := irt.Collect(func(yield func(string) bool) {
+						for elem := path.Front(); elem != nil; elem = elem.Next() {
+							if !yield(elem.Value()) {
+								return
+							}
+						}
+					})
+					return fmt.Errorf("no further selections at %s", util.DotJoin(pathSlice...))
 				}
 
 				if path.Len() > 0 {
@@ -392,7 +414,7 @@ func dmenuSearch() *cmdr.Commander {
 				selected, err := godmenu.Run(ctx,
 					godmenu.Sorted(),
 					godmenu.SetSelections(selections),
-					godmenu.WithFlags(ft.Ptr(args.conf.Settings.DMenuFlags)),
+					godmenu.WithFlags(stw.Ptr(args.conf.Settings.DMenuFlags)),
 					godmenu.Prompt(fmt.Sprintf("%s =>>", prompt)),
 					godmenu.MenuLines(min(len(selections), args.conf.Settings.DMenuFlags.Lines)),
 				)
@@ -422,17 +444,19 @@ func listCommands() *cmdr.Commander {
 			SetUsage("prints all commands, group, and aliases."),
 		"group", func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf
-			set := dt.NewSetFromSlice(args.arg)
+			set := make(map[string]struct{})
+			for _, item := range args.arg {
+				set[item] = struct{}{}
+			}
 
 			groups := conf.Operations.ExportCommandGroups()
-			groupSet := &dt.Set[string]{}
-			groupSet.AppendStream(groups.Keys())
 
 			table := tabby.New()
 			table.AddHeader("Category", "Group", "Prefix", "Name")
 
 			for name, group := range groups {
-				if set.Len() == 0 || set.Check(name) {
+				_, inSet := set[name]
+				if len(set) == 0 || inSet {
 					for idx, cc := range group.Commands {
 						if idx == 0 {
 							table.AddLine(group.Category, group.Name, group.CmdNamePrefix, cc.Name)
@@ -477,7 +501,7 @@ func listCommandsPlain() *cmdr.Commander {
 				buf := bufio.NewWriter(os.Stdout)
 
 				for op := range ops {
-					ft.Ignore(ft.Must(fmt.Fprintln(buf, op)))
+					erc.Must(fmt.Fprintln(buf, op))
 				}
 
 				return buf.Flush()

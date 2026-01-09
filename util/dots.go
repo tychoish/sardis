@@ -4,8 +4,6 @@ import (
 	"iter"
 	"slices"
 	"strings"
-
-	"github.com/tychoish/fun/ft"
 )
 
 func DotJoin(elems ...string) string            { return DotJoinParts(elems) }
@@ -15,7 +13,12 @@ func DotSplitN(in string, n int) []string       { return strings.SplitN(in, ".",
 func IsZero[T comparable](i T) bool             { var z T; return i == z }
 func IsWhitespace(s string) bool                { return strings.TrimSpace(s) == "" }
 func MakeSparse[T comparable](in []T) (out []T) { return NilWhenEmpty(slices.DeleteFunc(in, IsZero)) }
-func NilWhenEmpty[T any](in []T) []T            { return ft.IfElse(len(in) > 0, in, nil) }
+func NilWhenEmpty[T any](in []T) []T {
+	if len(in) > 0 {
+		return in
+	}
+	return nil
+}
 
 func Narrow[T any](indexes []int, source []T) []T {
 	out := make([]T, 0, len(indexes))

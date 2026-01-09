@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/wpa"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
@@ -33,13 +33,17 @@ func fetchAur() *cmdr.Commander {
 		SetUsage("download source to build directory"),
 		nameFlagName, func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf.System.Arch
-			return fun.Convert(fnx.MakeConverter(func(name string) fnx.Worker {
-				return conf.FetchPackageFromAUR(name, true)
-			})).Stream(fun.SliceStream(args.arg)).Parallel(
-				func(ctx context.Context, op fnx.Worker) error { return op(ctx) },
-				fun.WorkerGroupConfContinueOnError(),
-				fun.WorkerGroupConfWorkerPerCPU(),
-			).Run(ctx)
+			workers := func(yield func(fnx.Worker) bool) {
+				for _, name := range args.arg {
+					if !yield(conf.FetchPackageFromAUR(name, true)) {
+						return
+					}
+				}
+			}
+			return wpa.RunWithPool(workers,
+				wpa.WorkerGroupConfContinueOnError(),
+				wpa.WorkerGroupConfWorkerPerCPU(),
+			)(ctx)
 		})
 }
 
@@ -49,14 +53,17 @@ func buildPkg() *cmdr.Commander {
 		SetUsage("build a package"),
 		nameFlagName, func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf.System.Arch
-
-			return fun.Convert(fnx.MakeConverter(func(name string) fnx.Worker {
-				return conf.BuildPackageInABS(name)
-			})).Stream(fun.SliceStream(args.arg)).Parallel(
-				func(ctx context.Context, op fnx.Worker) error { return op(ctx) },
-				fun.WorkerGroupConfContinueOnError(),
-				fun.WorkerGroupConfWorkerPerCPU(),
-			).Run(ctx)
+			workers := func(yield func(fnx.Worker) bool) {
+				for _, name := range args.arg {
+					if !yield(conf.BuildPackageInABS(name)) {
+						return
+					}
+				}
+			}
+			return wpa.RunWithPool(workers,
+				wpa.WorkerGroupConfContinueOnError(),
+				wpa.WorkerGroupConfWorkerPerCPU(),
+			)(ctx)
 		})
 }
 
@@ -66,14 +73,17 @@ func installAur() *cmdr.Commander {
 		SetUsage("fetch AUR package to the ABS directory, and install it"),
 		nameFlagName, func(ctx context.Context, args *withConf[[]string]) error {
 			conf := args.conf.System.Arch
-
-			return fun.Convert(fnx.MakeConverter(func(name string) fnx.Worker {
-				return conf.FetchPackageFromAUR(name, true).Join(conf.BuildPackageInABS(name))
-			})).Stream(fun.SliceStream(args.arg)).Parallel(
-				func(ctx context.Context, op fnx.Worker) error { return op(ctx) },
-				fun.WorkerGroupConfContinueOnError(),
-				fun.WorkerGroupConfWorkerPerCPU(),
-			).Run(ctx)
+			workers := func(yield func(fnx.Worker) bool) {
+				for _, name := range args.arg {
+					if !yield(conf.FetchPackageFromAUR(name, true).Join(conf.BuildPackageInABS(name))) {
+						return
+					}
+				}
+			}
+			return wpa.RunWithPool(workers,
+				wpa.WorkerGroupConfContinueOnError(),
+				wpa.WorkerGroupConfWorkerPerCPU(),
+			)(ctx)
 		})
 }
 
@@ -111,7 +121,14 @@ func setupArchLinux() *cmdr.Commander {
 
 			}
 
-			fun.MAKE.WorkerPool(wpq.StreamFront()).Operation(ec.Push).Run(ctx)
+			workers := func(yield func(fnx.Worker) bool) {
+				for elem := wpq.Front(); elem != nil; elem = elem.Next() {
+					if !yield(elem.Value()) {
+						return
+					}
+				}
+			}
+			ec.Push(wpa.RunWithPool(workers)(ctx))
 
 			return ec.Resolve()
 		}).Add)

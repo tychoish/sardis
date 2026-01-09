@@ -7,11 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -122,8 +121,8 @@ func (conf *SystemdService) Worker() fnx.Worker {
 	}
 }
 
-func (conf *SystemdConfiguration) TaskGroups() dt.Slice[subexec.Group] {
-	groups := make(dt.Slice[subexec.Group], 0, len(conf.Services))
+func (conf *SystemdConfiguration) TaskGroups() stw.Slice[subexec.Group] {
+	groups := make(stw.Slice[subexec.Group], 0, len(conf.Services))
 	for idx, service := range conf.Services {
 		var command string
 		var opString string
@@ -138,7 +137,7 @@ func (conf *SystemdConfiguration) TaskGroups() dt.Slice[subexec.Group] {
 		groups.Push(subexec.Group{
 			Category:      "systemd",
 			Name:          service.Name,
-			Notify:        ft.Ptr(true),
+			Notify:        stw.Ptr(true),
 			Synthetic:     true,
 			CmdNamePrefix: opString,
 			Command:       fmt.Sprint(command, " {{name}} ", service.Unit),

@@ -1,16 +1,14 @@
 package repo
 
 import (
-	"context"
-
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
+	"github.com/tychoish/fun/wpa"
 	"github.com/tychoish/sardis/subexec"
 )
 
-func (conf *Configuration) ConcreteTaskGroups() dt.Slice[subexec.Group] {
+func (conf *Configuration) ConcreteTaskGroups() stw.Slice[subexec.Group] {
 	pull := subexec.Group{
 		Category:  "repo",
 		Name:      "pull",
@@ -37,7 +35,7 @@ func (conf *Configuration) ConcreteTaskGroups() dt.Slice[subexec.Group] {
 		pull.Commands = append(pull.Commands, subexec.Command{
 			Name:             repo.Name,
 			WorkerDefinition: repo.FetchJob(),
-			Notify:           ft.Ptr(repo.Notify),
+			Notify:           stw.Ptr(repo.Notify),
 			SortHint:         -4,
 		})
 
@@ -45,7 +43,7 @@ func (conf *Configuration) ConcreteTaskGroups() dt.Slice[subexec.Group] {
 			update.Commands = append(update.Commands, subexec.Command{
 				Name:             repo.Name,
 				WorkerDefinition: repo.UpdateJob(),
-				Notify:           ft.Ptr(repo.Notify),
+				Notify:           stw.Ptr(repo.Notify),
 				SortHint:         16,
 			})
 		}
@@ -65,12 +63,12 @@ func (conf *Configuration) ConcreteTaskGroups() dt.Slice[subexec.Group] {
 	return []subexec.Group{update, pull}
 }
 
-func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
+func (conf *Configuration) SyntheticTaskGroups() stw.Slice[subexec.Group] {
 	pull := subexec.Group{
 		Category:      "repo",
 		Name:          "pull",
 		CmdNamePrefix: "tag",
-		Notify:        ft.Ptr(true),
+		Notify:        stw.Ptr(true),
 		Synthetic:     true,
 		SortHint:      -4,
 	}
@@ -79,7 +77,7 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 		Category:      "repo",
 		Name:          "update",
 		CmdNamePrefix: "tag",
-		Notify:        ft.Ptr(true),
+		Notify:        stw.Ptr(true),
 		Synthetic:     true,
 		SortHint:      16,
 	}
@@ -100,7 +98,7 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 			continue
 		}
 
-		batch := dt.Slice[GitRepository]{}
+		batch := stw.Slice[GitRepository]{}
 
 		for _, name := range repos {
 			repo, ok := conf.caches.lookup[name]
@@ -114,29 +112,31 @@ func (conf *Configuration) SyntheticTaskGroups() dt.Slice[subexec.Group] {
 		pull.Commands = append(pull.Commands, subexec.Command{
 			Name:     tag,
 			SortHint: -4,
-			WorkerDefinition: func(ctx context.Context) error {
-				return fun.Convert(fnx.MakeConverter(func(r GitRepository) fnx.Worker {
-					return r.FetchJob()
-				})).Stream(batch.Stream()).Parallel(
-					func(ctx context.Context, op fnx.Worker) error { return op(ctx) },
-					fun.WorkerGroupConfContinueOnError(),
-					fun.WorkerGroupConfWorkerPerCPU(),
-				).Run(ctx)
-			},
+			WorkerDefinition: wpa.RunWithPool(
+				irt.Convert(
+					irt.Slice(batch),
+					func(r GitRepository) fnx.Worker {
+						return r.FetchJob()
+					},
+				),
+				wpa.WorkerGroupConfContinueOnError(),
+				wpa.WorkerGroupConfWorkerPerCPU(),
+			),
 		})
 
 		update.Commands = append(update.Commands, subexec.Command{
 			Name:     tag,
 			SortHint: 8,
-			WorkerDefinition: func(ctx context.Context) error {
-				return fun.Convert(fnx.MakeConverter(func(r GitRepository) fnx.Worker {
-					return r.UpdateJob()
-				})).Stream(batch.Stream()).Parallel(
-					func(ctx context.Context, op fnx.Worker) error { return op(ctx) },
-					fun.WorkerGroupConfContinueOnError(),
-					fun.WorkerGroupConfWorkerPerCPU(),
-				).Run(ctx)
-			},
+			WorkerDefinition: wpa.RunWithPool(
+				irt.Convert(
+					irt.Slice(batch),
+					func(r GitRepository) fnx.Worker {
+						return r.UpdateJob()
+					},
+				),
+				wpa.WorkerGroupConfContinueOnError(),
+				wpa.WorkerGroupConfWorkerPerCPU(),
+			),
 		})
 	}
 

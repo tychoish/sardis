@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/sardis/util"
 )
 
@@ -49,9 +50,13 @@ func (conf *Configuration) ResolveCommands(args []string) (*CommandListStage, er
 	switch len(args) {
 	case 0:
 		cmds := conf.ExportAllCommands()
-		cmds.ReadAll(func(c Command) {
-			output.Selections = append(output.Selections, c.NamePrime())
-		})
+		slices.AppendSeq(
+			output.Selections,
+			irt.Convert(
+				irt.Slice(cmds),
+				func(cmd Command) string { return cmd.NamePrime() },
+			),
+		)
 		return &output, nil
 	case 1:
 		selection := args[0]
@@ -69,11 +74,14 @@ func (conf *Configuration) ResolveCommands(args []string) (*CommandListStage, er
 				output.NextLabel = selection
 				output.Prefix = selection
 
-				gr.Commands.ReadAll(func(c Command) {
-					np := c.NamePrime()
-					output.Selections = append(output.Selections, np)
-					output.Prefixed = append(output.Prefixed, util.DotJoin(selection, np))
-				})
+				irt.Apply(
+					irt.Slice(gr.Commands),
+					func(c Command) {
+						np := c.NamePrime()
+						output.Selections = append(output.Selections, np)
+						output.Prefixed = append(output.Prefixed, util.DotJoin(selection, np))
+					},
+				)
 
 				return &output, nil
 			}
@@ -105,7 +113,7 @@ func (conf *Configuration) ResolveCommands(args []string) (*CommandListStage, er
 			case len(missing) > 0 && len(groups) > 0:
 				return nil, fmt.Errorf("ambiguous operation, cannot mix groups %s and commands %s", groups, missing)
 			case len(groups) > 0:
-				ops := dt.NewSetFromSlice(args)
+				ops := dt.MakeSet(irt.Slice(args))
 				if ops.Len() != len(args) {
 					return nil, fmt.Errorf("invalid list of groups %d vs %d %s", ops.Len(), len(args), args)
 				}

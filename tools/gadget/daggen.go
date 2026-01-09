@@ -6,19 +6,20 @@ import (
 	"fmt"
 	"go/types"
 	"io"
+	"iter"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
 	"gopkg.in/yaml.v3"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/itertool"
+	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/send"
@@ -64,7 +65,7 @@ func (p Packages) IndexByLocalDirectory() map[string]PackageInfo {
 	return out
 }
 
-func (p Packages) IndexByPackageName() dt.Map[string, PackageInfo] {
+func (p Packages) IndexByPackageName() stw.Map[string, PackageInfo] {
 	out := make(map[string]PackageInfo, len(p))
 	for idx := range p {
 		info := p[idx]
@@ -73,25 +74,33 @@ func (p Packages) IndexByPackageName() dt.Map[string, PackageInfo] {
 	return out
 }
 
-func (p Packages) ConvertPathsToPackages(iter *fun.Stream[string]) *fun.Stream[string] {
+func (p Packages) ConvertPathsToPackages(iter iter.Seq[string]) iter.Seq[string] {
 	index := p.IndexByLocalDirectory()
-	return fun.Convert(fnx.MakeConverter(func(path string) string {
-		return index[path].PackageName
-	})).Stream(iter)
+	return func(yield func(string) bool) {
+		for path := range iter {
+			if !yield(index[path].PackageName) {
+				return
+			}
+		}
+	}
 }
 
-func (p Packages) ConvertPackagesToPaths(iter *fun.Stream[string]) *fun.Stream[string] {
+func (p Packages) ConvertPackagesToPaths(iter iter.Seq[string]) iter.Seq[string] {
 	index := p.IndexByPackageName()
-	return fun.Convert(fnx.MakeConverter(func(path string) string {
-		return index[path].LocalDirectory
-	})).Stream(iter)
+	return func(yield func(string) bool) {
+		for path := range iter {
+			if !yield(index[path].LocalDirectory) {
+				return
+			}
+		}
+	}
 }
 
-func (p Packages) Graph() *dt.Pairs[string, []string] {
-	mp := &dt.Pairs[string, []string]{}
+func (p Packages) Graph() *dt.List[irt.KV[string, []string]] {
+	mp := &dt.List[irt.KV[string, []string]]{}
 
 	for idx := range p {
-		mp.Add(p[idx].PackageName, p[idx].Dependencies)
+		mp.PushBack(irt.MakeKV(p[idx].PackageName, p[idx].Dependencies))
 	}
 
 	// sort.SliceStable(mp, func(i, j int) bool {
@@ -134,7 +143,7 @@ func (info PackageInfo) String() string {
 
 	enc := yaml.NewEncoder(buf)
 	enc.SetIndent(5)
-	fun.Invariant.Must(enc.Encode(info))
+	erc.Invariant(enc.Encode(info))
 
 	return buf.String()
 }
@@ -166,9 +175,9 @@ func Collect(ctx context.Context, path string) (*Module, error) {
 
 	sort.Slice(files, func(i, j int) bool { return files[i].PkgPath < files[j].PkgPath })
 
-	seen := &dt.Map[string, PackageInfo]{}
+	seen := &stw.Map[string, PackageInfo]{}
 	for _, f := range files {
-		fun.Invariant.Ok(f.Module != nil, "should always collect module information")
+		erc.InvariantOk(f.Module != nil, "should always collect module information")
 
 		info := PackageInfo{
 			PackageName:    f.PkgPath,
@@ -177,42 +186,49 @@ func Collect(ctx context.Context, path string) (*Module, error) {
 		}
 
 		pkgIter := filterLocal(f.Module.Path, f.Types.Imports())
-		for pkgIter.Next(ctx) {
-			pkg := pkgIter.Value()
+		for pkg := range pkgIter {
 			pkgs := &dt.Set[string]{}
 
 			depPkgIter := filterLocal(f.Module.Path, pkg.Imports())
 
-			for depPkgIter.Next(ctx) {
-				dpkg := depPkgIter.Value()
-				pkgs.AppendStream(fun.Convert(fnx.MakeConverter(func(p *types.Package) string { return p.Path() })).Stream(filterLocal(f.Module.Path, dpkg.Imports())))
+			for dpkg := range depPkgIter {
+				pkgs.Extend(
+					irt.Convert(
+						filterLocal(f.Module.Path, dpkg.Imports()),
+						func(p *types.Package) string { return p.Path() },
+					),
+				)
 			}
 
-			info.Dependencies = ft.Must(pkgs.Stream().Slice(ctx))
+			info.Dependencies = irt.Collect(pkgs.Iterator())
 			sort.Strings(info.Dependencies)
 		}
 		if seen.Check(info.PackageName) {
 			prev := seen.Get(info.PackageName)
-			prev.Dependencies = ft.Must(itertool.Uniq(fun.SliceStream(append(prev.Dependencies, info.Dependencies...))).Slice(ctx))
+			prev.Dependencies = irt.Collect(irt.Unique(irt.Slice(append(prev.Dependencies, info.Dependencies...))))
 			info = prev
 		}
 
-		seen.Add(info.PackageName, info)
+		seen.Store(info.PackageName, info)
 	}
 
 	if seen.Len() == 0 {
 		return nil, fmt.Errorf("no packages for %q", path)
 	}
 
-	if out.Packages, err = seen.Values().Slice(ctx); err != nil {
-		return nil, err
-	}
+	out.Packages = irt.Collect(seen.Values())
 
 	return out, nil
 }
 
-func filterLocal(path string, imports []*types.Package) *fun.Stream[*types.Package] {
-	return fun.SliceStream(imports).Filter(func(p *types.Package) bool {
-		return strings.HasPrefix(p.Path(), path)
-	})
+func filterLocal(path string, imports []*types.Package) iter.Seq[*types.Package] {
+	return func(yield func(*types.Package) bool) {
+		for p := range slices.Values(imports) {
+			if strings.HasPrefix(p.Path(), path) {
+				if !yield(p) {
+					return
+				}
+			}
+		}
+	}
 }

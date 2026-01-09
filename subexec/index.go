@@ -9,14 +9,15 @@ import (
 	"slices"
 
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/sardis/util"
 )
 
 type Node struct {
 	word     string
 	command  *Command
-	children dt.Map[string, *Node]
+	children stw.Map[string, *Node]
 }
 
 func NewCommandTree(commands []Command) *Node {
@@ -64,7 +65,7 @@ func (n *Node) ID() string                { return n.word }
 
 func (n *Node) MarshalJSON() ([]byte, error) {
 	out := bytes.Buffer{}
-	fmt.Fprintf(&out, `{"word":"%s","has_command":%t,"tree":%s}`, n.word, n.command != nil, string(ft.Must(json.Marshal(n.children))))
+	fmt.Fprintf(&out, `{"word":"%s","has_command":%t,"tree":%s}`, n.word, n.command != nil, string(erc.Must(json.Marshal(n.children))))
 	return out.Bytes(), nil
 }
 
@@ -135,7 +136,7 @@ func (n *Node) Resolve() iter.Seq[Command] {
 	return func(yield func(Command) bool) {
 		for elem := queue.PopFront(); elem.Ok(); elem = queue.PopFront() {
 			node := elem.Value()
-			if node.command != nil && !yield(ft.Ref(node.command)) {
+			if node.command != nil && !yield(stw.Deref(node.command)) {
 				return
 			}
 			for k := range node.children {

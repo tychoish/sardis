@@ -5,22 +5,21 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"runtime"
 	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/libfun"
 	"github.com/tychoish/sardis/util"
 )
 
-var fileCache = &adt.Map[string, []byte]{}
+var fileCache = &stw.Map[string, []byte]{}
 
-func PopulateCache(ctx context.Context, root string) error {
+func PopulateCache(ctx context.Context, root string) (err error) {
 	start := time.Now()
 	initSize := fileCache.Len()
 	var (
@@ -29,8 +28,9 @@ func PopulateCache(ctx context.Context, root string) error {
 		countFilesChecked    = &atomic.Int64{}
 		countFilesRead       = &atomic.Int64{}
 	)
-
-	goFilesIter := libfun.WalkDirIterator(root, func(path string, d fs.DirEntry) (*string, error) {
+	ec := &erc.Collector{}
+	defer func() { err = ec.Resolve() }()
+	goFilesIter, closer := libfun.WalkDirIterator(root, func(path string, d fs.DirEntry) (*string, error) {
 		countFilesConsidered.Add(1)
 		if d.IsDir() && d.Name() == ".git" {
 			return nil, fs.SkipDir
@@ -43,6 +43,7 @@ func PopulateCache(ctx context.Context, root string) error {
 		return &path, nil
 	})
 	defer func() {
+		ec.Push(closer())
 		nowSize := fileCache.Len()
 		grip.Info(message.Fields{
 			"path":             root,
@@ -55,10 +56,10 @@ func PopulateCache(ctx context.Context, root string) error {
 			"files_read":       countFilesRead.Load(),
 		})
 	}()
-	return goFilesIter.Parallel(func(ctx context.Context, path string) error {
+	for path := range goFilesIter {
 		countFilesChecked.Add(1)
 		if fileCache.Check(path) {
-			return nil
+			continue
 		}
 		f, err := os.Open(path)
 		if err != nil {
@@ -72,6 +73,6 @@ func PopulateCache(ctx context.Context, root string) error {
 		}
 		countFilesRead.Add(1)
 		fileCache.Store(path, data)
-		return nil
-	}, fun.WorkerGroupConfSet(&fun.WorkerGroupConf{NumWorkers: runtime.NumCPU(), ContinueOnError: true})).Run(ctx)
+	}
+	return nil
 }

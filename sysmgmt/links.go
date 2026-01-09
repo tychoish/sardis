@@ -9,11 +9,10 @@ import (
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -46,8 +45,8 @@ type LinkDefinition struct {
 	TargetExists bool `bson:"target_exists,omitempty" json:"target_exists,omitempty" yaml:"target_exists,omitempty"`
 }
 
-func (conf *LinkConfiguration) Resolve() dt.Map[string, LinkDefinition] {
-	out := dt.NewMap(make(map[string]LinkDefinition, len(conf.Links)))
+func (conf *LinkConfiguration) Resolve() stw.Map[string, LinkDefinition] {
+	out := stw.Map[string, LinkDefinition](make(map[string]LinkDefinition, len(conf.Links)))
 	for link := range slices.Values(conf.Links) {
 		out.Store(link.Path, link)
 	}
@@ -65,7 +64,9 @@ func (conf *LinkConfiguration) Validate() error {
 	for idx := range conf.Links {
 		ec.Wrapf(conf.Links[idx].Validate(), "%d/%d of %T is not valid", idx, len(conf.Links), conf.Links[idx])
 	}
-	conf.Discovery = ft.DefaultNew(conf.Discovery)
+	if conf.Discovery == nil {
+		conf.Discovery = new(LinkDiscovery)
+	}
 	ec.Push(conf.Discovery.Validate())
 
 	return ec.Resolve()

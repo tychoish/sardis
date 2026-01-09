@@ -12,9 +12,8 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -88,9 +87,16 @@ func repoUpdate() *cmdr.Commander {
 		"repo", func(ctx context.Context, args *withConf[[]string]) error {
 			ct := &atomic.Int64{}
 
-			repos := args.conf.Repos.FindAll(args.arg...).Stream()
+			repos := args.conf.Repos.FindAll(args.arg...)
 
-			jobs := fun.Convert(fnx.MakeConverter(func(rc repo.GitRepository) fnx.Worker { ct.Add(1); return rc.UpdateJob() })).Stream(repos)
+			jobs := func(yield func(fnx.Worker) bool) {
+				for _, rc := range repos {
+					ct.Add(1)
+					if !yield(rc.UpdateJob()) {
+						return
+					}
+				}
+			}
 
 			err := subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 			switch {
@@ -112,11 +118,18 @@ func repoCleanup() *cmdr.Commander {
 			Aliases("cleanup").
 			SetUsage("run repository cleanup"),
 		"repo", func(ctx context.Context, args *withConf[[]string]) error {
-			repos := args.conf.Repos.FindAll(args.arg...).Stream()
+			repos := args.conf.Repos.FindAll(args.arg...)
 
 			ct := &atomic.Int64{}
 
-			jobs := fun.Convert(fnx.MakeConverter(func(rc repo.GitRepository) fnx.Worker { ct.Add(1); return rc.CleanupJob() })).Stream(repos)
+			jobs := func(yield func(fnx.Worker) bool) {
+				for _, rc := range repos {
+					ct.Add(1)
+					if !yield(rc.CleanupJob()) {
+						return
+					}
+				}
+			}
 
 			err := subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 			switch {
@@ -137,21 +150,23 @@ func repoClone() *cmdr.Commander {
 			SetName("clone").
 			SetUsage("clone a repository or all matching repositories"),
 		"repo", func(ctx context.Context, args *withConf[[]string]) error {
-			repos := args.conf.Repos.FindAll(args.arg...).Stream()
+			repos := args.conf.Repos.FindAll(args.arg...)
 
-			missingRepos := repos.Filter(func(rc repo.GitRepository) bool {
-				if _, err := os.Stat(rc.Path); os.IsNotExist(err) {
-					return true
+			jobs := func(yield func(fnx.Worker) bool) {
+				for _, rc := range repos {
+					if _, err := os.Stat(rc.Path); os.IsNotExist(err) {
+						if !yield(rc.CloneJob()) {
+							return
+						}
+					} else {
+						grip.Warning(message.Fields{
+							"path":    rc.Path,
+							"op":      "clone",
+							"outcome": "skipping",
+						})
+					}
 				}
-				grip.Warning(message.Fields{
-					"path":    rc.Path,
-					"op":      "clone",
-					"outcome": "skipping",
-				})
-				return false
-			})
-
-			jobs := fun.Convert(fnx.MakeConverter(func(rc repo.GitRepository) fnx.Worker { return rc.CloneJob() })).Stream(missingRepos)
+			}
 
 			return subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 		})
@@ -176,11 +191,18 @@ func repoStatus() *cmdr.Commander {
 			SetName("status").
 			SetUsage("report on the status of repos"),
 		"repo", func(ctx context.Context, args *withConf[[]string]) error {
-			repos := args.conf.Repos.FindAll(args.arg...).Stream()
+			repos := args.conf.Repos.FindAll(args.arg...)
 
 			ct := &atomic.Int64{}
 
-			jobs := fun.Convert(fnx.MakeConverter(func(rc repo.GitRepository) fnx.Worker { ct.Add(1); return rc.StatusJob() })).Stream(repos)
+			jobs := func(yield func(fnx.Worker) bool) {
+				for _, rc := range repos {
+					ct.Add(1)
+					if !yield(rc.StatusJob()) {
+						return
+					}
+				}
+			}
 
 			err := subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 			switch {
@@ -201,11 +223,19 @@ func repoFetch() *cmdr.Commander {
 			SetName("fetch").
 			SetUsage("fetch one or more repos"),
 		"repo", func(ctx context.Context, args *withConf[[]string]) error {
-			repos := args.conf.Repos.FindAll(args.arg...).Stream().
-				Filter(func(repo repo.GitRepository) bool { return repo.Fetch })
+			repos := args.conf.Repos.FindAll(args.arg...)
 
 			ct := &atomic.Int64{}
-			jobs := fun.Convert(fnx.MakeConverter(func(rc repo.GitRepository) fnx.Worker { ct.Add(1); return rc.FetchJob() })).Stream(repos)
+			jobs := func(yield func(fnx.Worker) bool) {
+				for _, rc := range repos {
+					if rc.Fetch {
+						ct.Add(1)
+						if !yield(rc.FetchJob()) {
+							return
+						}
+					}
+				}
+			}
 
 			err := subexec.TOOLS.WorkerPool(jobs).Run(ctx)
 			switch {
@@ -232,7 +262,7 @@ func repoGithubClone() *cmdr.Commander {
 				SetName("repo", "r").
 				SetUsage("name of repository").
 				Flag(),
-			cmdr.FlagBuilder(ft.Must(os.Getwd())).
+			cmdr.FlagBuilder(erc.Must(os.Getwd())).
 				SetName("path", "p").
 				SetUsage("path to clone repo to, defaults to pwd").
 				Flag(),

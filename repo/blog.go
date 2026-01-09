@@ -5,7 +5,7 @@ import (
 
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/sardis/util"
 )
 
 type Project struct {
@@ -28,8 +28,8 @@ func (conf *Configuration) projectsValidate() error {
 			continue
 		}
 
-		bc.Name = ft.Default(bc.Name, bc.RepoName)
-		bc.RepoName = ft.Default(bc.RepoName, bc.Name)
+		bc.Name = util.Default(bc.Name, bc.RepoName)
+		bc.RepoName = util.Default(bc.RepoName, bc.Name)
 
 		ec.Whenf(set.Check(bc.Name), "blog named %q(%d) has a duplicate blog configured", bc.Name, idx)
 		ec.Whenf(set.Check(bc.RepoName), "blog with repo %s (named %s(%d)) has a duplicate name", bc.RepoName, bc.Name, idx)

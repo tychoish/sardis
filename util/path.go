@@ -9,13 +9,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/erc"
 	jutil "github.com/tychoish/jasper/util"
 )
 
-func FileExists(path string) bool { return ft.Not(os.IsNotExist(ft.IgnoreFirst(os.Stat(path)))) }
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}
 
 func Apply[T any](fn func(T) T, in []T) []T {
 	out := make([]T, len(in))
@@ -45,23 +46,6 @@ func TryExpandHomeDir(in string) string {
 	return filepath.Join(GetHomeDir(), in[1:])
 }
 
-func GetDirectoryContents(path string) (*fun.Stream[string], error) {
-	dir, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	return fun.MakeStream(fnx.MakeFuture(func() (string, error) {
-		dir, err := dir.ReadDir(1)
-		if err != nil {
-			return "", err
-		}
-
-		fun.Invariant.Ok(len(dir) == 1, "impossible return value from ReadDir")
-
-		return filepath.Join(path, dir[0].Name()), nil
-	})), nil
-}
-
 func TryCollapseHomeDir(in string) string {
 	hd := jutil.GetHomedir()
 	if strings.HasPrefix(in, hd) {
@@ -71,8 +55,8 @@ func TryCollapseHomeDir(in string) string {
 }
 
 func TryCollapsePwd(in string) string {
-	dir := ft.Must(filepath.Abs(jutil.TryExpandHomedir(in)))
-	cwd := ft.Must(os.Getwd())
+	dir := erc.Must(filepath.Abs(jutil.TryExpandHomedir(in)))
+	cwd := erc.Must(os.Getwd())
 
 	if strings.HasPrefix(dir, cwd) {
 		return strings.Replace(dir, cwd, ".", 1)

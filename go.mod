@@ -14,21 +14,21 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nwidger/jsoncolor v0.3.2
 	github.com/shirou/gopsutil v3.21.11+incompatible
-	github.com/tychoish/birch v0.3.1
-	github.com/tychoish/cmdr v0.4.1
-	github.com/tychoish/fun v0.13.1
+	github.com/tychoish/birch v0.3.2-0.20260108164004-e93907509812
+	github.com/tychoish/cmdr v0.4.2-0.20260108194140-61156ed74a6f
+	github.com/tychoish/fun v0.14.0
 	github.com/tychoish/godmenu v0.2.2
-	github.com/tychoish/grip v0.4.1
+	github.com/tychoish/grip v0.4.2
 	github.com/tychoish/grip/x/desktop v0.0.0-20250626175245-f5276066a1e9
-	github.com/tychoish/grip/x/jira v0.0.0-20250626173215-d516ec138ab2
-	github.com/tychoish/grip/x/system v0.0.0-20250626175245-f5276066a1e9
-	github.com/tychoish/grip/x/telegram v0.0.0-20251029084153-b8853b7f1aae
-	github.com/tychoish/grip/x/twitter v0.0.0-20250626175245-f5276066a1e9
-	github.com/tychoish/grip/x/xmpp v0.0.0-20250626175245-f5276066a1e9
-	github.com/tychoish/jasper v0.1.3
+	github.com/tychoish/grip/x/jira v0.0.0-00010101000000-000000000000
+	github.com/tychoish/grip/x/system v0.0.0-00010101000000-000000000000
+	github.com/tychoish/grip/x/telegram v0.0.0-00010101000000-000000000000
+	github.com/tychoish/grip/x/twitter v0.0.0-00010101000000-000000000000
+	github.com/tychoish/grip/x/xmpp v0.0.0-00010101000000-000000000000
+	github.com/tychoish/jasper v0.1.4-0.20260108191640-545b863110d2
 	github.com/tychoish/jasper/x/cli v0.0.0-20251029030949-6c07b06c1b1d
 	github.com/tychoish/jasper/x/track v0.0.0-20251029030949-6c07b06c1b1d
-	github.com/tychoish/libfun v0.0.0-20251101202106-a92b84c51255
+	github.com/tychoish/libfun v0.0.0-20260109032353-4c5c5f8c4048
 	github.com/urfave/cli/v2 v2.27.7
 	go.mongodb.org/mongo-driver v1.11.6
 	golang.org/x/tools v0.36.0
@@ -36,13 +36,45 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+replace github.com/tychoish/fun => ../fun/
+
+replace github.com/tychoish/grip => ../grip/
+
+replace github.com/tychoish/birch => ../birch/
+
+replace github.com/tychoish/birch/x/ftdc => ../birch/x/ftdc/
+
+replace github.com/tychoish/birch/x/mrpc => ../birch/x/mrpc/
+
+replace github.com/tychoish/grip/x/desktop => ../grip/x/desktop
+
+replace github.com/tychoish/grip/x/jira => ../grip/x/jira
+
+replace github.com/tychoish/grip/x/system => ../grip/x/system
+
+replace github.com/tychoish/grip/x/telegram => ../grip/x/telegram
+
+replace github.com/tychoish/grip/x/twitter => ../grip/x/twitter
+
+replace github.com/tychoish/grip/x/xmpp => ../grip/x/xmpp
+
+replace github.com/tychoish/jasper => ../jasper
+
+replace github.com/tychoish/jasper/x/cli => ../jasper/x/cli
+
+replace github.com/tychoish/jasper/x/remote => ../jasper/x/remote
+
+replace github.com/tychoish/jasper/x/track => ../jasper/x/track
+
+replace github.com/tychoish/libfun => ../libfun
+
 require (
 	git.sr.ht/~jackmordaunt/go-toast v1.1.2 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20230217124315-7d5c6f04bbb8 // indirect
-	github.com/andygrunwald/go-jira v1.16.0 // indirect
+	github.com/andygrunwald/go-jira v1.15.1 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/charmbracelet/bubbles v0.16.1 // indirect
 	github.com/charmbracelet/bubbletea v0.24.2 // indirect
 	github.com/charmbracelet/lipgloss v0.7.1 // indirect
@@ -51,9 +83,9 @@ require (
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
 	github.com/coreos/go-systemd/v22 v22.6.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
-	github.com/dghubble/go-twitter v0.0.0-20221104224141-912508c3888b // indirect
-	github.com/dghubble/oauth1 v0.7.3 // indirect
-	github.com/dghubble/sling v1.4.2 // indirect
+	github.com/dghubble/go-twitter v0.0.0-20220626024101-68c0170dc641 // indirect
+	github.com/dghubble/oauth1 v0.7.1 // indirect
+	github.com/dghubble/sling v1.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
@@ -108,10 +140,10 @@ require (
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
-	github.com/tychoish/birch/x/ftdc v0.0.0-20251029024444-91e948b0e397 // indirect
+	github.com/tychoish/birch/x/ftdc v0.0.0-20260108164004-e93907509812 // indirect
 	github.com/tychoish/birch/x/mrpc v0.0.0-20250610225000-f5dba0d9b062 // indirect
 	github.com/tychoish/gimlet v0.0.0-20251028182000-6a35909ebafc // indirect
-	github.com/tychoish/grip/x/metrics v0.0.0-20251029025449-1ae82bef74a7 // indirect
+	github.com/tychoish/grip/x/metrics v0.0.0-20260108164604-8e807edbbafb // indirect
 	github.com/tychoish/grip/x/splunk v0.0.0-20250608160243-37fab929fbd2 // indirect
 	github.com/tychoish/jasper/x/remote v0.0.0-20251029030949-6c07b06c1b1d // indirect
 	github.com/tychoish/jasper/x/splunk v0.0.0-20251029030949-6c07b06c1b1d // indirect

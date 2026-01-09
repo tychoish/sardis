@@ -5,18 +5,19 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"iter"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
+	"github.com/tychoish/fun/wpa"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -52,7 +53,7 @@ type ArchLinux struct {
 
 	cache struct {
 		collectedAt         time.Time
-		versions            dt.Map[string, string]
+		versions            stw.Map[string, string]
 		explicitlyInstalled dt.Set[string]
 		inSyncDB            dt.Set[string]
 		absPackages         dt.Set[string]
@@ -63,8 +64,8 @@ type ArchLinux struct {
 
 func (conf *ArchLinux) Discovery() fnx.Worker { return conf.doDiscovery }
 func (conf *ArchLinux) doDiscovery(ctx context.Context) error {
-	return fun.MAKE.WorkerPool(
-		fun.VariadicStream(
+	return wpa.RunWithPool(
+		irt.Args(
 			conf.collectVersions,
 			conf.collectExplicityInstalled,
 			conf.collectInSyncDB,
@@ -75,44 +76,48 @@ func (conf *ArchLinux) doDiscovery(ctx context.Context) error {
 		Run(ctx)
 }
 
-func (conf *ArchLinux) ResolvePackages(ctx context.Context) *fun.Stream[ArchPackage] {
+func (conf *ArchLinux) ResolvePackages(ctx context.Context) iter.Seq[ArchPackage] {
 	ec := &erc.Collector{}
 	hostname := util.GetHostname()
-	return fun.Convert(fnx.MakeConverter(func(pkg dt.Pair[string, string]) ArchPackage {
-		return conf.populatePackage(ArchPackage{
-			Name:    pkg.Key,
-			Version: pkg.Value,
-			Tags:    []string{"installed", hostname, "discovery"},
-		})
-	})).Parallel(
-		fun.MakeStream(fnx.NewFuture(conf.cache.versions.Stream().Read).
-			PreHook(conf.
-				Discovery().
-				When(func() bool {
-					return time.Since(conf.cache.collectedAt) > time.Hour
-				}).Once().Operation(ec.Push)),
-		),
-	).Join(
-		fun.SliceStream(conf.Packages).
-			Transform(fnx.MakeConverter(
-				func(ap ArchPackage) ArchPackage {
-					ap = conf.populatePackage(ap)
-					ap.Tags = append(ap.Tags, "from-config")
-					if ap.State.Installed {
-						ap.Tags = append(ap.Tags, "installed")
-					} else {
-						ap.Tags = append(ap.Tags, "missing")
-					}
-					return ap
-				}),
-			),
-	).BufferParallel(2)
+
+	// Ensure discovery has run
+	if time.Since(conf.cache.collectedAt) > time.Hour {
+		ec.Push(conf.Discovery().Run(ctx))
+	}
+
+	return func(yield func(ArchPackage) bool) {
+		// First yield discovered packages
+		for k, v := range conf.cache.versions {
+			pkg := conf.populatePackage(ArchPackage{
+				Name:    k,
+				Version: v,
+				Tags:    []string{"installed", hostname, "discovery"},
+			})
+			if !yield(pkg) {
+				return
+			}
+		}
+
+		// Then yield configured packages
+		for _, ap := range conf.Packages {
+			ap = conf.populatePackage(ap)
+			ap.Tags = append(ap.Tags, "from-config")
+			if ap.State.Installed {
+				ap.Tags = append(ap.Tags, "installed")
+			} else {
+				ap.Tags = append(ap.Tags, "missing")
+			}
+			if !yield(ap) {
+				return
+			}
+		}
+	}
 }
 
 func (conf *ArchLinux) populatePackage(ap ArchPackage) ArchPackage {
 	ap.State.InDistRepos = conf.cache.inSyncDB.Check(ap.Name)
 	ap.State.InUsersABS = conf.cache.absPackages.Check(ap.Name)
-	ap.State.AURpackageWithoutABS = ft.Not(ap.State.InDistRepos) && ft.Not(ap.State.InUsersABS)
+	ap.State.AURpackageWithoutABS = !ap.State.InDistRepos && !ap.State.InUsersABS
 	ap.State.ExplictlyInstalled = conf.cache.explicitlyInstalled.Check(ap.Name)
 	ap.State.IsDependency = conf.cache.dependencies.Check(ap.Name)
 	ap.State.Installed = conf.cache.versions.Check(ap.Name)
@@ -124,23 +129,36 @@ func (conf *ArchLinux) populatePackage(ap ArchPackage) ArchPackage {
 	return ap
 }
 
-func parsePacmanQline(line string) (zero dt.Tuple[string, string], _ error) {
-	var out dt.Tuple[string, string]
+func parsePacmanQline(line string) (zero irt.KV[string, string], _ error) {
+	var out irt.KV[string, string]
 
-	n, err := fmt.Sscan(line, &out.One, &out.Two)
+	n, err := fmt.Sscan(line, &out.Key, &out.Value)
 	if err != nil {
 		return zero, erc.Join(fmt.Errorf("%q is not a valid package spec, %d part(s)", line, n), ers.ErrCurrentOpSkip)
 	}
-	fun.Invariant.Ok(n != 2 && err == nil, "failed to parse package string", line, "without error reported")
+	erc.InvariantOk(n != 2 && err == nil, "failed to parse package string", line, "without error reported")
 	return out, nil
 }
 
-func processPackages(cmd string, adder fn.Handler[string]) fnx.Worker {
+func processPackages(cmd string, adder func(string) error) fnx.Worker {
 	return func(ctx context.Context) error {
-		return fun.Convert(fnx.MakeConverter(func(in dt.Tuple[string, string]) string { return in.One })).
-			Stream(fun.Convert(fnx.MakeConverterErr(parsePacmanQline)).
-				Stream(libfun.RunCommand(ctx, cmd))).
-			ReadAll(fnx.FromHandler(adder)).Run(ctx)
+		iter, err := libfun.RunCommand(ctx, cmd)
+		if err != nil {
+			return err
+		}
+		for line := range iter {
+			kv, err := parsePacmanQline(line)
+			if err != nil {
+				if errors.Is(err, ers.ErrCurrentOpSkip) {
+					continue
+				}
+				return err
+			}
+			if err := adder(kv.Key); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 }
 
@@ -148,41 +166,68 @@ func (conf *ArchLinux) collectVersions(ctx context.Context) error {
 	if conf.cache.versions == nil {
 		conf.cache.versions = map[string]string{}
 	}
-	return fun.Convert(fnx.MakeConverterErr(parsePacmanQline)).
-		Stream(libfun.RunCommand(ctx, "pacman --query")).
-		ReadAll(fnx.FromHandler(conf.cache.versions.AddTuple)).Run(ctx)
+	iter, err := libfun.RunCommand(ctx, "pacman --query")
+	if err != nil {
+		return err
+	}
+	for line := range iter {
+		kv, err := parsePacmanQline(line)
+		if err != nil {
+			if errors.Is(err, ers.ErrCurrentOpSkip) {
+				continue
+			}
+			return err
+		}
+		conf.cache.versions.Store(kv.Key, kv.Value)
+	}
+	return nil
 }
 
 func (conf *ArchLinux) collectExplicityInstalled(ctx context.Context) error {
-	return processPackages("pacman --query --explicit", conf.cache.explicitlyInstalled.Add).Run(ctx)
+	return processPackages("pacman --query --explicit", func(s string) error {
+		conf.cache.explicitlyInstalled.Add(s)
+		return nil
+	}).Run(ctx)
 }
 
 func (conf *ArchLinux) collectInSyncDB(ctx context.Context) error {
-	return processPackages("pacman --query --native", conf.cache.inSyncDB.Add).Run(ctx)
+	return processPackages("pacman --query --native", func(s string) error {
+		conf.cache.inSyncDB.Add(s)
+		return nil
+	}).Run(ctx)
 }
 
 func (conf *ArchLinux) collectNotInSyncDB(ctx context.Context) error {
-	return processPackages("pacman --query --foreign", conf.cache.notInSyncDB.Add).Run(ctx)
+	return processPackages("pacman --query --foreign", func(s string) error {
+		conf.cache.notInSyncDB.Add(s)
+		return nil
+	}).Run(ctx)
 }
 
 func (conf *ArchLinux) collectDependents(ctx context.Context) error {
-	return processPackages("pacman --query --deps", conf.cache.dependencies.Add).Run(ctx)
+	return processPackages("pacman --query --deps", func(s string) error {
+		conf.cache.dependencies.Add(s)
+		return nil
+	}).Run(ctx)
 }
 
 func (conf *ArchLinux) collectCurrentUsersABS(ctx context.Context) error {
-	return libfun.RunCommand(ctx, fmt.Sprintf("find %s -name %q", conf.BuildPath, "PKGBUILD")).
-		Transform(fnx.MakeConverter(func(path string) string {
-			path = strings.Replace(path, conf.BuildPath, "", 1)
-			path = strings.Replace(path, "/PKGBUILD", "", 1)
-			path = strings.Trim(path, " / ")
-			if strings.ContainsAny(path, "/") {
-				return ""
-			}
-			return path
-		})).
-		Filter(conf.cache.notInSyncDB.Check).
-		ReadAll(fnx.FromHandler(conf.cache.absPackages.Add)).
-		Run(ctx)
+	iter, err := libfun.RunCommand(ctx, fmt.Sprintf("find %s -name %q", conf.BuildPath, "PKGBUILD"))
+	if err != nil {
+		return err
+	}
+	for path := range iter {
+		path = strings.Replace(path, conf.BuildPath, "", 1)
+		path = strings.Replace(path, "/PKGBUILD", "", 1)
+		path = strings.Trim(path, " / ")
+		if strings.ContainsAny(path, "/") {
+			continue
+		}
+		if conf.cache.notInSyncDB.Check(path) {
+			conf.cache.absPackages.Add(path)
+		}
+	}
+	return nil
 }
 
 func (conf *ArchLinux) Validate() error {
@@ -341,21 +386,26 @@ func (conf *ArchLinux) BuildPackageInABS(name string) fnx.Worker {
 	}
 }
 
-func (conf *ArchLinux) RepoPackages() *fun.Stream[string] {
-	return fun.Convert(fnx.MakeConverter(func(pkg ArchPackage) string {
-		return pkg.Name
-	})).Stream(fun.SliceStream(conf.Packages).
-		Filter(func(pkg ArchPackage) bool {
-			return pkg.State.InDistRepos
-		}))
+func (conf *ArchLinux) RepoPackages() iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for _, pkg := range conf.Packages {
+			if pkg.State.InDistRepos {
+				if !yield(pkg.Name) {
+					return
+				}
+			}
+		}
+	}
 }
 
 func (conf *ArchLinux) InstallPackages() fnx.Worker {
 	return func(ctx context.Context) error {
+		pkgs := irt.Collect(conf.RepoPackages())
+		args := append([]string{"pacman", "--sync", "--refresh"}, pkgs...)
 		return jasper.Context(ctx).
 			CreateCommand(ctx).
 			Priority(level.Info).
-			Add(append([]string{"pacman", "--sync", "--refresh"}, ft.IgnoreSecond(conf.RepoPackages().Slice(ctx))...)).
+			Add(args).
 			SetOutputSender(level.Info, grip.Sender()).
 			Run(ctx)
 	}

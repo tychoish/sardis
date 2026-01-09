@@ -5,7 +5,6 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip/x/telegram"
 	"github.com/tychoish/sardis/util"
@@ -34,19 +33,19 @@ func (conf *Configuration) Join(mc *Configuration) {
 	conf.Credentials.Join(&mc.Credentials)
 	conf.Logging.Join(&mc.Logging)
 
-	conf.DMenuFlags.BackgroundColor = ft.Default(mc.DMenuFlags.BackgroundColor, conf.DMenuFlags.BackgroundColor)
-	conf.DMenuFlags.Font = ft.Default(mc.DMenuFlags.Font, conf.DMenuFlags.Font)
-	conf.DMenuFlags.Lines = ft.Default(mc.DMenuFlags.Lines, conf.DMenuFlags.Lines)
-	conf.DMenuFlags.Path = ft.Default(mc.DMenuFlags.Path, conf.DMenuFlags.Path)
-	conf.DMenuFlags.TextColor = ft.Default(mc.DMenuFlags.TextColor, conf.DMenuFlags.TextColor)
-	conf.DMenuFlags.Prompt = ft.Default(mc.DMenuFlags.Prompt, conf.DMenuFlags.Prompt)
-	conf.DMenuFlags.Monitor = ft.Default(mc.DMenuFlags.Monitor, conf.DMenuFlags.Monitor)
-	conf.DMenuFlags.WindowID = ft.Default(mc.DMenuFlags.WindowID, conf.DMenuFlags.WindowID)
+	conf.DMenuFlags.BackgroundColor = util.Default(mc.DMenuFlags.BackgroundColor, conf.DMenuFlags.BackgroundColor)
+	conf.DMenuFlags.Font = util.Default(mc.DMenuFlags.Font, conf.DMenuFlags.Font)
+	conf.DMenuFlags.Lines = util.Default(mc.DMenuFlags.Lines, conf.DMenuFlags.Lines)
+	conf.DMenuFlags.Path = util.Default(mc.DMenuFlags.Path, conf.DMenuFlags.Path)
+	conf.DMenuFlags.TextColor = util.Default(mc.DMenuFlags.TextColor, conf.DMenuFlags.TextColor)
+	conf.DMenuFlags.Prompt = util.Default(mc.DMenuFlags.Prompt, conf.DMenuFlags.Prompt)
+	conf.DMenuFlags.Monitor = util.Default(mc.DMenuFlags.Monitor, conf.DMenuFlags.Monitor)
+	conf.DMenuFlags.WindowID = util.Default(mc.DMenuFlags.WindowID, conf.DMenuFlags.WindowID)
 
-	conf.Telegram.Name = ft.Default(mc.Telegram.Name, conf.Telegram.Name)
-	conf.Telegram.Target = ft.Default(mc.Telegram.Target, conf.Telegram.Target)
-	conf.Telegram.Token = ft.Default(mc.Telegram.Token, conf.Telegram.Token)
-	conf.Telegram.Client = ft.Default(mc.Telegram.Client, conf.Telegram.Client)
+	conf.Telegram.Name = util.Default(mc.Telegram.Name, conf.Telegram.Name)
+	conf.Telegram.Target = util.Default(mc.Telegram.Target, conf.Telegram.Target)
+	conf.Telegram.Token = util.Default(mc.Telegram.Token, conf.Telegram.Token)
+	conf.Telegram.Client = util.Default(mc.Telegram.Client, conf.Telegram.Client)
 }
 
 type Credentials struct {
@@ -80,33 +79,33 @@ func (conf *Credentials) Join(mc *Credentials) {
 	if mc == nil {
 		return
 	}
-	conf.Path = ft.Default(mc.Path, conf.Path)
+	conf.Path = util.Default(mc.Path, conf.Path)
 
-	conf.Twitter.Username = ft.Default(mc.Twitter.Username, conf.Twitter.Username)
-	conf.Twitter.ConsumerKey = ft.Default(mc.Twitter.ConsumerKey, conf.Twitter.ConsumerKey)
-	conf.Twitter.ConsumerSecret = ft.Default(mc.Twitter.ConsumerSecret, conf.Twitter.ConsumerSecret)
-	conf.Twitter.OauthToken = ft.Default(mc.Twitter.OauthToken, conf.Twitter.OauthToken)
-	conf.Twitter.OauthSecret = ft.Default(mc.Twitter.OauthSecret, conf.Twitter.OauthSecret)
+	conf.Twitter.Username = util.Default(mc.Twitter.Username, conf.Twitter.Username)
+	conf.Twitter.ConsumerKey = util.Default(mc.Twitter.ConsumerKey, conf.Twitter.ConsumerKey)
+	conf.Twitter.ConsumerSecret = util.Default(mc.Twitter.ConsumerSecret, conf.Twitter.ConsumerSecret)
+	conf.Twitter.OauthToken = util.Default(mc.Twitter.OauthToken, conf.Twitter.OauthToken)
+	conf.Twitter.OauthSecret = util.Default(mc.Twitter.OauthSecret, conf.Twitter.OauthSecret)
 
-	conf.Jira.Username = ft.Default(mc.Jira.Username, conf.Jira.Username)
-	conf.Jira.Password = ft.Default(mc.Jira.Password, conf.Jira.Password)
-	conf.Jira.URL = ft.Default(mc.Jira.URL, conf.Jira.URL)
+	conf.Jira.Username = util.Default(mc.Jira.Username, conf.Jira.Username)
+	conf.Jira.Password = util.Default(mc.Jira.Password, conf.Jira.Password)
+	conf.Jira.URL = util.Default(mc.Jira.URL, conf.Jira.URL)
 
-	conf.GitHub.Username = ft.Default(mc.GitHub.Username, conf.GitHub.Username)
-	conf.GitHub.Password = ft.Default(mc.GitHub.Password, conf.GitHub.Password)
-	conf.GitHub.Token = ft.Default(mc.GitHub.Token, conf.GitHub.Token)
+	conf.GitHub.Username = util.Default(mc.GitHub.Username, conf.GitHub.Username)
+	conf.GitHub.Password = util.Default(mc.GitHub.Password, conf.GitHub.Password)
+	conf.GitHub.Token = util.Default(mc.GitHub.Token, conf.GitHub.Token)
 
 	conf.AWS = append(conf.AWS, mc.AWS...)
 }
 
 func (conf *Configuration) Validate() error {
 	conf.DMenuFlags = godmenu.Flags{
-		Path:            ft.Default(conf.DMenuFlags.Path, godmenu.DefaultDMenuPath),
-		BackgroundColor: ft.Default(conf.DMenuFlags.BackgroundColor, godmenu.DefaultBackgroundColor),
-		TextColor:       ft.Default(conf.DMenuFlags.TextColor, godmenu.DefaultTextColor),
-		Font:            ft.Default(conf.DMenuFlags.Font, "Source Code Pro-14"),
-		Lines:           ft.Default(conf.DMenuFlags.Lines, 16),
-		Prompt:          ft.Default(conf.DMenuFlags.Prompt, "=>>"),
+		Path:            util.Default(conf.DMenuFlags.Path, godmenu.DefaultDMenuPath),
+		BackgroundColor: util.Default(conf.DMenuFlags.BackgroundColor, godmenu.DefaultBackgroundColor),
+		TextColor:       util.Default(conf.DMenuFlags.TextColor, godmenu.DefaultTextColor),
+		Font:            util.Default(conf.DMenuFlags.Font, "Source Code Pro-14"),
+		Lines:           util.Default(conf.DMenuFlags.Lines, 16),
+		Prompt:          util.Default(conf.DMenuFlags.Prompt, "=>>"),
 	}
 
 	ec := &erc.Collector{}
@@ -120,7 +119,7 @@ func (conf *Configuration) Validate() error {
 	// which checks if the client is set,
 	// but users shouldn't have to fix this.
 
-	if ft.Not(conf.Telegram.IsZero()) {
+	if !conf.Telegram.IsZero() {
 		ec.Push(conf.Telegram.Validate())
 	}
 

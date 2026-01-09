@@ -8,7 +8,6 @@ import (
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -33,7 +32,10 @@ func bulkCreateTickets() *cmdr.Commander {
 			SetName("create").
 			SetUsage("create tickets as specified in a file"),
 		pathFlagName, func(ctx context.Context, op *withConf[string]) error {
-			path := ft.DefaultFuture(op.arg, func() string { return ft.Must(os.Getwd()) })
+			path := op.arg
+			if op.arg == "" {
+				path = erc.Must(os.Getwd())
+			}
 
 			if !util.FileExists(path) {
 				return fmt.Errorf("ticket spec file file %s does not exist", path)

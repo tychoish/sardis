@@ -10,7 +10,6 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
@@ -154,7 +153,7 @@ func GetOperationRuntime(ctx context.Context) OperationRuntimeInfo {
 		if !opr.ShouldBlock {
 			switch opr.ParentName {
 			case "zsh", "bash", "fish", "sh", "nu":
-				opr.ShouldBlock = false && ft.Not(opr.TTY)
+				opr.ShouldBlock = false && !opr.TTY
 			case "emacs":
 				opr.ShouldBlock = false
 			case "ssh":

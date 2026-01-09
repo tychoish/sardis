@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/grip"
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis/tools/dupe"
-	"github.com/tychoish/sardis/tools/munger"
 )
 
 type bufCloser struct{ bytes.Buffer }
@@ -48,17 +47,8 @@ func Utilities() *cmdr.Commander {
 		SetUsage("short utility commands").
 		Subcommanders(
 			diffTrees(),
-			blogConvert(),
 			qrCode(),
 		)
-}
-
-func blogConvert() *cmdr.Commander {
-	return cmdr.MakeCommander().
-		SetName("convert").
-		SetUsage("convert a hugo site to markdown from restructured text").
-		Flags(cmdr.FlagBuilder("~/src/blog").SetName("path").Flag()).
-		With(StringSpecBuilder("path", nil).SetAction(munger.ConvertSite).Add)
 }
 
 func diffTrees() *cmdr.Commander {

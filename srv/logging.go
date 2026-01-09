@@ -13,8 +13,8 @@ import (
 	"github.com/nwidger/jsoncolor"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/srv"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -41,27 +41,27 @@ func (ls *LoggingSettings) Join(mc *LoggingSettings) {
 	if mc == nil {
 		return
 	}
-	ls.DisableStandardOutput = ft.Default(mc.DisableStandardOutput, ls.DisableStandardOutput)
-	ls.EnableJSONFormating = ft.Default(mc.EnableJSONFormating, ls.EnableJSONFormating)
-	ls.EnableJSONColorFormatting = ft.Default(mc.EnableJSONColorFormatting, ls.EnableJSONColorFormatting)
-	ls.DisableSyslog = ft.Default(mc.DisableSyslog, ls.DisableSyslog)
-	ls.Priority = ft.Default(mc.Priority, ls.Priority)
+	ls.DisableStandardOutput = util.Default(mc.DisableStandardOutput, ls.DisableStandardOutput)
+	ls.EnableJSONFormating = util.Default(mc.EnableJSONFormating, ls.EnableJSONFormating)
+	ls.EnableJSONColorFormatting = util.Default(mc.EnableJSONColorFormatting, ls.EnableJSONColorFormatting)
+	ls.DisableSyslog = util.Default(mc.DisableSyslog, ls.DisableSyslog)
+	ls.Priority = util.Default(mc.Priority, ls.Priority)
 }
 
 func (ls *LoggingSettings) DisableLoggingToStandardOutput() bool {
-	return ls.DisableStandardOutput != nil && ft.Ref(ls.DisableStandardOutput)
+	return ls.DisableStandardOutput != nil && stw.Deref(ls.DisableStandardOutput)
 }
 
 func (ls *LoggingSettings) DisableLoggingToSyslog() bool {
-	return ls.DisableSyslog != nil && ft.Ref(ls.DisableSyslog)
+	return ls.DisableSyslog != nil && stw.Deref(ls.DisableSyslog)
 }
 
 func (ls *LoggingSettings) EnableJSONFormattingForLogOutput() bool {
-	return ls.EnableJSONFormating != nil && ft.Ref(ls.EnableJSONFormating)
+	return ls.EnableJSONFormating != nil && stw.Deref(ls.EnableJSONFormating)
 }
 
 func (ls *LoggingSettings) EnableJSONColorFormattingForLogOutput() bool {
-	return ls.EnableJSONColorFormatting != nil && ft.Ref(ls.EnableJSONColorFormatting)
+	return ls.EnableJSONColorFormatting != nil && stw.Deref(ls.EnableJSONColorFormatting)
 }
 
 type NotifySettings struct {
@@ -74,15 +74,15 @@ type NotifySettings struct {
 }
 
 func (conf *NotifySettings) Join(mc *NotifySettings) {
-	conf.Name = ft.Default(mc.Name, conf.Name)
-	conf.Target = ft.Default(mc.Target, conf.Target)
-	conf.Host = ft.Default(mc.Host, conf.Host)
-	conf.User = ft.Default(mc.User, conf.User)
-	conf.Password = ft.Default(mc.Password, conf.Password)
-	conf.Disabled = ft.Default(mc.Disabled, conf.Disabled)
+	conf.Name = util.Default(mc.Name, conf.Name)
+	conf.Target = util.Default(mc.Target, conf.Target)
+	conf.Host = util.Default(mc.Host, conf.Host)
+	conf.User = util.Default(mc.User, conf.User)
+	conf.Password = util.Default(mc.Password, conf.Password)
+	conf.Disabled = util.Default(mc.Disabled, conf.Disabled)
 }
 
-func (conf *NotifySettings) Enabled() bool { return conf.Disabled == nil || !ft.Ref(conf.Disabled) }
+func (conf *NotifySettings) Enabled() bool { return conf.Disabled == nil || !stw.Deref(conf.Disabled) }
 
 func (conf *NotifySettings) Validate() error {
 	if conf == nil || (conf.Target == "" && os.Getenv("SARDIS_NOTIFY_TARGET") == "") {

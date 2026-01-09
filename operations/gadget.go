@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/tychoish/cmdr"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/jasper"
@@ -30,7 +30,7 @@ func Gadget() *cmdr.Commander {
 			SetUsage("path of top-level workpace for gadget to look for go.mod").
 			SetValidate(func(path string) error {
 				if path == "./" {
-					path = ft.Must(os.Getwd())
+					path = erc.Must(os.Getwd())
 				}
 
 				if strings.HasSuffix(path, "...") {

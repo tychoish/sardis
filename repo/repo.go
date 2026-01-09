@@ -7,7 +7,6 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/util"
 )
@@ -38,7 +37,7 @@ func (conf *GitRepository) Validate() error {
 		conf.RemoteName = "origin"
 	}
 
-	conf.Logs = ft.Default(conf.Logs, conf.Logs.Default())
+	conf.Logs = util.Default(conf.Logs, conf.Logs.Default())
 	conf.Path = util.TryExpandHomeDir(conf.Path)
 	conf.Post = util.TryExpandHomeDirs(conf.Post)
 	conf.Pre = util.TryExpandHomeDirs(conf.Pre)

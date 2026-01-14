@@ -22,7 +22,7 @@ type Configuration struct {
 	}
 }
 
-func (conf *Configuration) Validate() error { return conf.caches.validation.Call(conf.doValidate) }
+func (conf *Configuration) Validate() error { return conf.caches.validation.Do(conf.doValidate) }
 func (conf *Configuration) doValidate() error {
 	ec := &erc.Collector{}
 	ec.Push(conf.projectsValidate())

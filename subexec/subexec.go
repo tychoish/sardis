@@ -43,7 +43,7 @@ func (conf *Configuration) Join(mcf *Configuration) {
 	conf.Commands = append(conf.Commands, mcf.Commands...)
 }
 
-func (conf *Configuration) Validate() error { return conf.caches.validation.Call(conf.doValidate) }
+func (conf *Configuration) Validate() error { return conf.caches.validation.Do(conf.doValidate) }
 func (conf *Configuration) doValidate() error {
 	ec := &erc.Collector{}
 
@@ -197,7 +197,7 @@ func (conf *Configuration) resolveAliasesAndMergeGroups() error {
 }
 
 func (conf *Configuration) ExportAllCommands() stw.Slice[Command] {
-	return conf.caches.allCommdands.Call(conf.doExportAllCommands)
+	return conf.caches.allCommdands.Do(conf.doExportAllCommands)
 }
 
 func (conf *Configuration) doExportAllCommands() stw.Slice[Command] {
@@ -221,11 +221,11 @@ func (conf *Configuration) doExportAllCommands() stw.Slice[Command] {
 }
 
 func (conf *Configuration) ExportCommandGroups() stw.Map[string, Group] {
-	return conf.caches.commandGroups.Call(conf.doExportCommandGroups)
+	return conf.caches.commandGroups.Do(conf.doExportCommandGroups)
 }
 
 func (conf *Configuration) ExportGroupNames() stw.Slice[string] {
-	return conf.caches.comandGroupNames.Call(conf.doExportGroupNames)
+	return conf.caches.comandGroupNames.Do(conf.doExportGroupNames)
 }
 
 func (conf *Configuration) doExportGroupNames() []string {

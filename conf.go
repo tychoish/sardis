@@ -95,7 +95,7 @@ func readConfiguration(fn string) (*Configuration, error) {
 	return out, nil
 }
 
-func (conf *Configuration) Validate() error { return conf.caches.validation.Call(conf.doValidate) }
+func (conf *Configuration) Validate() error { return conf.caches.validation.Do(conf.doValidate) }
 func (conf *Configuration) doValidate() error {
 	grip.Debugf("validating %q", conf.originalPath)
 	if conf.Settings == nil {
@@ -199,7 +199,6 @@ func (conf *Configuration) Migrate() *Configuration {
 
 	return conf
 }
-
 
 func (conf *Configuration) Join(mcf *Configuration) *Configuration {
 	if mcf == nil {

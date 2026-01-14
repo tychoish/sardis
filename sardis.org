@@ -1,0 +1,12 @@
+#+TITLE:sardis.tychoish.projects
+#+CATEGORY: sardis
+* Inbox
+* Tasks
+** TODO pacman collect lists of packages
+* Notes
+* Loops
+** Daily
+** Weekly
+** Quarterly
+** Yearly
+* Journal

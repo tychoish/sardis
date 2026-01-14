@@ -2,7 +2,6 @@ package sysmgmt
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -33,12 +32,11 @@ type LinkConfiguration struct {
 }
 
 type LinkDefinition struct {
-	Name              string `bson:"name" json:"name" yaml:"name"`
-	Path              string `bson:"path" json:"path" yaml:"path"`
-	Target            string `bson:"target" json:"target" yaml:"target"`
-	Update            bool   `bson:"update" json:"update" yaml:"update"`
-	DirectoryContents bool   `bson:"directory_contents" json:"directory_contents" yaml:"directory_contents"`
-	RequireSudo       bool   `bson:"sudo" json:"sudo" yaml:"sudo"`
+	Name        string `bson:"name" json:"name" yaml:"name"`
+	Path        string `bson:"path" json:"path" yaml:"path"`
+	Target      string `bson:"target" json:"target" yaml:"target"`
+	Update      bool   `bson:"update" json:"update" yaml:"update"`
+	RequireSudo bool   `bson:"sudo" json:"sudo" yaml:"sudo"`
 
 	Defined      bool `bson:"defined,omitempty" json:"defined,omitempty" yaml:"defined,omitempty"`
 	PathExists   bool `bson:"path_exists,omitempty" json:"path_exists,omitempty" yaml:"path_exists,omitempty"`
@@ -64,6 +62,7 @@ func (conf *LinkConfiguration) Validate() error {
 	for idx := range conf.Links {
 		ec.Wrapf(conf.Links[idx].Validate(), "%d/%d of %T is not valid", idx, len(conf.Links), conf.Links[idx])
 	}
+
 	if conf.Discovery == nil {
 		conf.Discovery = new(LinkDiscovery)
 	}
@@ -121,26 +120,6 @@ func (conf *LinkConfiguration) expand() error {
 
 		if lnk.Path, err = homedir.Expand(lnk.Path); err != nil {
 			ec.Push(err)
-			continue
-		}
-
-		if lnk.DirectoryContents {
-			files, err := os.ReadDir(lnk.Target)
-			if err != nil {
-				ec.Push(err)
-				continue
-			}
-
-			for _, info := range files {
-				name := info.Name()
-				links = append(links, LinkDefinition{
-					Name:   fmt.Sprintf("%s:%s", lnk.Name, name),
-					Path:   filepath.Join(lnk.Path, name),
-					Target: filepath.Join(lnk.Target, name),
-					Update: lnk.Update,
-				})
-			}
-
 			continue
 		}
 

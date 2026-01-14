@@ -188,9 +188,9 @@ func RunTests(ctx context.Context, opts Options) error {
 			pkg := pkg // capture for closure
 			ec.Push(main.Push(func(ctx context.Context) error {
 				if reports.Check(pkg.PackageName) {
-				grip.Errorln("duplicate", pkg.PackageName)
-				return nil
-			}
+					grip.Errorln("duplicate", pkg.PackageName)
+					return nil
+				}
 				grip.Build().Level(level.Debug).
 					Fields(message.Fields{
 						"pkg":  pkg.PackageName,
@@ -228,11 +228,11 @@ func RunTests(ctx context.Context, opts Options) error {
 
 				testStart := time.Now()
 				catch.Push(jpm.CreateCommand(ctx).
-				ID(fmt.Sprint("test.", pkg.PackageName)).
-				Directory(pkg.LocalDirectory).
-				AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
-				SetOutputSender(level.Info, testOut).
-				SetErrorSender(level.Error, testOut).
+					ID(fmt.Sprint("test.", pkg.PackageName)).
+					Directory(pkg.LocalDirectory).
+					AddEnv(global.EnvVarSardisLogQuietSyslog, "true").
+					SetOutputSender(level.Info, testOut).
+					SetErrorSender(level.Error, testOut).
 					PreHook(options.NewDefaultLoggingPreHook(level.Debug)).
 					Add(args).
 					Run(ctx))

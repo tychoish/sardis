@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/grip/message"
@@ -60,7 +60,7 @@ func notifyDesktop() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("desktop").
 		SetUsage("send desktop notification").
-		SetAction(func(ctx context.Context, c *cli.Context) error {
+		SetAction(func(ctx context.Context, c *cli.Command) error {
 			srv.DesktopNotify(ctx).Notice(strings.Join(c.Args().Slice(), " "))
 			return nil
 		})

@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cheynewallace/tabby"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/erc"
@@ -267,7 +267,7 @@ func repoGithubClone() *cmdr.Commander {
 				SetUsage("path to clone repo to, defaults to pwd").
 				Flag(),
 		).
-		SetAction(func(ctx context.Context, cc *cli.Context) error {
+		SetAction(func(ctx context.Context, cc *cli.Command) error {
 			jpm := jasper.Context(ctx)
 			args := append(cc.Args().Slice(), "", "")
 

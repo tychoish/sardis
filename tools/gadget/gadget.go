@@ -339,7 +339,7 @@ func (tr testReport) Message() message.Composer {
 			elem = elem.Next()
 		}
 	}
-	out := message.MakePairs(pairSeq)
+	out := message.MakeKV(pairSeq)
 	out.SetPriority(priority)
 
 	return out
@@ -467,32 +467,32 @@ func report(
 		err = erc.Join(err, scanErr)
 	}
 
-	msg := grip.Build().PairBuilder()
-	msg.Pair("pkg", mod.PackageName)
+	msg := grip.Build().KVbuilder()
+	msg.KV("pkg", mod.PackageName)
 
 	if tr.MissingTests {
-		msg.Pair("state", "no tests")
+		msg.KV("state", "no tests")
 	} else if tr.Cached {
-		msg.Pair("state", "CACHED")
+		msg.KV("state", "CACHED")
 	}
 
 	if tr.CoverageEnabled {
 		if tr.Coverage == 100.0 {
-			msg.Pair("covered", true)
+			msg.KV("covered", true)
 		} else {
-			msg.Pair("coverage", tr.Coverage)
-			msg.Pair("fncount", count)
-			msg.Pair("covered", numCovered)
+			msg.KV("coverage", tr.Coverage)
+			msg.KV("fncount", count)
+			msg.KV("covered", numCovered)
 		}
 		table.Print()
 	}
 
-	msg.Pair("wal", runtime.Round(time.Millisecond))
-	msg.Pair("dur", tr.Duration.Round(time.Millisecond))
+	msg.KV("wal", runtime.Round(time.Millisecond))
+	msg.KV("dur", tr.Duration.Round(time.Millisecond))
 
 	switch {
 	case err != nil:
-		msg.Pair("err", err)
+		msg.KV("err", err)
 		msg.SetPriority(level.Error)
 	case tr.MissingTests:
 		msg.SetPriority(level.Warning)

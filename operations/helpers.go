@@ -7,7 +7,7 @@ import (
 
 	"github.com/mattn/go-isatty"
 	"github.com/shirou/gopsutil/process"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/erc"
@@ -45,7 +45,7 @@ func addOpCommand[T cmdr.FlagTypes](
 }
 
 func withConfBuilderSpec[T cmdr.FlagTypes](name string) cmdr.Hook[*withConf[T]] {
-	return func(ctx context.Context, cc *cli.Context) (*withConf[T], error) {
+	return func(ctx context.Context, cc *cli.Command) (*withConf[T], error) {
 		conf, err := ResolveConfiguration(ctx, cc)
 		if err != nil {
 			return nil, err
@@ -60,7 +60,7 @@ func withConfBuilderSpec[T cmdr.FlagTypes](name string) cmdr.Hook[*withConf[T]] 
 	}
 }
 
-func embeddedFlag[T cmdr.FlagTypes](name string, cc *cli.Context) (zero T, _ error) {
+func embeddedFlag[T cmdr.FlagTypes](name string, cc *cli.Command) (zero T, _ error) {
 	arg := cmdr.GetFlag[T](cc, name)
 
 	if !cc.IsSet(name) {

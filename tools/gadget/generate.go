@@ -39,10 +39,10 @@ func GoGenerate(
 
 		cmd := append([]string{"go", "generate"}, group...)
 
-		grip.Debug(message.BuildPair().
-			Pair("group", idx).
-			Pair("packages", len(group)).
-			Pair("cmd", strings.Join(cmd, " ")))
+		grip.Debug(message.BuildKV().
+			KV("group", idx).
+			KV("packages", len(group)).
+			KV("cmd", strings.Join(cmd, " ")))
 
 		err := jpm.CreateCommand(ctx).
 			ID(fmt.Sprint("generate.", idx)).
@@ -56,14 +56,14 @@ func GoGenerate(
 			Run(ctx)
 
 		builder := grip.Build().Level(level.Info)
-		msg := builder.PairBuilder().
-			Pair("op", "run group command").
-			Pair("group", idx+1).
-			Pair("items", len(group))
+		msg := builder.
+			KV("op", "run group command").
+			KV("group", idx+1).
+			KV("items", len(group))
 
 		if err != nil {
 			builder.Level(level.Error)
-			msg.Pair("err", err)
+			msg.KV("err", err)
 			builder.Send()
 			if args.ContinueOnError {
 				continue
@@ -74,12 +74,12 @@ func GoGenerate(
 		builder.Send()
 	}
 
-	grip.Notice(message.BuildPair().
-		Pair("op", "go generate").
-		Pair("dur", time.Since(opStart)).
-		Pair("ok", ec.Ok()).
-		Pair("groups", len(args.Spec.Order)).
-		Pair("packages", numPackages))
+	grip.Notice(message.BuildKV().
+		KV("op", "go generate").
+		KV("dur", time.Since(opStart)).
+		KV("ok", ec.Ok()).
+		KV("groups", len(args.Spec.Order)).
+		KV("packages", numPackages))
 
 	return ec.Resolve()
 }

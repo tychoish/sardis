@@ -15,7 +15,7 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis/tools/gadget"
 	"github.com/tychoish/sardis/util"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func Gadget() *cmdr.Commander {
@@ -79,7 +79,7 @@ func Gadget() *cmdr.Commander {
 			return jasper.WithManager(ctx, jpm)
 		}).
 		With(cmdr.SpecBuilder(
-			func(_ context.Context, cc *cli.Context) (gadget.Options, error) {
+			func(_ context.Context, cc *cli.Command) (gadget.Options, error) {
 				opts := gadget.Options{
 					Timeout:        cc.Duration("timeout"),
 					Recursive:      cc.Bool("recursive"),

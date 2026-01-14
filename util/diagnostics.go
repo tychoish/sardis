@@ -4,15 +4,17 @@ import (
 	"time"
 
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/message"
+	"github.com/tychoish/grip/level"
 )
 
 func LogTiming(name string, op func()) {
 	start := time.Now()
 	defer func() {
-		grip.Info(message.BuildPair().
-			Pair("op", name).
-			Pair("dur", time.Since(start)))
+		grip.Build().
+			Level(level.Info).
+			KV("op", name).
+			KV("dur", time.Since(start)).
+			Send()
 	}()
 
 	op()

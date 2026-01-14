@@ -64,24 +64,24 @@ func blogPublish() *cmdr.Commander {
 				return nil
 			}
 
-			grip.Notice(message.BuildPair().
-				Pair("op", opName).
-				Pair("state", "STARTED").
-				Pair("name", name).
-				Pair("repo", blog.RepoName).
-				Pair("path", repo.Path).
-				Pair("dur", time.Since(startAt)),
+			grip.Notice(message.BuildKV().
+				KV("op", opName).
+				KV("state", "STARTED").
+				KV("name", name).
+				KV("repo", blog.RepoName).
+				KV("path", repo.Path).
+				KV("dur", time.Since(startAt)),
 			)
 
 			defer func() {
-				grip.Notice(message.BuildPair().
-					Pair("op", opName).
-					Pair("state", "COMPLETED").
-					Pair("err", err != nil).
-					Pair("name", name).
-					Pair("repo", blog.RepoName).
-					Pair("path", repo.Path).
-					Pair("dur", time.Since(startAt)),
+				grip.Notice(message.BuildKV().
+					KV("op", opName).
+					KV("state", "COMPLETED").
+					KV("err", err != nil).
+					KV("name", name).
+					KV("repo", blog.RepoName).
+					KV("path", repo.Path).
+					KV("dur", time.Since(startAt)),
 				)
 			}()
 

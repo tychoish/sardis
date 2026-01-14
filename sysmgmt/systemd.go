@@ -97,13 +97,13 @@ func (conf *SystemdService) Worker() fnx.Worker {
 			}
 		}
 
-		msg := message.BuildPair().
-			Pair("op", opName).
-			Pair("state", "COMPLETED").
-			Pair("unit", conf.Unit).
-			Pair("system", conf.System).
-			Pair("dur", time.Since(startAt)).
-			Pair("host", hn)
+		msg := message.BuildKV().
+			KV("op", opName).
+			KV("state", "COMPLETED").
+			KV("unit", conf.Unit).
+			KV("system", conf.System).
+			KV("dur", time.Since(startAt)).
+			KV("host", hn)
 
 		proclog.Infoln("----------------", nonce, "---", jobID, "--->")
 		if err := cmd.Run(ctx); err != nil {
@@ -111,7 +111,7 @@ func (conf *SystemdService) Worker() fnx.Worker {
 			grip.Critical(err)
 
 			grip.Error(buf.String())
-			grip.Error(msg.Pair("err", err != nil))
+			grip.Error(msg.KV("err", err != nil))
 			return err
 		}
 

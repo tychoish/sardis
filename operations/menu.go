@@ -211,14 +211,14 @@ func fuzzy() *cmdr.Commander {
 						}
 					})
 
-					grip.Notice(message.BuildPair().
-						Pair("op", "cmd.fuzzy").
-						Pair("state", "COMPLETED").
-						Pair("err", err != nil).
-						Pair("waited", opr.ShouldBlock).
-						Pair("run_dur", ranFor.Span()).
-						Pair("wait_dur", waitedFor.Span()).
-						Pair("commands", strings.Join(stage.CommandNames(), ", ")))
+					grip.Notice(message.BuildKV().
+						KV("op", "cmd.fuzzy").
+						KV("state", "COMPLETED").
+						KV("err", err != nil).
+						KV("waited", opr.ShouldBlock).
+						KV("run_dur", ranFor.Span()).
+						KV("wait_dur", waitedFor.Span()).
+						KV("commands", strings.Join(stage.CommandNames(), ", ")))
 
 					return err
 				case stage.Selections != nil:

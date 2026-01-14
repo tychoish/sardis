@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/sardis"
@@ -20,7 +20,7 @@ func Tweet() *cmdr.Commander {
 			SetUsage("message to tweet").
 			Flag()).
 		With(cmdr.SpecBuilder(
-			func(ctx context.Context, cc *cli.Context) (string, error) {
+			func(ctx context.Context, cc *cli.Command) (string, error) {
 				return cc.String("message"), nil
 			}).
 			SetAction(func(ctx context.Context, msg string) error {

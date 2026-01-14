@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
@@ -41,10 +40,10 @@ type LockInfo struct {
 }
 
 func (l *LockInfo) Update(status LockStatus) {
-	fun.Invariant.IsTrue(l.LogicalClock+1 != 0, "cannot overflow the logical clock")
-	fun.Invariant.IsTrue(l.LastModified.IsZero() || time.Since(l.LastModified) >= time.Millisecond,
+	erc.InvariantOk(l.LogicalClock+1 != 0, "cannot overflow the logical clock")
+	erc.InvariantOk(l.LastModified.IsZero() || time.Since(l.LastModified) >= time.Millisecond,
 		"lock time resolution requires at least 1ms between updates")
-	fun.Invariant.Must(status.ValidateStateTransion(status), "cannot apply impossible state transition ")
+	erc.Invariant(status.ValidateStateTransion(status), "cannot apply impossible state transition ")
 
 	l.LogicalClock++
 	l.LastModified = time.Now().UTC().Truncate(time.Millisecond)

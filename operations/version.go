@@ -3,7 +3,7 @@ package operations
 import (
 	"context"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/grip"
@@ -16,11 +16,11 @@ func Version() *cmdr.Commander {
 		SetName("version").
 		Aliases("v").
 		SetUsage("returns the version and build information of the binary").
-		SetAction(func(ctx context.Context, cc *cli.Context) error {
+		SetAction(func(ctx context.Context, cc *cli.Command) error {
 			grip.Log(grip.Sender().Priority(), message.Fields{
-				"name":    cc.App.Name,
+				"name":    cc.Name,
 				"build":   sardis.BuildRevision,
-				"version": cc.App.Version,
+				"version": cc.Version,
 			})
 
 			return nil

@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/fun/testt"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -73,12 +74,12 @@ func TestGraph(t *testing.T) {
 		totalNodes := 0
 		for idx, group := range graph.Order {
 			totalNodes += len(group)
-			seen.AppendStream(fun.SliceStream(group))
-			grip.Info(message.MakeKV(
-				message.KV("idx", idx),
-				message.KV("size", len(group)),
-				message.KV("group", group),
-			))
+			seen.Extend(irt.Slice(group))
+			grip.Info(message.BuildKV().
+				KV("idx", idx).
+				KV("size", len(group)).
+				KV("group", group),
+			)
 		}
 		check.Equal(t, totalNodes, len(graph.Packages))
 		check.Equal(t, totalNodes, seen.Len())
@@ -91,7 +92,7 @@ func TestGraph(t *testing.T) {
 		assert.NotError(t, err)
 
 		seen := &dt.Set[string]{}
-		pkgs := dt.NewMap(graph.Packages.IndexByPackageName())
+		pkgs := stw.NewMap(graph.Packages.IndexByPackageName())
 
 		for gidx, group := range graph.Order {
 			for eidx, edge := range group {
@@ -127,7 +128,7 @@ func TestGraph(t *testing.T) {
 		graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
 		assert.NotError(t, err)
 		assert.True(t, len(graph.Order) >= 1)
-		pkgs := dt.NewMap(graph.Packages.IndexByPackageName())
+		pkgs := stw.NewMap(graph.Packages.IndexByPackageName())
 		for _, edge := range graph.Order[0] {
 			testt.Log(t, edge)
 			check.True(t, pkgs.Check(edge))
@@ -141,27 +142,27 @@ func TestGraph(t *testing.T) {
 		report := func(t *testing.T, graph *BuildOrder) {
 			builder := grip.Build().Level(level.Notice)
 
-			msg := builder.PairBuilder().
-				Pair("pkgs", len(graph.Packages)).
-				Pair("groups", len(graph.Order))
+			msg := builder.
+				KV("pkgs", len(graph.Packages)).
+				KV("groups", len(graph.Order))
 
 			observed := 0
 
 			var longest int
 			for idx, group := range graph.Order {
 				observed += len(group)
-				grip.Info(message.MakeKV(
-					message.KV("idx", idx),
-					message.KV("size", len(group)),
-					message.KV("group", group),
-				))
+				grip.Info(message.BuildKV().
+					KV("idx", idx).
+					KV("size", len(group)).
+					KV("group", group),
+				)
 
 				if len(group) > longest {
 					longest = len(group)
 				}
 			}
-			msg.Pair("longest", longest)
-			msg.Pair("observed", observed)
+			msg.KV("longest", longest)
+			msg.KV("observed", observed)
 			var numSingle int
 			for _, group := range graph.Order {
 				if len(group) > 1 {
@@ -193,28 +194,29 @@ func TestGraph(t *testing.T) {
 			graph, err := GetBuildOrder(ctx, "/home/tychoish/neon/cloud")
 			assert.NotError(t, err)
 
-			iter := libfun.Ripgrep(ctx, jpm, libfun.RipgrepArgs{
+			iter, err := libfun.Ripgrep(ctx, jpm, libfun.RipgrepArgs{
 				Types:       []string{"go"},
 				Regexp:      "go:generate",
 				Path:        "~/neon/cloud",
 				Directories: true,
 				Unique:      true,
 			})
+			assert.NotError(t, err)
 
 			limits := &dt.Set[string]{}
-			limits.AppendStream(graph.Packages.ConvertPathsToPackages(iter))
+			limits.Extend(graph.Packages.ConvertPathsToPackages(iter))
 			report(t, graph.Narrow(limits))
 		})
 	})
 }
 
 func BenchmarkGadget(b *testing.B) {
-	for _, p := range dt.MakePairs(
-		dt.MakePair("Jasper", "/home/tychoish/src/jasper"),
-		dt.MakePair("Grip", "/home/tychoish/src/grip"),
-		dt.MakePair("Sardis", "/home/tychoish/src/sardis"),
-		dt.MakePair("NeonCloud", "/home/tychoish/neon/cloud"),
-	).Slice() {
+	for p := range irt.Args(
+		irt.MakeKV("Jasper", "/home/tychoish/src/jasper"),
+		irt.MakeKV("Grip", "/home/tychoish/src/grip"),
+		irt.MakeKV("Sardis", "/home/tychoish/src/sardis"),
+		irt.MakeKV("NeonCloud", "/home/tychoish/neon/cloud"),
+	) {
 		b.Run(p.Key, func(b *testing.B) {
 			b.Run("DagGenCollect", func(b *testing.B) {
 				start := time.Now()

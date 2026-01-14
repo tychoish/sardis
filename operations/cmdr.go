@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/fnx"
@@ -36,7 +36,7 @@ import (
 */
 
 func StringSpecBuilder(flagName string, defaultValue *string) *cmdr.OperationSpec[string] {
-	return cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (string, error) {
+	return cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Command) (string, error) {
 		if out := cc.String(flagName); out != "" {
 			return out, nil
 		}
@@ -53,14 +53,14 @@ func StringSpecBuilder(flagName string, defaultValue *string) *cmdr.OperationSpe
 	})
 }
 
-func ResolveConfiguration(ctx context.Context, cc *cli.Context) (*sardis.Configuration, error) {
+func ResolveConfiguration(ctx context.Context, cc *cli.Command) (*sardis.Configuration, error) {
 	if sardis.HasAppConfiguration(ctx) {
 		return sardis.AppConfiguration(ctx), nil
 	}
 	return LoadConfiguration(cc)
 }
 
-func LoadConfiguration(cc *cli.Context) (*sardis.Configuration, error) {
+func LoadConfiguration(cc *cli.Command) (*sardis.Configuration, error) {
 	conf, err := sardis.LoadConfiguration(cc.String("conf"))
 	if err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func Commander() *cmdr.Commander {
 				wpa.WorkerGroupConfContinueOnPanic(),
 			)
 		}).
-		SetAction(func(ctx context.Context, cc *cli.Context) error {
+		SetAction(func(ctx context.Context, cc *cli.Command) error {
 			return cli.ShowAppHelp(cc)
 		}).
 		Subcommanders(

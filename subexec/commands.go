@@ -67,15 +67,15 @@ func (conf *Command) Worker() fnx.Worker {
 			Append(conf.Command).
 			Append(conf.Commands...).
 			Prerequisite(func() bool {
-				msg := message.BuildPair().
-					Pair("op", conf.Name).
-					Pair("state", "STARTED").
-					Pair("host", hn).
-					Pair("dir", conf.Directory).
-					Pair("cmd", conf.Command)
+				msg := message.BuildKV().
+					KV("op", conf.Name).
+					KV("state", "STARTED").
+					KV("host", hn).
+					KV("dir", conf.Directory).
+					KV("cmd", conf.Command)
 
 				if len(conf.Commands) > 0 {
-					msg.Pair("cmds", conf.Commands)
+					msg.KV("cmds", conf.Commands)
 				}
 
 				grip.Info(msg)
@@ -88,17 +88,17 @@ func (conf *Command) Worker() fnx.Worker {
 				err = ec.Resolve()
 
 				defer util.DropErrorOnDefer(buf.Close)
-				msg := message.BuildPair().
-					Pair("op", conf.Name).
-					Pair("state", "COMPLETED").
-					Pair("dur", time.Since(startAt)).
-					Pair("err", err != nil).
-					Pair("host", hn).
-					Pair("dir", conf.Directory).
-					Pair("cmd", conf.Command)
+				msg := message.BuildKV().
+					KV("op", conf.Name).
+					KV("state", "COMPLETED").
+					KV("dur", time.Since(startAt)).
+					KV("err", err != nil).
+					KV("host", hn).
+					KV("dir", conf.Directory).
+					KV("cmd", conf.Command)
 
 				if len(conf.Commands) > 0 {
-					msg.Pair("cmds", conf.Commands)
+					msg.KV("cmds", conf.Commands)
 				}
 
 				defer grip.Notice(msg)

@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/srv"
@@ -58,10 +58,10 @@ func BuildCommand() *cmdr.Commander {
 	// create an operation spec; initialize the builder with the
 	// constructor for the configuration type. While you can use
 	// the commander directly and have more access to the
-	// cli.Context for interacting with command line arguments,
+	// cli.Command for interacting with command line arguments,
 	// the Spec model makes it possible to write more easily
 	// testable functions, and limit your exposure to the CLI
-	operation := cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Context) (*ServiceConfig, error) {
+	operation := cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Command) (*ServiceConfig, error) {
 		return &ServiceConfig{Message: cc.String("message")}, nil
 	}).SetMiddleware(func(ctx context.Context, conf *ServiceConfig) context.Context {
 		// create a new context with a timeout

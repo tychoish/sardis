@@ -43,14 +43,14 @@ func (conf *GitRepository) FetchJob() fnx.Worker {
 		hostname := util.GetHostname()
 
 		if !util.FileExists(conf.Path) {
-			grip.Info(message.BuildPair().
-				Pair("op", opName).
-				Pair("id", id).
-				Pair("run", runID).
-				Pair("repo", conf.Name).
-				Pair("path", conf.Path).
-				Pair("msg", "repo doesn't exist; cloning").
-				Pair("host", hostname),
+			grip.Info(message.BuildKV().
+				KV("op", opName).
+				KV("id", id).
+				KV("run", runID).
+				KV("repo", conf.Name).
+				KV("path", conf.Path).
+				KV("msg", "repo doesn't exist; cloning").
+				KV("host", hostname),
 			)
 
 			return conf.CloneJob().Run(ctx)
@@ -75,29 +75,29 @@ func (conf *GitRepository) FetchJob() fnx.Worker {
 			Append(conf.Post...).
 			Worker().
 			PreHook(func(context.Context) {
-				grip.Info(message.BuildPair().
-					Pair("op", opName).
-					Pair("state", "STARTED").
-					Pair("run", runID).
-					Pair("repo", conf.Name).
-					Pair("path", conf.Path).
-					Pair("host", hostname),
+				grip.Info(message.BuildKV().
+					KV("op", opName).
+					KV("state", "STARTED").
+					KV("run", runID).
+					KV("repo", conf.Name).
+					KV("path", conf.Path).
+					KV("host", hostname),
 				)
 			}).
 			WithErrorFilter(func(err error) error {
 				proclog.Infoln(ruler, id, ruler)
-				msg := message.BuildPair().
-					Pair("op", opName).
-					Pair("state", "COMPLETED").
-					Pair("run", runID).
-					Pair("err", err != nil).
-					Pair("dur", time.Since(startAt)).
-					Pair("repo", conf.Name).
-					Pair("path", conf.Path)
+				msg := message.BuildKV().
+					KV("op", opName).
+					KV("state", "COMPLETED").
+					KV("run", runID).
+					KV("err", err != nil).
+					KV("dur", time.Since(startAt)).
+					KV("repo", conf.Name).
+					KV("path", conf.Path)
 
 				if err != nil {
 					grip.Error(procbuf.String())
-					grip.Critical(msg.Pair("err", err))
+					grip.Critical(msg.KV("err", err))
 					return err
 				} else if conf.Logs.Full() {
 					grip.Info(procbuf.String())
@@ -121,14 +121,14 @@ func (conf *GitRepository) CloneJob() fnx.Worker {
 		nonce := strings.ToLower(rand.Text())[:7]
 
 		if _, err := os.Stat(conf.Path); !os.IsNotExist(err) {
-			grip.Info(message.BuildPair().
-				Pair("op", opName).
-				Pair("run", nonce).
-				Pair("msg", "repo exists, skipping clone, running update jobs").
-				Pair("host", hostname).
-				Pair("repo", conf.Name).
-				Pair("path", conf.Path).
-				Pair("remote", conf.Remote),
+			grip.Info(message.BuildKV().
+				KV("op", opName).
+				KV("run", nonce).
+				KV("msg", "repo exists, skipping clone, running update jobs").
+				KV("host", hostname).
+				KV("repo", conf.Name).
+				KV("path", conf.Path).
+				KV("remote", conf.Remote),
 			)
 
 			if conf.LocalSync {
@@ -162,15 +162,15 @@ func (conf *GitRepository) CloneJob() fnx.Worker {
 			Append(conf.Post...).
 			Run(ctx)
 
-		msg := message.BuildPair().
-			Pair("op", opName).
-			Pair("run", nonce).
-			Pair("dur", time.Since(startAt)).
-			Pair("err", err != nil).
-			Pair("host", hostname).
-			Pair("repo", conf.Name).
-			Pair("path", conf.Path).
-			Pair("remote", conf.Remote)
+		msg := message.BuildKV().
+			KV("op", opName).
+			KV("run", nonce).
+			KV("dur", time.Since(startAt)).
+			KV("err", err != nil).
+			KV("host", hostname).
+			KV("repo", conf.Name).
+			KV("path", conf.Path).
+			KV("remote", conf.Remote)
 
 		if err != nil {
 			grip.Error(message.WrapError(err, msg))
@@ -201,26 +201,26 @@ func (conf *GitRepository) UpdateJob() fnx.Worker {
 			return ers.Wrap(err, id)
 		}
 
-		grip.Info(message.BuildPair().
-			Pair("op", opName).
-			Pair("state", "STARTED").
-			Pair("id", id).
-			Pair("path", conf.Path).
-			Pair("operator", host),
+		grip.Info(message.BuildKV().
+			KV("op", opName).
+			KV("state", "STARTED").
+			KV("id", id).
+			KV("path", conf.Path).
+			KV("operator", host),
 		)
 
 		defer func() {
-			msg := message.BuildPair().
-				Pair("op", opName).
-				Pair("state", "COMPLETED").
-				Pair("id", id).
-				Pair("dur", time.Since(startAt)).
-				Pair("err", err != nil).
-				Pair("path", conf.Path).
-				Pair("operator", host)
+			msg := message.BuildKV().
+				KV("op", opName).
+				KV("state", "COMPLETED").
+				KV("id", id).
+				KV("dur", time.Since(startAt)).
+				KV("err", err != nil).
+				KV("path", conf.Path).
+				KV("operator", host)
 
 			if err != nil {
-				msg.Pair("error", err)
+				msg.KV("error", err)
 				grip.Critical(msg)
 			} else {
 				grip.Info(msg)
@@ -318,14 +318,14 @@ func (conf *GitRepository) SyncRemoteJob(host string) fnx.Worker {
 		defer util.DropErrorOnDefer(procbuf.Close)
 		proclog.Noticeln(ruler, bullet, ruler)
 
-		grip.Info(message.BuildPair().
-			Pair("op", opName).
-			Pair("state", "STARTED").
-			Pair("run", nonce).
-			Pair("id", buildID).
-			Pair("path", conf.Path).
-			Pair("host", host).
-			Pair("operator", hn),
+		grip.Info(message.BuildKV().
+			KV("op", opName).
+			KV("state", "STARTED").
+			KV("run", nonce).
+			KV("id", buildID).
+			KV("path", conf.Path).
+			KV("host", host).
+			KV("operator", hn),
 		)
 
 		err := jasper.Context(ctx).
@@ -349,18 +349,18 @@ func (conf *GitRepository) SyncRemoteJob(host string) fnx.Worker {
 			WithErrorFilter(func(err error) error {
 				proclog.Noticeln(ruler, bullet, ruler)
 				if err != nil {
-					grip.Critical(message.BuildPair().
-						Pair("op", opName).
-						Pair("state", "ERRORED").
-						Pair("run", nonce).
-						Pair("repo", conf.Name).
-						Pair("path", conf.Path).
-						Pair("remote", conf.Remote).
-						Pair("host", host).
-						Pair("operator", hn).
-						Pair("dur", time.Since(started)).
-						Pair("id", buildID).
-						Pair("err", err),
+					grip.Critical(message.BuildKV().
+						KV("op", opName).
+						KV("state", "ERRORED").
+						KV("run", nonce).
+						KV("repo", conf.Name).
+						KV("path", conf.Path).
+						KV("remote", conf.Remote).
+						KV("host", host).
+						KV("operator", hn).
+						KV("dur", time.Since(started)).
+						KV("id", buildID).
+						KV("err", err),
 					)
 					grip.Error(procbuf.String())
 				} else if conf.Logs.Full() {
@@ -370,17 +370,17 @@ func (conf *GitRepository) SyncRemoteJob(host string) fnx.Worker {
 			}).
 			Run(ctx)
 
-		grip.Info(message.BuildPair().
-			Pair("op", opName).
-			Pair("state", "COMPLETED").
-			Pair("run", nonce).
-			Pair("repo", conf.Name).
-			Pair("path", conf.Path).
-			Pair("remote", conf.Remote).
-			Pair("host", host).
-			Pair("operator", hn).
-			Pair("id", buildID).
-			Pair("err", err != nil),
+		grip.Info(message.BuildKV().
+			KV("op", opName).
+			KV("state", "COMPLETED").
+			KV("run", nonce).
+			KV("repo", conf.Name).
+			KV("path", conf.Path).
+			KV("remote", conf.Remote).
+			KV("host", host).
+			KV("operator", hn).
+			KV("id", buildID).
+			KV("err", err != nil),
 		)
 
 		return nil
@@ -399,14 +399,14 @@ func (conf *GitRepository) CleanupJob() fnx.Worker {
 		nonce := strings.ToLower(rand.Text())[:7]
 
 		defer func() {
-			grip.Critical(message.BuildPair().
-				Pair("op", opName).
-				Pair("id", id).
-				Pair("run", nonce).
-				Pair("repo", conf.Name).
-				Pair("path", conf.Path).
-				Pair("dur", time.Since(start)).
-				Pair("err", err != nil),
+			grip.Critical(message.BuildKV().
+				KV("op", opName).
+				KV("id", id).
+				KV("run", nonce).
+				KV("repo", conf.Name).
+				KV("path", conf.Path).
+				KV("dur", time.Since(start)).
+				KV("err", err != nil),
 			)
 		}()
 
@@ -424,13 +424,13 @@ func (conf *GitRepository) CleanupJob() fnx.Worker {
 			WithErrorFilter(func(err error) error {
 				proclog.Infoln(ruler, id, ruler)
 				if err != nil {
-					grip.Critical(message.BuildPair().
-						Pair("op", opName).
-						Pair("id", id).
-						Pair("run", nonce).
-						Pair("repo", conf.Name).
-						Pair("path", conf.Path).
-						Pair("err", err),
+					grip.Critical(message.BuildKV().
+						KV("op", opName).
+						KV("id", id).
+						KV("run", nonce).
+						KV("repo", conf.Name).
+						KV("path", conf.Path).
+						KV("err", err),
 					)
 					grip.Error(procbuf.String())
 				} else if conf.Logs.Full() {

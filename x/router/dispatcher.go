@@ -3,13 +3,13 @@ package router
 import (
 	"context"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/srv"
 	"github.com/tychoish/fun/stw"
+	"github.com/tychoish/fun/wpa"
 )
 
 // Config describes the behavior of the Dispatcher.
@@ -36,9 +36,9 @@ type Dispatcher struct {
 	// NewDispatcher constructor creates a noop observer.
 	ErrorObserver adt.Atomic[func(error)]
 
-	middleware  astw.Map[Protocol, *pubsub.Deque[Middleware]]
-	interceptor astw.Map[Protocol, *pubsub.Deque[Interceptor]]
-	handlers    astw.Map[Protocol, Handler]
+	middleware  adt.Map[Protocol, *pubsub.Deque[Middleware]]
+	interceptor adt.Map[Protocol, *pubsub.Deque[Interceptor]]
+	handlers    adt.Map[Protocol, Handler]
 
 	isRunning    chan struct{}
 	orchestrator srv.Orchestrator
@@ -113,10 +113,10 @@ func NewDispatcher(conf Config) *Dispatcher {
 	// change,) because this is called exactly once when the
 	// Dispatcher is created, nothing can error
 
-	fun.Invariant.Must(r.registerBrokerService())
-	fun.Invariant.Must(r.registerPipeShutdownService())
-	fun.Invariant.Must(r.registerProcessResponseService())
-	fun.Invariant.Must(r.registerMiddlwareService())
+	erc.Invariant(r.registerBrokerService())
+	erc.Invariant(r.registerPipeShutdownService())
+	erc.Invariant(r.registerProcessResponseService())
+	erc.Invariant(r.registerMiddlwareService())
 
 	return r
 }
@@ -250,7 +250,7 @@ func (r *Dispatcher) Exec(ctx context.Context, m Message) (*Response, error) {
 		return nil, err
 	}
 
-	val, err := fun.Blocking(out).Receive().Read(ctx)
+	val, err := stw.ChanBlocking(out).Receive().Read(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -272,14 +272,12 @@ func (r *Dispatcher) doIntercept(ctx context.Context, key Protocol, rr *Response
 	defer ec.Recover()
 
 	if icept, ok := r.interceptor.Load(key); ok {
-		iter := icept.StreamFront()
-		for iter.Next(ctx) {
-			if err = iter.Value()(ctx, rr); err != nil {
+		for value := range icept.IteratorFront(ctx) {
+			if err = value(ctx, rr); err != nil {
 				ec.Push(err)
 				break
 			}
 		}
-		ec.Push(iter.Close())
 	}
 
 	return nil
@@ -291,14 +289,12 @@ func (r *Dispatcher) doMiddleware(ctx context.Context, key Protocol, req *Messag
 	defer ec.Recover()
 
 	if mw, ok := r.middleware.Load(key); ok {
-		iter := mw.StreamFront()
-		for iter.Next(ctx) {
-			if err := iter.Value()(ctx, req); err != nil {
+		for value := range mw.IteratorFront(ctx) {
+			if err := value(ctx, req); err != nil {
 				ec.Push(err)
 				break
 			}
 		}
-		ec.Push(iter.Close())
 	}
 	return nil
 }
@@ -353,23 +349,22 @@ func (r *Dispatcher) registerProcessResponseService() error {
 			case <-ctx.Done():
 				return nil
 			case <-r.isRunning:
-				return r.outgoing.Stream().Parallel(
-					func(ctx context.Context, rr Response) error {
-						if err := r.doIntercept(ctx, Protocol{}, &rr); err != nil {
-							rr.Error = err
-							r.broker.Publish(ctx, rr)
-							return ctx.Err()
-						}
-
-						if err := r.doIntercept(ctx, rr.Protocol, &rr); err != nil {
-							rr.Error = erc.Join(err, rr.Error)
-						}
-
+				return wpa.WithHandler(fnx.NewHandler(func(ctx context.Context, rr Response) error {
+					if err := r.doIntercept(ctx, Protocol{}, &rr); err != nil {
+						rr.Error = err
 						r.broker.Publish(ctx, rr)
 						return ctx.Err()
-					},
-					wpa.WorkerGroupConfNumWorkers(r.conf.Workers),
-				).Run(ctx)
+					}
+
+					if err := r.doIntercept(ctx, rr.Protocol, &rr); err != nil {
+						rr.Error = erc.Join(err, rr.Error)
+					}
+
+					r.broker.Publish(ctx, rr)
+					return ctx.Err()
+				})).RunWithPool().
+					For(r.outgoing.Iterator()).
+					Run(ctx)
 			}
 		},
 	})
@@ -379,7 +374,7 @@ func (r *Dispatcher) registerMiddlwareService() error {
 	return r.orchestrator.Add(&srv.Service{
 		Shutdown: r.pipe.Close,
 		Run: func(ctx context.Context) error {
-			return r.pipe.Distributor().Stream().Parallel(
+			return wpa.WithHandler(fnx.NewHandler(
 				func(ctx context.Context, req Message) error {
 					var resp Response
 					var err error
@@ -405,10 +400,11 @@ func (r *Dispatcher) registerMiddlwareService() error {
 						resp.Error = &Error{Err: err, ID: id, Protocol: protocol}
 						r.ErrorObserver.Get()(resp.Error)
 					}
-					return r.outgoing.Add(resp)
+					return r.outgoing.Push(resp)
 				},
-				wpa.WorkerGroupConfNumWorkers(r.conf.Workers),
-			).Run(ctx)
+			)).RunWithPool(wpa.WorkerGroupConfNumWorkers(r.conf.Workers)).
+				For(r.pipe.IteratorWaitPopFront(ctx)).
+				Run(ctx)
 		},
 	})
 }

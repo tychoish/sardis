@@ -9,12 +9,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/stw"
 )
@@ -47,8 +47,8 @@ type Router[T any] struct {
 	outgoing pubsub.Deque[Envelope]
 	peerPipe pubsub.Queue[T]
 
-	peers astw.Map[string, Connection]
-	store astw.Map[string, peer[T]]
+	peers stw.Map[string, Connection]
+	store stw.Map[string, peer[T]]
 
 	connErrorPeers pubsub.Deque[disconnectedPeer[T]]
 	wg             fnx.WaitGroup
@@ -202,14 +202,14 @@ type Envelope struct {
 	Sequence int64
 }
 
-func (r *Router[T]) AddPeer(opt T) error { return r.peerPipe.Add(opt) }
+func (r *Router[T]) AddPeer(opt T) error { return r.peerPipe.Push(opt) }
 
 func (r *Router[T]) Send(ep Envelope) error { return r.outgoing.PushBack(ep) }
 
 func (r *Router[T]) Stream(ctx context.Context) iter.Seq[Envelope] {
 	sub := r.incoming.Subscribe(ctx)
 	defer r.incoming.Unsubscribe(ctx, sub)
-	return fun.ChannelStream(sub)
+	return irt.Channel(ctx, sub)
 }
 
 func (r *Router[T]) Exec(ctx context.Context, ep Envelope) (Envelope, error) {
@@ -255,13 +255,13 @@ func (r *Router[T]) createNewPeer(ctx context.Context, opts T, conn Connection) 
 
 	// when ensure store returns true, we already had a
 	// peer with the same address, let's use that one
-	if !r.store.EnsureStore(id, p) {
+	if !r.store.Set(id, p) {
 		// TODO: make sure here that the peer's info
 		// is related? we might not want to do
 		p = r.store.Get(id)
 	}
 
-	if previous, ok := r.peers.Swap(id, conn); ok {
+	if previous, ok := r.peers.Load(id); ok {
 		// TODO handle this error? maybe?
 		_ = previous.Close()
 	}
@@ -318,11 +318,7 @@ func (r *Router[T]) createNewPeer(ctx context.Context, opts T, conn Connection) 
 			r.wg.Done()
 		}()
 
-		iter := r.outgoing.StreamFront()
-		defer func() { r.ErrorObserver.Get()(iter.Close()) }()
-
-		for iter.Next(ctx) {
-			ep := iter.Value()
+		for ep := range r.outgoing.IteratorFront(ctx) {
 			ep.Sequence = r.seq.Add(1)
 			ep.SentAt = time.Now()
 			ep.Source = r.self
@@ -449,9 +445,9 @@ func (r *Router[T]) startDialer(ctx context.Context) {
 	r.wg.Add(1)
 	go func() {
 		defer r.wg.Done()
-		iter := r.peerPipe.Stream()
-		for iter.Next(ctx) {
-			r.dialNewPeer(ctx, iter.Value())
+
+		for value := range r.peerPipe.Iterator() {
+			r.dialNewPeer(ctx, value)
 		}
 	}()
 }

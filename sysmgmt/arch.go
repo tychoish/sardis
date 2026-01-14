@@ -287,26 +287,26 @@ func (conf *ArchLinux) FetchPackageFromAUR(name string, update bool) fnx.Worker 
 
 		return repo.FetchJob().
 			PreHook(func(context.Context) {
-				grip.Info(message.BuildPair().
-					Pair("op", opName).
-					Pair("state", "STARTED").
-					Pair("pkg", name).
-					Pair("class", "fetch").
-					Pair("ID", nonce).
-					Pair("host", hn))
+				grip.Info(message.BuildKV().
+					KV("op", opName).
+					KV("state", "STARTED").
+					KV("pkg", name).
+					KV("class", "fetch").
+					KV("ID", nonce).
+					KV("host", hn))
 			}).
 			WithErrorHook(ec.Push).
 			PostHook(func() {
 				err := ec.Resolve()
-				grip.Notice(message.BuildPair().
-					Pair("op", opName).
-					Pair("pkg", name).
-					Pair("stage", "fetch").
-					Pair("err", err != nil).
-					Pair("state", "COMPLETED").
-					Pair("dur", time.Since(startAt)).
-					Pair("ID", nonce).
-					Pair("host", hn))
+				grip.Notice(message.BuildKV().
+					KV("op", opName).
+					KV("pkg", name).
+					KV("stage", "fetch").
+					KV("err", err != nil).
+					KV("state", "COMPLETED").
+					KV("dur", time.Since(startAt)).
+					KV("ID", nonce).
+					KV("host", hn))
 			}).Run(ctx)
 	}
 }
@@ -352,25 +352,25 @@ func (conf *ArchLinux) BuildPackageInABS(name string) fnx.Worker {
 			SetErrorSender(level.Error, buf).
 			Worker().
 			PreHook(func(context.Context) {
-				grip.Info(message.BuildPair().
-					Pair("op", opName).
-					Pair("state", "STARTED").
-					Pair("stage", "build").
-					Pair("pkg", name).
-					Pair("host", hn))
+				grip.Info(message.BuildKV().
+					KV("op", opName).
+					KV("state", "STARTED").
+					KV("stage", "build").
+					KV("pkg", name).
+					KV("host", hn))
 			}).
 			WithErrorHook(ec.Push).
 			PostHook(func() {
 				err := ec.Resolve()
 
-				msg := message.BuildPair().
-					Pair("op", opName).
-					Pair("state", "STARTED").
-					Pair("stage", "build").
-					Pair("pkg", name).
-					Pair("err", err != nil).
-					Pair("dur", time.Since(startAt)).
-					Pair("host", hn)
+				msg := message.BuildKV().
+					KV("op", opName).
+					KV("state", "STARTED").
+					KV("stage", "build").
+					KV("pkg", name).
+					KV("err", err != nil).
+					KV("dur", time.Since(startAt)).
+					KV("host", hn)
 
 				if err != nil {
 					proclog.Infoln("<---------------", jobID, "----------------")

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/sardis/util"
 )
@@ -11,7 +10,7 @@ import (
 type ListNS[T any] struct{ stw.Slice[T] }
 
 func NewList[T any](items ...T) *ListNS[T] {
-	return &ListNS[T]{dt.NewSlice(items)}
+	return &ListNS[T]{stw.NewSlice(items)}
 }
 
 func (ls ListNS[T]) Len() int { return ls.Slice.Len() }

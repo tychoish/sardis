@@ -7,7 +7,7 @@ import (
 	"os"
 
 	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/grip"
@@ -23,7 +23,7 @@ func qrCode() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("qr").
 		SetUsage("gets qrcode from x11 clipboard and renders it on the terminal").
-		SetAction(func(ctx context.Context, _ *cli.Context) error {
+		SetAction(func(ctx context.Context, _ *cli.Command) error {
 			buf := &bufCloser{}
 
 			err := jasper.Context(ctx).CreateCommand(ctx).
@@ -56,7 +56,7 @@ func diffTrees() *cmdr.Commander {
 		SetName("tree-diff").
 		SetUsage("Compare two trees of files, printing duplicates."),
 		// parse args
-		func(ctx context.Context, cc *cli.Context) (dupe.Options, error) {
+		func(ctx context.Context, cc *cli.Command) (dupe.Options, error) {
 			opts := dupe.Options{
 				Target: cc.String("target"),
 				Mirror: cc.String("mirror"),

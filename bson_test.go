@@ -12,7 +12,7 @@ import (
 
 func TestInterBSON(t *testing.T) {
 	input := map[string]string{}
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		input[fmt.Sprint("key", i)] = fmt.Sprint("value", i*2)
 	}
 

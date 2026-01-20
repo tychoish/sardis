@@ -15,21 +15,21 @@ require (
 	github.com/nwidger/jsoncolor v0.3.2
 	github.com/quasilyte/go-ruleguard v0.4.5
 	github.com/shirou/gopsutil v3.21.11+incompatible
-	github.com/tychoish/birch v0.3.2-0.20260108164004-e93907509812
+	github.com/tychoish/birch v0.3.2-0.20260120031640-50aa42790fba
 	github.com/tychoish/cmdr v0.5.0
 	github.com/tychoish/fun v0.14.2
 	github.com/tychoish/godmenu v0.2.2
-	github.com/tychoish/grip v0.4.5-0.20260118231542-68a7c070680b
-	github.com/tychoish/grip/x/desktop v0.0.0-20260117181316-be3c02b2bbb4
-	github.com/tychoish/grip/x/jira v0.0.0-20260117181316-be3c02b2bbb4
-	github.com/tychoish/grip/x/system v0.0.0-20260117181316-be3c02b2bbb4
-	github.com/tychoish/grip/x/telegram v0.0.0-20260117181316-be3c02b2bbb4
-	github.com/tychoish/grip/x/twitter v0.0.0-20260117181316-be3c02b2bbb4
-	github.com/tychoish/grip/x/xmpp v0.0.0-20260117181316-be3c02b2bbb4
-	github.com/tychoish/jasper v0.1.4-0.20260118222050-fb5eb90f244b
-	github.com/tychoish/jasper/x/cli v0.0.0-20260118222050-fb5eb90f244b
-	github.com/tychoish/jasper/x/track v0.0.0-20260118222050-fb5eb90f244b
-	github.com/tychoish/libfun v0.0.0-20260118211327-5b83e2fbc362
+	github.com/tychoish/grip v0.4.5
+	github.com/tychoish/grip/x/desktop v0.0.0-20260120005703-9e626bdebcea
+	github.com/tychoish/grip/x/jira v0.0.0-20260120005703-9e626bdebcea
+	github.com/tychoish/grip/x/system v0.0.0-20260120005703-9e626bdebcea
+	github.com/tychoish/grip/x/telegram v0.0.0-20260120005703-9e626bdebcea
+	github.com/tychoish/grip/x/twitter v0.0.0-20260120005703-9e626bdebcea
+	github.com/tychoish/grip/x/xmpp v0.0.0-20260120005703-9e626bdebcea
+	github.com/tychoish/jasper v0.1.4-0.20260120043549-dc5aa6a6a405
+	github.com/tychoish/jasper/x/cli v0.0.0-20260120043549-dc5aa6a6a405
+	github.com/tychoish/jasper/x/track v0.0.0-20260120043549-dc5aa6a6a405
+	github.com/tychoish/libfun v0.0.0-00010101000000-000000000000
 	github.com/urfave/cli/v3 v3.6.2
 	go.mongodb.org/mongo-driver v1.11.6
 	golang.org/x/tools v0.40.0
@@ -69,7 +69,7 @@ require (
 
 // replace github.com/tychoish/jasper/x/track => ../jasper/x/track
 
-// replace github.com/tychoish/libfun => ../libfun
+replace github.com/tychoish/libfun => ../libfun
 
 require (
 	git.sr.ht/~jackmordaunt/go-toast v1.1.2 // indirect
@@ -85,6 +85,7 @@ require (
 	github.com/containerd/cgroups/v3 v3.1.2 // indirect
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
 	github.com/coreos/go-systemd/v22 v22.6.0 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/dghubble/go-twitter v0.0.0-20220626024101-68c0170dc641 // indirect
 	github.com/dghubble/oauth1 v0.7.1 // indirect
 	github.com/dghubble/sling v1.4.0 // indirect
@@ -137,6 +138,7 @@ require (
 	github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rs/cors v1.11.1 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sergeymakinen/go-bmp v1.0.0 // indirect
 	github.com/sergeymakinen/go-ico v1.0.0-beta.0 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
@@ -145,14 +147,14 @@ require (
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
-	github.com/tychoish/birch/x/ftdc v0.0.0-20260114025157-d2102f5441c3 // indirect
-	github.com/tychoish/birch/x/mrpc v0.0.0-20260114025157-d2102f5441c3 // indirect
+	github.com/tychoish/birch/x/ftdc v0.0.0-20260120031640-50aa42790fba // indirect
 	github.com/tychoish/gimlet v0.0.0-20251028182000-6a35909ebafc // indirect
-	github.com/tychoish/grip/x/metrics v0.0.0-20260118231542-68a7c070680b // indirect
-	github.com/tychoish/grip/x/splunk v0.0.0-20260118231542-68a7c070680b // indirect
-	github.com/tychoish/jasper/x/remote v0.0.0-20260118222050-fb5eb90f244b // indirect
-	github.com/tychoish/jasper/x/splunk v0.0.0-20260118222050-fb5eb90f244b // indirect
+	github.com/tychoish/grip/x/metrics v0.0.0-20260120005703-9e626bdebcea // indirect
+	github.com/tychoish/grip/x/splunk v0.0.0-20260120005703-9e626bdebcea // indirect
+	github.com/tychoish/jasper/x/remote v0.0.0-20260120043549-dc5aa6a6a405 // indirect
+	github.com/tychoish/jasper/x/splunk v0.0.0-20260120043549-dc5aa6a6a405 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
+	github.com/urfave/cli/v2 v2.27.7 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
@@ -160,6 +162,7 @@ require (
 	github.com/xdg-go/stringprep v1.0.3 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/xmppo/go-xmpp v0.2.15 // indirect
+	github.com/xrash/smetrics v0.0.0-20250705151800-55b8f293f342 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/crypto v0.47.0 // indirect

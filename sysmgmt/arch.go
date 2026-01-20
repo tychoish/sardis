@@ -11,12 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
-	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/fun/wpa"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
@@ -53,12 +52,12 @@ type ArchLinux struct {
 
 	cache struct {
 		collectedAt         time.Time
-		versions            stw.Map[string, string]
-		explicitlyInstalled dt.Set[string]
-		inSyncDB            dt.Set[string]
-		absPackages         dt.Set[string]
-		notInSyncDB         dt.Set[string]
-		dependencies        dt.Set[string]
+		versions            adt.Map[string, string]
+		explicitlyInstalled adt.Set[string]
+		inSyncDB            adt.Set[string]
+		absPackages         adt.Set[string]
+		notInSyncDB         adt.Set[string]
+		dependencies        adt.Set[string]
 	}
 }
 
@@ -87,7 +86,7 @@ func (conf *ArchLinux) ResolvePackages(ctx context.Context) iter.Seq[ArchPackage
 
 	return func(yield func(ArchPackage) bool) {
 		// First yield discovered packages
-		for k, v := range conf.cache.versions {
+		for k, v := range conf.cache.versions.Iterator() {
 			pkg := conf.populatePackage(ArchPackage{
 				Name:    k,
 				Version: v,
@@ -163,9 +162,6 @@ func processPackages(cmd string, adder func(string) error) fnx.Worker {
 }
 
 func (conf *ArchLinux) collectVersions(ctx context.Context) error {
-	if conf.cache.versions == nil {
-		conf.cache.versions = map[string]string{}
-	}
 	iter, err := libfun.RunCommand(ctx, "pacman --query")
 	if err != nil {
 		return err

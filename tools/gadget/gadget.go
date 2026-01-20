@@ -467,8 +467,7 @@ func report(
 		err = erc.Join(err, scanErr)
 	}
 
-	msg := grip.Build().KVbuilder()
-	msg.KV("pkg", mod.PackageName)
+	msg := grip.Build().KV("pkg", mod.PackageName)
 
 	if tr.MissingTests {
 		msg.KV("state", "no tests")

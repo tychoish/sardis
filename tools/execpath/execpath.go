@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/stw"
@@ -22,13 +23,17 @@ func FindAll(ctx context.Context) iter.Seq[string] {
 			irt.Unique(irt.Slice(filepath.SplitList(os.Getenv("PATH")))),
 			func(path string) iter.Seq[string] {
 				if !util.FileExists(path) {
-					return nil
+					return irt.One(uuid.Must(uuid.NewUUID()).String())
 				}
 				seq, closer := libfun.WalkDirIterator(path, func(p string, d fs.DirEntry) (*string, error) {
-					if d.IsDir() || d.Type().Perm()&0o111 != 0 {
+					if d == nil || d.IsDir() || d.Type().Perm()&0o111 != 0 {
 						return nil, nil
 					}
-					return stw.Ptr(strings.TrimSpace(p)), nil
+					p = strings.TrimSpace(p)
+					if p == "" {
+						return nil, nil
+					}
+					return stw.Ptr(p), nil
 				})
 				defer func() { grip.Error(closer()) }()
 				return irt.Keep(seq,
@@ -37,7 +42,7 @@ func FindAll(ctx context.Context) iter.Seq[string] {
 							return false
 						}
 						stat, err := os.Stat(in)
-						if err != nil || os.IsNotExist(err) || stat.IsDir() {
+						if err != nil || os.IsNotExist(err) || (stat != nil && stat.IsDir()) {
 							return false
 						}
 						return true

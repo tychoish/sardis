@@ -260,6 +260,8 @@ github.com/tychoish/gimlet v0.0.0-20251028182000-6a35909ebafc h1:y4H20p6MC55U627
 github.com/tychoish/gimlet v0.0.0-20251028182000-6a35909ebafc/go.mod h1:pH2mprJw9cYWMtLsrd0YrxDajjixYyd7K0c65aDDUBQ=
 github.com/tychoish/godmenu v0.2.2 h1:fMmrvEPmcp58K6qeB1RaJm6GT1UEnLYbPXw7r5FBGIo=
 github.com/tychoish/godmenu v0.2.2/go.mod h1:ruH4Akm197H2G5r2/HhmZhnhlq3hJLCVHKAYPYWPLFU=
+github.com/tychoish/godmenu v0.2.3-0.20260121030142-c70ca6cfed3c h1:Qup4UJ12ZTE1VQL12gLMOuEzROZJvpt2yR5nzOHOj2w=
+github.com/tychoish/godmenu v0.2.3-0.20260121030142-c70ca6cfed3c/go.mod h1:ruH4Akm197H2G5r2/HhmZhnhlq3hJLCVHKAYPYWPLFU=
 github.com/tychoish/grip v0.4.4 h1:rhNwCDC9n3wl9gFeCwvSnhzvvyJDOZkeFMcw4fmUV3U=
 github.com/tychoish/grip v0.4.4/go.mod h1:rsQaL/y3avHi8G8UHhTDGwttebcm/eDD7+MYdxrCQv8=
 github.com/tychoish/grip v0.4.5 h1:8c2vEL39ESTRcK0JUl0yBzQ7p7aXeyVWuLX/UcOYtLM=

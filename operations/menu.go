@@ -2,10 +2,12 @@ package operations
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"fmt"
 	"iter"
 	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -110,18 +112,56 @@ func SearchMenu() *cmdr.Commander {
 	)
 }
 
+func HasCapitals(str string) bool  { return strings.ContainsAny(str, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") }
+func HasSeparator(str string) bool { return strings.ContainsAny(str, "_-=+.><>(){}[]") }
+func HasNumbers(str string) bool   { return strings.ContainsAny(str, "1234567890") }
 func ExecCommand() *cmdr.Commander {
 	return addOpCommand(cmdr.MakeCommander().
 		SetName("exec").
 		SetUsage("list or run a command"),
 		"command", func(ctx context.Context, args *withConf[string]) error {
-			st := irt.Collect(irt.Unique(execpath.FindAll(ctx)))
-			var err error
+			st := irt.Collect(irt.Unique(irt.Convert(execpath.FindAll(ctx), filepath.Base)))
+			slices.SortFunc(st, func(a, b string) int {
+				ahn, bhn := HasNumbers(a), HasNumbers(b)
+				switch {
+				case ahn && !bhn:
+					return 1
+				case !ahn && bhn:
+					return -1
+				}
+
+				ahc, bhc := HasCapitals(a), HasCapitals(b)
+				switch {
+				case ahc && !bhc:
+					return 1
+				case !ahc && bhc:
+					return -1
+				}
+				ahs, bhs := HasSeparator(a), HasSeparator(b)
+
+				switch {
+				case ahs && !bhs:
+					return 1
+				case !ahs && bhs:
+					return -1
+				}
+
+				ahl, bhl := len(a) < 7, len(b) < 7
+				switch {
+				case ahl && !bhl:
+					return 1
+				case !ahl && bhl:
+					return -1
+				}
+
+				return cmp.Compare(len(a), len(b))
+			})
 
 			res, err := godmenu.Run(ctx,
 				godmenu.SetSelections(st),
+				godmenu.SetMatchRequirement(false),
 				godmenu.WithFlags(stw.Ptr(args.conf.Settings.DMenuFlags)),
-				godmenu.Prompt(fmt.Sprintf("%s exec ==>>", "sardis")),
+				godmenu.Prompt(fmt.Sprintf("%s exec [%d] ==>>", "sardis", len(st))),
 				godmenu.MenuLines(min(len(st), args.conf.Settings.DMenuFlags.Lines)),
 			)
 			if err != nil {

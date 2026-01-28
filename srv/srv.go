@@ -5,6 +5,7 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/godmenu"
 	"github.com/tychoish/grip/x/telegram"
 	"github.com/tychoish/sardis/util"
@@ -22,6 +23,10 @@ type Configuration struct {
 		WithAnnotations     bool   `bson:"annotate" json:"annotate" yaml:"annotate"`
 		AnnotationSeparator string `bson:"annotation_separator" json:"annotation_separator" yaml:"annotation_separator"`
 	} `bson:"runtime" json:"runtime" yaml:"runtime"`
+	ShellHistory struct {
+		Paths           []string `bson:"paths" json:"paths" yaml:"paths"`
+		ExcludePrefixes []string `bson:"exclude_prefixes" json:"exclude_prefixes" yaml:"exclude_prefixes"`
+	} `bson:"shell_history" json:"shell_history" yaml:"shell_history"`
 }
 
 func (conf *Configuration) Join(mc *Configuration) {
@@ -46,6 +51,13 @@ func (conf *Configuration) Join(mc *Configuration) {
 	conf.Telegram.Target = util.Default(mc.Telegram.Target, conf.Telegram.Target)
 	conf.Telegram.Token = util.Default(mc.Telegram.Token, conf.Telegram.Token)
 	conf.Telegram.Client = util.Default(mc.Telegram.Client, conf.Telegram.Client)
+
+	conf.ShellHistory.Paths = irt.Collect(irt.RemoveZeros(
+		irt.Keep(irt.Convert(
+			irt.Slice(conf.ShellHistory.Paths),
+			util.TryExpandHomeDir,
+		), util.FileExists),
+	))
 }
 
 type Credentials struct {

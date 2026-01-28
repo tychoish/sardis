@@ -2,9 +2,11 @@ package operations
 
 import (
 	"bufio"
+	"bytes"
 	"cmp"
 	"context"
 	"fmt"
+	"io"
 	"iter"
 	"os"
 	"path/filepath"
@@ -115,51 +117,76 @@ func SearchMenu() *cmdr.Commander {
 func HasCapitals(str string) bool  { return strings.ContainsAny(str, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") }
 func HasSeparator(str string) bool { return strings.ContainsAny(str, "_-=+.><>(){}[]") }
 func HasNumbers(str string) bool   { return strings.ContainsAny(str, "1234567890") }
+
+func CmpBool(a, b bool) int {
+	switch {
+	case a == b:
+		return 0
+	case a:
+		return -1
+	case b:
+		return 1
+	default:
+		panic("impossible")
+	}
+}
+
+func HasPrefix(prefixes iter.Seq[string], item string) bool {
+	for prefix := range prefixes {
+		if strings.HasPrefix(item, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func ExecCommand() *cmdr.Commander {
 	return addOpCommand(cmdr.MakeCommander().
 		SetName("exec").
 		SetUsage("list or run a command"),
 		"command", func(ctx context.Context, args *withConf[string]) error {
-			st := irt.Collect(irt.Unique(irt.Convert(execpath.FindAll(ctx), filepath.Base)))
+			var ec erc.Collector
+			st := irt.Collect(irt.Unique(
+				irt.Remove(irt.Convert(
+					irt.Chain(irt.Args(
+						irt.Convert(execpath.FindAll(ctx), filepath.Base),
+						irt.Chain(irt.Convert(
+							irt.Convert(irt.Slice(args.conf.Settings.ShellHistory.Paths),
+								func(fn string) io.Reader {
+									data, err := os.ReadFile(fn)
+									ec.Push(err)
+									return bufio.NewReader(bytes.NewReader(data))
+								},
+							),
+							irt.ReadLines),
+						),
+					)), strings.TrimSpace),
+					func(str string) bool {
+						switch {
+						case len(str) == 1 || len(str) > 180 || strings.ContainsAny(str, "/;$()'\\\"*|"):
+							return true
+						case HasPrefix(irt.Slice(args.conf.Settings.ShellHistory.ExcludePrefixes), str):
+							return true
+						default:
+							return false
+						}
+					}),
+			))
+
 			slices.SortFunc(st, func(a, b string) int {
-				ahn, bhn := HasNumbers(a), HasNumbers(b)
-				switch {
-				case ahn && !bhn:
-					return 1
-				case !ahn && bhn:
-					return -1
-				}
-
-				ahc, bhc := HasCapitals(a), HasCapitals(b)
-				switch {
-				case ahc && !bhc:
-					return 1
-				case !ahc && bhc:
-					return -1
-				}
-				ahs, bhs := HasSeparator(a), HasSeparator(b)
-
-				switch {
-				case ahs && !bhs:
-					return 1
-				case !ahs && bhs:
-					return -1
-				}
-
-				ahl, bhl := len(a) < 7, len(b) < 7
-				switch {
-				case ahl && !bhl:
-					return 1
-				case !ahl && bhl:
-					return -1
-				}
-
-				return cmp.Compare(len(a), len(b))
+				return cmp.Or(
+					CmpBool(HasNumbers(a), HasNumbers(b)),
+					CmpBool(HasCapitals(a), HasCapitals(b)),
+					CmpBool(HasSeparator(a), HasSeparator(b)),
+					cmp.Compare(len(b), len(a)),
+				)
 			})
+			grip.Info(strings.Join(st, "\n"))
 
 			res, err := godmenu.Run(ctx,
 				godmenu.SetSelections(st),
 				godmenu.SetMatchRequirement(false),
+				godmenu.AllowDuplicateSelections(),
 				godmenu.WithFlags(stw.Ptr(args.conf.Settings.DMenuFlags)),
 				godmenu.Prompt(fmt.Sprintf("%s exec [%d] ==>>", "sardis", len(st))),
 				godmenu.MenuLines(min(len(st), args.conf.Settings.DMenuFlags.Lines)),

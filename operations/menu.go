@@ -146,20 +146,36 @@ func ExecCommand() *cmdr.Commander {
 		SetUsage("list or run a command"),
 		"command", func(ctx context.Context, args *withConf[string]) error {
 			var ec erc.Collector
+
+			bins := &dt.Set[string]{}
+			bins.Extend(irt.Convert(execpath.FindAll(ctx), filepath.Base))
+
+			history := irt.Unique(irt.Remove(
+				irt.Chain(irt.Convert(irt.Convert(irt.Slice(args.conf.Settings.ShellHistory.Paths),
+					func(fn string) io.Reader {
+						data, err := os.ReadFile(fn)
+						ec.Push(err)
+						return bufio.NewReader(bytes.NewReader(data))
+					}), irt.ReadLines)),
+				func(bin string) bool {
+					if !strings.Contains(bin, " ") && bins.Check(bin) {
+						return false
+					}
+					cmd := strings.Fields(bin)
+					if len(cmd) == 0 {
+						return true
+					}
+					if bins.Check(cmd[0]) {
+						return false
+					}
+					return true
+				}))
+
 			st := irt.Collect(irt.Unique(
 				irt.Remove(irt.Convert(
 					irt.Chain(irt.Args(
-						irt.Convert(execpath.FindAll(ctx), filepath.Base),
-						irt.Chain(irt.Convert(
-							irt.Convert(irt.Slice(args.conf.Settings.ShellHistory.Paths),
-								func(fn string) io.Reader {
-									data, err := os.ReadFile(fn)
-									ec.Push(err)
-									return bufio.NewReader(bytes.NewReader(data))
-								},
-							),
-							irt.ReadLines),
-						),
+						bins.Iterator(),
+						history,
 					)), strings.TrimSpace),
 					func(str string) bool {
 						switch {

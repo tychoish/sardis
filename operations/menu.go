@@ -195,6 +195,7 @@ func ExecCommand() *cmdr.Commander {
 					CmpBool(HasCapitals(a), HasCapitals(b)),
 					CmpBool(HasSeparator(a), HasSeparator(b)),
 					cmp.Compare(len(b), len(a)),
+					cmp.Compare(a, b),
 				)
 			})
 			grip.Info(strings.Join(st, "\n"))

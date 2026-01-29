@@ -43,34 +43,46 @@ func Admin() *cmdr.Commander {
 func hacking() *cmdr.Commander {
 	return cmdr.MakeCommander().
 		SetName("hack").
-		With(StandardSardisOperationSpec().SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-			grip.Noticeln("has conf", conf != nil)
-			grip.Noticeln("has default jasper", jasper.HasManager(ctx))
-
-			grip.Info(message.Fields{
-				"istty":                      isatty.IsTerminal(os.Stdin.Fd()),
-				"version":                    sardis.BuildRevision,
-				"alacritty":                  conf.Operations.AlacrittySocket(),
-				"ssh_agent":                  conf.Operations.SSHAgentSocket(),
-				"ops.include_local":          conf.Operations.Settings.IncludeLocalSHH,
-				global.EnvVarAlacrittySocket: os.Getenv(global.EnvVarAlacrittySocket),
-				global.EnvVarSSHAgentSocket:  os.Getenv(global.EnvVarSSHAgentSocket),
-			})
-			table := tabby.New()
-			table.AddHeader("Group", "Command")
-			for cg := range slices.Values(conf.Operations.Commands) {
-				for i := 0; i < len(cg.Commands); i++ {
-					if i == 0 {
-						table.AddLine(cg.Name, cg.NamesAtIndex(i)[0:])
-						continue
+		Subcommanders(
+			cmdr.MakeCommander().
+				SetName("pkg").
+				With(StandardSardisOperationSpec().SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
+					seq := conf.System.Arch.ResolvePackages(ctx)
+					for pkg := range seq {
+						grip.Info(pkg)
 					}
-					table.AddLine("", cg.NamesAtIndex(i)[0:])
-				}
-				table.AddLine("", "")
-			}
-			table.Print()
-			return nil
-		}).Add)
+					return nil
+				}).Add),
+			cmdr.MakeCommander().
+				SetName("env").
+				With(StandardSardisOperationSpec().SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
+					grip.Noticeln("has conf", conf != nil)
+					grip.Noticeln("has default jasper", jasper.HasManager(ctx))
+
+					grip.Info(message.Fields{
+						"istty":                      isatty.IsTerminal(os.Stdin.Fd()),
+						"version":                    sardis.BuildRevision,
+						"alacritty":                  conf.Operations.AlacrittySocket(),
+						"ssh_agent":                  conf.Operations.SSHAgentSocket(),
+						"ops.include_local":          conf.Operations.Settings.IncludeLocalSHH,
+						global.EnvVarAlacrittySocket: os.Getenv(global.EnvVarAlacrittySocket),
+						global.EnvVarSSHAgentSocket:  os.Getenv(global.EnvVarSSHAgentSocket),
+					})
+					table := tabby.New()
+					table.AddHeader("Group", "Command")
+					for cg := range slices.Values(conf.Operations.Commands) {
+						for i := 0; i < len(cg.Commands); i++ {
+							if i == 0 {
+								table.AddLine(cg.Name, cg.NamesAtIndex(i)[0:])
+								continue
+							}
+							table.AddLine("", cg.NamesAtIndex(i)[0:])
+						}
+						table.AddLine("", "")
+					}
+					table.Print()
+					return nil
+				}).Add))
 }
 
 func linkOp() *cmdr.Commander {

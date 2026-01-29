@@ -16,7 +16,6 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
-	"github.com/tychoish/fun/wpa"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/level"
 	"github.com/tychoish/grip/message"
@@ -63,16 +62,14 @@ type ArchLinux struct {
 
 func (conf *ArchLinux) Discovery() fnx.Worker { return conf.doDiscovery }
 func (conf *ArchLinux) doDiscovery(ctx context.Context) error {
-	return wpa.RunWithPool(
-		irt.Args(
-			conf.collectVersions,
-			conf.collectExplicityInstalled,
-			conf.collectInSyncDB,
-			conf.collectDependents,
-			fnx.Worker(conf.collectNotInSyncDB).Join(conf.collectCurrentUsersABS),
-		)).
-		Join(fnx.MakeOperation(func() { conf.cache.collectedAt = time.Now() }).Worker()).
-		Run(ctx)
+	defer func() { conf.cache.collectedAt = time.Now() }()
+	return erc.Join(
+		conf.collectVersions(ctx),
+		conf.collectExplicityInstalled(ctx),
+		conf.collectInSyncDB(ctx),
+		conf.collectDependents(ctx),
+		fnx.Worker(conf.collectNotInSyncDB).Join(conf.collectCurrentUsersABS).Run(ctx),
+	)
 }
 
 func (conf *ArchLinux) ResolvePackages(ctx context.Context) iter.Seq[ArchPackage] {
@@ -135,7 +132,10 @@ func parsePacmanQline(line string) (zero irt.KV[string, string], _ error) {
 	if err != nil {
 		return zero, erc.Join(fmt.Errorf("%q is not a valid package spec, %d part(s)", line, n), ers.ErrCurrentOpSkip)
 	}
-	erc.InvariantOk(n != 2 && err == nil, "failed to parse package string", line, "without error reported")
+	if n != 2 {
+		return zero, fmt.Errorf("failed to parse package string %q [%d] without error reported", line, n)
+	}
+
 	return out, nil
 }
 

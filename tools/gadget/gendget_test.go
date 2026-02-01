@@ -75,7 +75,7 @@ func TestGraph(t *testing.T) {
 		for idx, group := range graph.Order {
 			totalNodes += len(group)
 			seen.Extend(irt.Slice(group))
-			grip.Info(message.BuildKV().
+			grip.Info(message.NewKV().
 				KV("idx", idx).
 				KV("size", len(group)).
 				KV("group", group),
@@ -151,7 +151,7 @@ func TestGraph(t *testing.T) {
 			var longest int
 			for idx, group := range graph.Order {
 				observed += len(group)
-				grip.Info(message.BuildKV().
+				grip.Info(message.NewKV().
 					KV("idx", idx).
 					KV("size", len(group)).
 					KV("group", group),

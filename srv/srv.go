@@ -24,10 +24,15 @@ type Configuration struct {
 		AnnotationSeparator string `bson:"annotation_separator" json:"annotation_separator" yaml:"annotation_separator"`
 	} `bson:"runtime" json:"runtime" yaml:"runtime"`
 	ShellHistory struct {
-		Paths           []string `bson:"paths" json:"paths" yaml:"paths"`
-		ExcludePrefixes []string `bson:"exclude_prefixes" json:"exclude_prefixes" yaml:"exclude_prefixes"`
+		MinLength         int      `bson:"min_length" json:"min_length" yaml:"min_length"`
+		MaxLength         int      `bson:"max_length" json:"max_length" yaml:"max_length"`
+		Paths             []string `bson:"paths" json:"paths" yaml:"paths"`
+		ExcludePrefixes   []string `bson:"exclude_prefixes" json:"exclude_prefixes" yaml:"exclude_prefixes"`
+		ExcludeSubstrings []string `bson:"exclude_substrings" json:"exclude_substrings" yaml:"exclude_substrings"`
 	} `bson:"shell_history" json:"shell_history" yaml:"shell_history"`
 }
+
+func (conf *Configuration) DMenu() godmenu.Arg { return godmenu.WithFlags(&conf.DMenuFlags) }
 
 func (conf *Configuration) Join(mc *Configuration) {
 	if mc == nil {
@@ -52,12 +57,51 @@ func (conf *Configuration) Join(mc *Configuration) {
 	conf.Telegram.Token = util.Default(mc.Telegram.Token, conf.Telegram.Token)
 	conf.Telegram.Client = util.Default(mc.Telegram.Client, conf.Telegram.Client)
 
+	conf.ShellHistory.ExcludePrefixes = irt.Collect(irt.Unique(irt.ChainSlices(irt.Args(conf.ShellHistory.ExcludePrefixes, mc.ShellHistory.ExcludePrefixes))))
+	conf.ShellHistory.ExcludeSubstrings = irt.Collect(irt.Unique(irt.ChainSlices(irt.Args(conf.ShellHistory.ExcludeSubstrings, mc.ShellHistory.ExcludeSubstrings))))
 	conf.ShellHistory.Paths = irt.Collect(irt.RemoveZeros(
 		irt.Keep(irt.Convert(
-			irt.Slice(conf.ShellHistory.Paths),
+			irt.Unique(irt.ChainSlices(irt.Args(conf.ShellHistory.Paths, mc.ShellHistory.Paths))),
 			util.TryExpandHomeDir,
 		), util.FileExists),
 	))
+	conf.ShellHistory.MinLength = min(min(conf.ShellHistory.MinLength, mc.ShellHistory.MinLength))
+	conf.ShellHistory.MaxLength = max(conf.ShellHistory.MaxLength, mc.ShellHistory.MaxLength)
+}
+
+func (conf *Configuration) Validate() error {
+	conf.DMenuFlags = godmenu.Flags{
+		Path:            util.Default(conf.DMenuFlags.Path, godmenu.DefaultDMenuPath),
+		BackgroundColor: util.Default(conf.DMenuFlags.BackgroundColor, godmenu.DefaultBackgroundColor),
+		TextColor:       util.Default(conf.DMenuFlags.TextColor, godmenu.DefaultTextColor),
+		Font:            util.Default(conf.DMenuFlags.Font, "Source Code Pro-14"),
+		Lines:           util.Default(conf.DMenuFlags.Lines, 16),
+		Prompt:          util.Default(conf.DMenuFlags.Prompt, "=>>"),
+	}
+
+	ec := &erc.Collector{}
+	ec.Push(conf.Notify.Validate())
+	ec.Push(conf.Credentials.Validate())
+
+	// TODO: actually have a client pool
+	conf.Telegram.Client = http.DefaultClient
+
+	// TODO fix: there's an IsZero method
+	// which checks if the client is set,
+	// but users shouldn't have to fix this.
+
+	if !conf.Telegram.IsZero() {
+		ec.Push(conf.Telegram.Validate())
+	}
+
+	for idx := range conf.ConfigPaths {
+		conf.ConfigPaths[idx] = util.TryExpandHomeDir(conf.ConfigPaths[idx])
+	}
+
+	conf.ShellHistory.MaxLength = util.Default(max(0, conf.ShellHistory.MaxLength), 32)
+	conf.ShellHistory.MinLength = util.Default(min(conf.ShellHistory.MaxLength, conf.ShellHistory.MinLength), 4)
+
+	return ec.Resolve()
 }
 
 type Credentials struct {
@@ -109,40 +153,6 @@ func (conf *Credentials) Join(mc *Credentials) {
 
 	conf.AWS = append(conf.AWS, mc.AWS...)
 }
-
-func (conf *Configuration) Validate() error {
-	conf.DMenuFlags = godmenu.Flags{
-		Path:            util.Default(conf.DMenuFlags.Path, godmenu.DefaultDMenuPath),
-		BackgroundColor: util.Default(conf.DMenuFlags.BackgroundColor, godmenu.DefaultBackgroundColor),
-		TextColor:       util.Default(conf.DMenuFlags.TextColor, godmenu.DefaultTextColor),
-		Font:            util.Default(conf.DMenuFlags.Font, "Source Code Pro-14"),
-		Lines:           util.Default(conf.DMenuFlags.Lines, 16),
-		Prompt:          util.Default(conf.DMenuFlags.Prompt, "=>>"),
-	}
-
-	ec := &erc.Collector{}
-	ec.Push(conf.Notify.Validate())
-	ec.Push(conf.Credentials.Validate())
-
-	// TODO: actually have a client pool
-	conf.Telegram.Client = http.DefaultClient
-
-	// TODO fix: there's an IsZero method
-	// which checks if the client is set,
-	// but users shouldn't have to fix this.
-
-	if !conf.Telegram.IsZero() {
-		ec.Push(conf.Telegram.Validate())
-	}
-
-	for idx := range conf.ConfigPaths {
-		conf.ConfigPaths[idx] = util.TryExpandHomeDir(conf.ConfigPaths[idx])
-	}
-
-	return ec.Resolve()
-}
-
-func (conf *Configuration) DMenu() godmenu.Arg { return godmenu.WithFlags(&conf.DMenuFlags) }
 
 func (conf *Credentials) Validate() error {
 	if conf.Path == "" {

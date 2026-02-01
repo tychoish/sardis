@@ -67,7 +67,7 @@ func (conf *Command) Worker() fnx.Worker {
 			Append(conf.Command).
 			Append(conf.Commands...).
 			Prerequisite(func() bool {
-				msg := message.BuildKV().
+				msg := message.NewKV().
 					KV("op", conf.Name).
 					KV("state", "STARTED").
 					KV("host", hn).
@@ -88,7 +88,7 @@ func (conf *Command) Worker() fnx.Worker {
 				err = ec.Resolve()
 
 				defer util.DropErrorOnDefer(buf.Close)
-				msg := message.BuildKV().
+				msg := message.NewKV().
 					KV("op", conf.Name).
 					KV("state", "COMPLETED").
 					KV("dur", time.Since(startAt)).

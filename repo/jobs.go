@@ -43,7 +43,7 @@ func (conf *GitRepository) FetchJob() fnx.Worker {
 		hostname := util.GetHostname()
 
 		if !util.FileExists(conf.Path) {
-			grip.Info(message.BuildKV().
+			grip.Info(message.NewKV().
 				KV("op", opName).
 				KV("id", id).
 				KV("run", runID).
@@ -75,7 +75,7 @@ func (conf *GitRepository) FetchJob() fnx.Worker {
 			Append(conf.Post...).
 			Worker().
 			PreHook(func(context.Context) {
-				grip.Info(message.BuildKV().
+				grip.Info(message.NewKV().
 					KV("op", opName).
 					KV("state", "STARTED").
 					KV("run", runID).
@@ -86,7 +86,7 @@ func (conf *GitRepository) FetchJob() fnx.Worker {
 			}).
 			WithErrorFilter(func(err error) error {
 				proclog.Infoln(ruler, id, ruler)
-				msg := message.BuildKV().
+				msg := message.NewKV().
 					KV("op", opName).
 					KV("state", "COMPLETED").
 					KV("run", runID).
@@ -121,7 +121,7 @@ func (conf *GitRepository) CloneJob() fnx.Worker {
 		nonce := strings.ToLower(rand.Text())[:7]
 
 		if _, err := os.Stat(conf.Path); !os.IsNotExist(err) {
-			grip.Info(message.BuildKV().
+			grip.Info(message.NewKV().
 				KV("op", opName).
 				KV("run", nonce).
 				KV("msg", "repo exists, skipping clone, running update jobs").
@@ -162,7 +162,7 @@ func (conf *GitRepository) CloneJob() fnx.Worker {
 			Append(conf.Post...).
 			Run(ctx)
 
-		msg := message.BuildKV().
+		msg := message.NewKV().
 			KV("op", opName).
 			KV("run", nonce).
 			KV("dur", time.Since(startAt)).
@@ -201,7 +201,7 @@ func (conf *GitRepository) UpdateJob() fnx.Worker {
 			return ers.Wrap(err, id)
 		}
 
-		grip.Info(message.BuildKV().
+		grip.Info(message.NewKV().
 			KV("op", opName).
 			KV("state", "STARTED").
 			KV("id", id).
@@ -210,7 +210,7 @@ func (conf *GitRepository) UpdateJob() fnx.Worker {
 		)
 
 		defer func() {
-			msg := message.BuildKV().
+			msg := message.NewKV().
 				KV("op", opName).
 				KV("state", "COMPLETED").
 				KV("id", id).
@@ -318,7 +318,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fnx.Worker {
 		defer util.DropErrorOnDefer(procbuf.Close)
 		proclog.Noticeln(ruler, bullet, ruler)
 
-		grip.Info(message.BuildKV().
+		grip.Info(message.NewKV().
 			KV("op", opName).
 			KV("state", "STARTED").
 			KV("run", nonce).
@@ -349,7 +349,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fnx.Worker {
 			WithErrorFilter(func(err error) error {
 				proclog.Noticeln(ruler, bullet, ruler)
 				if err != nil {
-					grip.Critical(message.BuildKV().
+					grip.Critical(message.NewKV().
 						KV("op", opName).
 						KV("state", "ERRORED").
 						KV("run", nonce).
@@ -370,7 +370,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fnx.Worker {
 			}).
 			Run(ctx)
 
-		grip.Info(message.BuildKV().
+		grip.Info(message.NewKV().
 			KV("op", opName).
 			KV("state", "COMPLETED").
 			KV("run", nonce).
@@ -399,7 +399,7 @@ func (conf *GitRepository) CleanupJob() fnx.Worker {
 		nonce := strings.ToLower(rand.Text())[:7]
 
 		defer func() {
-			grip.Critical(message.BuildKV().
+			grip.Critical(message.NewKV().
 				KV("op", opName).
 				KV("id", id).
 				KV("run", nonce).
@@ -424,7 +424,7 @@ func (conf *GitRepository) CleanupJob() fnx.Worker {
 			WithErrorFilter(func(err error) error {
 				proclog.Infoln(ruler, id, ruler)
 				if err != nil {
-					grip.Critical(message.BuildKV().
+					grip.Critical(message.NewKV().
 						KV("op", opName).
 						KV("id", id).
 						KV("run", nonce).

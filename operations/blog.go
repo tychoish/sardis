@@ -64,7 +64,7 @@ func blogPublish() *cmdr.Commander {
 				return nil
 			}
 
-			grip.Notice(message.BuildKV().
+			grip.Notice(message.NewKV().
 				KV("op", opName).
 				KV("state", "STARTED").
 				KV("name", name).
@@ -74,7 +74,7 @@ func blogPublish() *cmdr.Commander {
 			)
 
 			defer func() {
-				grip.Notice(message.BuildKV().
+				grip.Notice(message.NewKV().
 					KV("op", opName).
 					KV("state", "COMPLETED").
 					KV("err", err != nil).

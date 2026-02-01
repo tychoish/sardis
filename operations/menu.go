@@ -140,11 +140,21 @@ func HasPrefix(prefixes iter.Seq[string], item string) bool {
 	return false
 }
 
+func HasSubstring(substrings iter.Seq[string], item string) bool {
+	for substr := range substrings {
+		if strings.Contains(item, substr) {
+			return true
+		}
+	}
+	return false
+}
+
 func ExecCommand() *cmdr.Commander {
 	return addOpCommand(cmdr.MakeCommander().
 		SetName("exec").
 		SetUsage("list or run a command"),
 		"command", func(ctx context.Context, args *withConf[string]) error {
+			conf := args.conf
 			var ec erc.Collector
 
 			bins := &dt.Set[string]{}
@@ -178,10 +188,17 @@ func ExecCommand() *cmdr.Commander {
 						history,
 					)), strings.TrimSpace),
 					func(str string) bool {
+						length := len(str)
 						switch {
-						case len(str) == 1 || len(str) > 180 || strings.ContainsAny(str, "/;$()'\\\"*|"):
+						case length < conf.Settings.ShellHistory.MinLength:
+							return true
+						case length > conf.Settings.ShellHistory.MaxLength:
 							return true
 						case HasPrefix(irt.Slice(args.conf.Settings.ShellHistory.ExcludePrefixes), str):
+							return true
+						case strings.ContainsAny(str, "/;$()'\\\"*|"):
+							return true
+						case HasSubstring(irt.Slice(args.conf.Settings.ShellHistory.ExcludeSubstrings), str):
 							return true
 						default:
 							return false
@@ -198,7 +215,6 @@ func ExecCommand() *cmdr.Commander {
 					cmp.Compare(a, b),
 				)
 			})
-			grip.Info(strings.Join(st, "\n"))
 
 			res, err := godmenu.Run(ctx,
 				godmenu.SetSelections(st),
@@ -295,7 +311,7 @@ func fuzzy() *cmdr.Commander {
 						}
 					})
 
-					grip.Notice(message.BuildKV().
+					grip.Notice(message.NewKV().
 						KV("op", "cmd.fuzzy").
 						KV("state", "COMPLETED").
 						KV("err", err != nil).
@@ -409,6 +425,7 @@ func DMenu() *cmdr.Commander {
 		Subcommanders(
 			dmenuSearch(),
 			listCommands(),
+			ExecCommand(),
 		),
 		commandFlagName, func(ctx context.Context, args *withConf[[]string]) error {
 			op := args.arg

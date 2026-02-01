@@ -97,7 +97,7 @@ func (conf *SystemdService) Worker() fnx.Worker {
 			}
 		}
 
-		msg := message.BuildKV().
+		msg := message.NewKV().
 			KV("op", opName).
 			KV("state", "COMPLETED").
 			KV("unit", conf.Unit).

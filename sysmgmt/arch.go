@@ -283,7 +283,7 @@ func (conf *ArchLinux) FetchPackageFromAUR(name string, update bool) fnx.Worker 
 
 		return repo.FetchJob().
 			PreHook(func(context.Context) {
-				grip.Info(message.BuildKV().
+				grip.Info(message.NewKV().
 					KV("op", opName).
 					KV("state", "STARTED").
 					KV("pkg", name).
@@ -294,7 +294,7 @@ func (conf *ArchLinux) FetchPackageFromAUR(name string, update bool) fnx.Worker 
 			WithErrorHook(ec.Push).
 			PostHook(func() {
 				err := ec.Resolve()
-				grip.Notice(message.BuildKV().
+				grip.Notice(message.NewKV().
 					KV("op", opName).
 					KV("pkg", name).
 					KV("stage", "fetch").
@@ -348,7 +348,7 @@ func (conf *ArchLinux) BuildPackageInABS(name string) fnx.Worker {
 			SetErrorSender(level.Error, buf).
 			Worker().
 			PreHook(func(context.Context) {
-				grip.Info(message.BuildKV().
+				grip.Info(message.NewKV().
 					KV("op", opName).
 					KV("state", "STARTED").
 					KV("stage", "build").
@@ -359,7 +359,7 @@ func (conf *ArchLinux) BuildPackageInABS(name string) fnx.Worker {
 			PostHook(func() {
 				err := ec.Resolve()
 
-				msg := message.BuildKV().
+				msg := message.NewKV().
 					KV("op", opName).
 					KV("state", "STARTED").
 					KV("stage", "build").

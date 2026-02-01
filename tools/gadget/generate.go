@@ -39,7 +39,7 @@ func GoGenerate(
 
 		cmd := append([]string{"go", "generate"}, group...)
 
-		grip.Debug(message.BuildKV().
+		grip.Debug(message.NewKV().
 			KV("group", idx).
 			KV("packages", len(group)).
 			KV("cmd", strings.Join(cmd, " ")))
@@ -74,7 +74,7 @@ func GoGenerate(
 		builder.Send()
 	}
 
-	grip.Notice(message.BuildKV().
+	grip.Notice(message.NewKV().
 		KV("op", "go generate").
 		KV("dur", time.Since(opStart)).
 		KV("ok", ec.Ok()).

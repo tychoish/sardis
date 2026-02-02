@@ -29,6 +29,7 @@ func ArchLinux() *cmdr.Commander {
 			fetchAur(),
 			buildPkg(),
 			installAur(),
+			dumpArchPackages(),
 			setupArchLinux(),
 		)
 }
@@ -123,6 +124,14 @@ func dumpArchPackages() *cmdr.Commander {
 				return err
 			}
 
+			data := conf.Export()
+
+			defer grip.Info(message.NewKV().
+				KV("ABS", len(data.ABS)).
+				KV("AUR", len(data.AUR)).
+				KV("USR", len(data.USR)).
+				KV("DEP", len(data.DEP)),
+			)
 			return util.MarshalerForFile(path).Write(conf.Export()).Into(output)
 		})
 }

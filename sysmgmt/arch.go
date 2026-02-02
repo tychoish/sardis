@@ -29,19 +29,19 @@ import (
 type ArchPackage struct {
 	Name         string `bson:"name" json:"name" yaml:"name"`
 	Version      string `bson:"version,omitempty" json:"version,omitempty" yaml:"version,omitempty"`
-	ShouldUpdate bool   `bson:"update" json:"update" yaml:"update"`
-	AUR          bool   `bson:"aur" json:"aur" yaml:"aur"`
 	PathABS      string `bson:"abs_path,omitempty" json:"abs_path,omitempty" yaml:"abs_path,omitempty"`
-
-	Tags []string `bson:"tags,omitempty" json:"tags,omitempty" yaml:"tags,omitempty"`
+	Hostname     string `bson:"hostname,omitempty" json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	ShouldUpdate bool   `bson:"update,omitempty" json:"update,omitempty" yaml:"update,omitempty"`
 
 	State struct {
 		InDistRepos          bool `bson:"from_arch_repo,omitempty" json:"from_arch_repo,omitempty" yaml:"from_arch_repo,omitempty"`
 		InUsersABS           bool `bson:"abs,omitempty" json:"abs,omitempty" yaml:"abs,omitempty"`
+		FromAUR              bool `bson:"aur,omitempty" json:"aur,omitempty" yaml:"aur,omitempty"`
 		AURpackageWithoutABS bool `bson:"aur_without_build_directory,omitempty" json:"aur_without_build_directory,omitempty" yaml:"aur_without_build_directory,omitempty"`
 		ExplictlyInstalled   bool `bson:"explictly_installed,omitempty" json:"explictly_installed,omitempty" yaml:"explictly_installed,omitempty"`
 		IsDependency         bool `bson:"dependency,omitempty" json:"dependency,omitempty" yaml:"dependency,omitempty"`
 		Installed            bool `bson:"-" json:"-" yaml:"-"`
+		Configured           bool `bson:"configured,omitempty" json:"configured,omitempty" yaml:"configured,omitempty"`
 	} `bson:"status,omitempty" json:"status,omitempty" yaml:"status,omitempty"`
 }
 
@@ -92,26 +92,19 @@ func (conf *ArchLinux) ResolvePackages(ctx context.Context) iter.Seq[ArchPackage
 	return func(yield func(ArchPackage) bool) {
 		// First yield discovered packages
 		for k, v := range conf.cache.versions.Iterator() {
-			pkg := conf.populatePackage(ArchPackage{
-				Name:    k,
-				Version: v,
-				Tags:    []string{"installed", hostname, "discovery"},
-			})
-			if !yield(pkg) {
+			if !yield(conf.populatePackage(ArchPackage{
+				Name:     k,
+				Version:  v,
+				Hostname: hostname,
+			})) {
 				return
 			}
 		}
 
 		// Then yield configured packages
 		for _, ap := range conf.Packages {
-			ap = conf.populatePackage(ap)
-			ap.Tags = append(ap.Tags, "from-config")
-			if ap.State.Installed {
-				ap.Tags = append(ap.Tags, "installed")
-			} else {
-				ap.Tags = append(ap.Tags, "missing")
-			}
-			if !yield(ap) {
+			ap.State.Configured = true
+			if !yield(conf.populatePackage(ap)) {
 				return
 			}
 		}
@@ -134,30 +127,30 @@ func (conf *ArchLinux) Export() ArchPackageIndex {
 
 	for name := range conf.cache.absPackages.Iterator() {
 		out.ABS = append(out.ABS, ArchPackage{
-			Name:    name,
-			Version: conf.cache.versions.Get(name),
-			Tags:    []string{hostname},
+			Name:     name,
+			Version:  conf.cache.versions.Get(name),
+			Hostname: hostname,
 		})
 	}
 	for name := range conf.cache.notInSyncDB.Iterator() {
 		out.AUR = append(out.AUR, ArchPackage{
-			Name:    name,
-			Version: conf.cache.versions.Get(name),
-			Tags:    []string{hostname},
+			Name:     name,
+			Version:  conf.cache.versions.Get(name),
+			Hostname: hostname,
 		})
 	}
 	for name := range conf.cache.explicitlyInstalled.Iterator() {
 		out.USR = append(out.USR, ArchPackage{
-			Name:    name,
-			Version: conf.cache.versions.Get(name),
-			Tags:    []string{hostname},
+			Name:     name,
+			Version:  conf.cache.versions.Get(name),
+			Hostname: hostname,
 		})
 	}
 	for name := range conf.cache.dependencies.Iterator() {
 		out.DEP = append(out.DEP, ArchPackage{
-			Name:    name,
-			Version: conf.cache.versions.Get(name),
-			Tags:    []string{hostname},
+			Name:     name,
+			Version:  conf.cache.versions.Get(name),
+			Hostname: hostname,
 		})
 	}
 
@@ -171,8 +164,9 @@ func (conf *ArchLinux) populatePackage(ap ArchPackage) ArchPackage {
 	ap.State.ExplictlyInstalled = conf.cache.explicitlyInstalled.Check(ap.Name)
 	ap.State.IsDependency = conf.cache.dependencies.Check(ap.Name)
 	ap.State.Installed = conf.cache.versions.Check(ap.Name)
+	ap.State.FromAUR = conf.cache.notInSyncDB.Check(ap.Name)
 
-	if ap.State.InUsersABS && ap.PathABS == "" {
+	if ap.State.InUsersABS && ap.PathABS != "" {
 		ap.PathABS = filepath.Join(conf.BuildPath, ap.Name)
 	}
 
@@ -262,7 +256,7 @@ func (conf *ArchLinux) collectDependents(ctx context.Context) error {
 }
 
 func (conf *ArchLinux) collectCurrentUsersABS(ctx context.Context) error {
-	iter, err := libfun.RunCommand(ctx, fmt.Sprintf("find %s -name %q", conf.BuildPath, "PKGBUILD"))
+	iter, err := libfun.RunCommand(ctx, fmt.Sprintf("sudo find %s -name %q", conf.BuildPath, "PKGBUILD"))
 	if err != nil {
 		return err
 	}

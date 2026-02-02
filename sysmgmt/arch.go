@@ -45,9 +45,17 @@ type ArchPackage struct {
 	} `bson:"status,omitempty" json:"status,omitempty" yaml:"status,omitempty"`
 }
 
+type ArchPackageIndex struct {
+	ABS []ArchPackage `bson:"abs" json:"abs" yaml:"abs"`
+	AUR []ArchPackage `bson:"aur" json:"aur" yaml:"aur"`
+	DEP []ArchPackage `bson:"dependencies" json:"dependencies" yaml:"dependencies"`
+	USR []ArchPackage `bson:"installed" json:"installed" yaml:"installed"`
+}
+
 type ArchLinux struct {
-	BuildPath string        `bson:"build_path" json:"build_path" yaml:"build_path"`
-	Packages  []ArchPackage `bson:"packages" json:"packages" yaml:"packages"`
+	BuildPath    string           `bson:"build_path" json:"build_path" yaml:"build_path"`
+	Packages     []ArchPackage    `bson:"packages" json:"packages" yaml:"packages"`
+	PackageIndex ArchPackageIndex `bson:"package_index" json:"package_index" yaml:"package_index"`
 
 	cache struct {
 		collectedAt         time.Time
@@ -108,6 +116,52 @@ func (conf *ArchLinux) ResolvePackages(ctx context.Context) iter.Seq[ArchPackage
 			}
 		}
 	}
+}
+
+func (conf *ArchLinux) Export() ArchPackageIndex {
+	if conf.cache.collectedAt.IsZero() {
+		grip.Error("no arch linux package data collected")
+	} else if conf.cache.collectedAt.Add(-time.Hour).Before(time.Now()) {
+		grip.Warning("arch linux package data may be stale")
+	}
+	hostname := util.GetHostname()
+
+	var out ArchPackageIndex
+	out.ABS = make([]ArchPackage, 0, conf.cache.absPackages.Len())
+	out.AUR = make([]ArchPackage, 0, conf.cache.notInSyncDB.Len())
+	out.USR = make([]ArchPackage, 0, conf.cache.explicitlyInstalled.Len())
+	out.DEP = make([]ArchPackage, 0, conf.cache.dependencies.Len())
+
+	for name := range conf.cache.absPackages.Iterator() {
+		out.ABS = append(out.ABS, ArchPackage{
+			Name:    name,
+			Version: conf.cache.versions.Get(name),
+			Tags:    []string{hostname},
+		})
+	}
+	for name := range conf.cache.notInSyncDB.Iterator() {
+		out.AUR = append(out.AUR, ArchPackage{
+			Name:    name,
+			Version: conf.cache.versions.Get(name),
+			Tags:    []string{hostname},
+		})
+	}
+	for name := range conf.cache.explicitlyInstalled.Iterator() {
+		out.USR = append(out.USR, ArchPackage{
+			Name:    name,
+			Version: conf.cache.versions.Get(name),
+			Tags:    []string{hostname},
+		})
+	}
+	for name := range conf.cache.dependencies.Iterator() {
+		out.DEP = append(out.DEP, ArchPackage{
+			Name:    name,
+			Version: conf.cache.versions.Get(name),
+			Tags:    []string{hostname},
+		})
+	}
+
+	return out
 }
 
 func (conf *ArchLinux) populatePackage(ap ArchPackage) ArchPackage {

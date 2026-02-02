@@ -140,6 +140,15 @@ func HasPrefix(prefixes iter.Seq[string], item string) bool {
 	return false
 }
 
+func HasSuffix(suffixes iter.Seq[string], item string) bool {
+	for suffix := range suffixes {
+		if strings.HasSuffix(item, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
 func HasSubstring(substrings iter.Seq[string], item string) bool {
 	for substr := range substrings {
 		if strings.Contains(item, substr) {

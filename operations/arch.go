@@ -2,15 +2,21 @@ package operations
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/tychoish/cmdr"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/wpa"
 	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis"
+	"github.com/tychoish/sardis/util"
 )
 
 const nameFlagName = "name"
@@ -84,6 +90,40 @@ func installAur() *cmdr.Commander {
 				wpa.WorkerGroupConfContinueOnError(),
 				wpa.WorkerGroupConfWorkerPerCPU(),
 			)(ctx)
+		})
+}
+
+func dumpArchPackages() *cmdr.Commander {
+	return addOpCommand(cmdr.MakeCommander().
+		SetName("export").
+		SetUsage("dump installed package database"),
+		nameFlagName, func(ctx context.Context, args *withConf[string]) (err error) {
+			path := args.arg
+			conf := args.conf.System.Arch
+			var output io.WriteCloser
+			switch {
+			case path == "":
+				output = os.Stdout
+			case util.FileExists(path):
+				return fmt.Errorf("file %s alredy exists")
+			case !util.FileExists(filepath.Dir(path)):
+				return fmt.Errorf("cannot write file %q, create parent directory", path)
+			case HasSuffix(irt.Args("json", "yaml", "bson", "yml", "jsonl"), path):
+				return fmt.Errorf("unknown serialization format for %s", filepath.Ext(path))
+			default:
+				output, err := os.Create(path)
+				if err != nil {
+					return err
+				}
+
+				defer func() { err = erc.Join(err, output.Close()) }()
+			}
+
+			if err := conf.Discovery().Run(ctx); err != nil {
+				return err
+			}
+
+			return util.MarshalerForFile(path).Write(conf.Export()).Into(output)
 		})
 }
 

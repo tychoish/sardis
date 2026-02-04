@@ -11,8 +11,9 @@ import (
 )
 
 type Configuration struct {
-	GitRepos stw.Slice[GitRepository] `bson:"git" json:"git" yaml:"git"`
-	Projects []Project                `bson:"projects" json:"projects" yaml:"projects"`
+	GitRepos  stw.Slice[GitRepository]           `bson:"git" json:"git" yaml:"git"`
+	Projects  []Project                          `bson:"projects" json:"projects" yaml:"projects"`
+	TagGroups stw.Map[string, stw.Slice[string]] `bson:"tag_groups" json:"tag_groups" yaml:"tag_groups"`
 
 	lookupProcessed bool
 	caches          struct {
@@ -31,13 +32,25 @@ func (conf *Configuration) doValidate() error {
 		ec.Wrapf((&conf.GitRepos[idx]).Validate(), "%d/%d of %T is not valid", idx, len(conf.GitRepos), conf.GitRepos[idx])
 	}
 
-	conf.rebuildIndexes()
+	ec.Push(conf.rebuildIndexes())
+
+	for group, tags := range conf.TagGroups {
+		ec.Whenf(conf.caches.lookup.Check(group), "group name %q is an existing repo name", group)
+		ec.Whenf(conf.caches.tags.Check(group), "group name %q is an existing tag name", group)
+		for _, tg := range tags {
+			ec.Whenf(!conf.caches.lookup.Check(tg), "tag %q in group %q is NOT an existing repo name", tg, group)
+			ec.Whenf(!conf.caches.tags.Check(tg), "tag name %q is NOT an existing tag name", group)
+		}
+	}
+
 	return ec.Resolve()
 }
 
 func (conf *Configuration) Join(mcf *Configuration) {
 	conf.GitRepos = append(conf.GitRepos, mcf.GitRepos...)
 	conf.Projects = append(conf.Projects, mcf.Projects...)
+	conf.GitRepos.Extend(irt.Slice(mcf.GitRepos))
+	conf.TagGroups.Extend(mcf.TagGroups.Iterator())
 }
 
 func (conf *Configuration) FindOne(name string) (*GitRepository, error) {
@@ -62,11 +75,12 @@ func (conf *Configuration) Tags() stw.Slice[string] {
 	return irt.Collect(conf.caches.tags.Keys())
 }
 
-func (conf *Configuration) rebuildIndexes() {
+func (conf *Configuration) rebuildIndexes() error {
 	if conf.lookupProcessed {
-		return
+		return nil
 	}
 	defer func() { conf.lookupProcessed = true }()
+	var ec erc.Collector
 
 	conf.caches.tags = make(map[string]stw.Slice[string])
 	conf.caches.lookup = make(map[string]GitRepository)
@@ -83,6 +97,19 @@ func (conf *Configuration) rebuildIndexes() {
 			conf.caches.tags[tg] = rps
 		}
 	}
+
+	for gt, tags := range conf.TagGroups.Iterator() {
+		group := dt.Set[string]{}
+		for tag := range irt.Slice(tags) {
+			group.Extend(irt.Slice(conf.caches.tags.Get(tag)))
+			if conf.caches.lookup.Check(tag) {
+				group.Add(tag)
+			}
+		}
+		conf.caches.tags.Store(gt, irt.Collect(group.Iterator(), group.Len()))
+		ec.Whenf(group.Len() == 0, "for tag group %q, no resolveable tags", gt)
+	}
+	return ec.Resolve()
 }
 
 func (conf *Configuration) FindAll(ids ...string) stw.Slice[GitRepository] {

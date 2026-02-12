@@ -47,8 +47,6 @@ func (conf *Configuration) doValidate() error {
 }
 
 func (conf *Configuration) Join(mcf *Configuration) {
-	conf.GitRepos = append(conf.GitRepos, mcf.GitRepos...)
-	conf.Projects = append(conf.Projects, mcf.Projects...)
 	conf.GitRepos.Extend(irt.Slice(mcf.GitRepos))
 	conf.TagGroups.Extend(mcf.TagGroups.Iterator())
 }

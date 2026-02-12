@@ -29,7 +29,7 @@ func GoGenerate(
 ) error {
 	ec := &erc.Collector{}
 
-	out := send.MakeWriter(send.MakePlain())
+	out := send.MakeStdOut()
 	out.SetPriority(grip.Sender().Priority())
 
 	opStart := time.Now()

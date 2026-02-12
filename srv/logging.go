@@ -129,7 +129,7 @@ func SetupLogging(conf LoggingSettings) send.Sender {
 	var sender send.Sender
 
 	if conf.EnableJSONFormattingForLogOutput() || conf.EnableJSONColorFormattingForLogOutput() {
-		sender = send.MakePlain()
+		sender = send.MakeStdOut()
 	} else {
 		sender = send.MakeStdError()
 	}

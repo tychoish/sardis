@@ -135,7 +135,7 @@ func RunTests(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	out := send.MakeWriter(send.MakePlain())
+	out := send.MakeStdOut()
 	out.SetPriority(level.Debug)
 	out.SetErrorHandler(send.ErrorHandlerFromSender(grip.Sender()))
 
@@ -202,7 +202,7 @@ func RunTests(ctx context.Context, opts Options) error {
 
 				catch := &erc.Collector{}
 
-				testOut := send.MakeWriter(send.MakePlain())
+				testOut := send.MakeStdOut()
 				testOut.SetPriority(grip.Sender().Priority())
 				testOut.SetFormatter(testOutputFilter(opts, reports, pkg))
 				testOut.SetErrorHandler(func(err error) { grip.ErrorWhen(!errors.Is(err, io.EOF), err) })

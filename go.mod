@@ -19,16 +19,16 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/tychoish/birch v0.4.0
 	github.com/tychoish/cmdr v0.5.0
-	github.com/tychoish/fun v0.14.5
+	github.com/tychoish/fun v0.14.6
 	github.com/tychoish/godmenu v0.2.3
-	github.com/tychoish/grip v0.4.7
+	github.com/tychoish/grip v0.4.8
 	github.com/tychoish/grip/x/desktop v0.1.1
 	github.com/tychoish/grip/x/jira v0.1.0
-	github.com/tychoish/grip/x/system v0.1.0
+	github.com/tychoish/grip/x/system v0.1.2
 	github.com/tychoish/grip/x/telegram v0.1.1
 	github.com/tychoish/grip/x/twitter v0.1.1
 	github.com/tychoish/grip/x/xmpp v0.1.1
-	github.com/tychoish/jasper v0.1.4
+	github.com/tychoish/jasper v0.1.5
 	github.com/tychoish/jasper/x/cli v0.1.1
 	github.com/tychoish/jasper/x/track v0.1.0
 	github.com/tychoish/libfun v0.1.0

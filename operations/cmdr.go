@@ -127,6 +127,7 @@ func Commander() *cmdr.Commander {
 				wpa.WorkerGroupConfContinueOnPanic(),
 			)
 		}).
+		Middleware(srv.WithCleanup).
 		SetAction(func(ctx context.Context, cc *cli.Command) error {
 			return cli.ShowAppHelp(cc)
 		}).

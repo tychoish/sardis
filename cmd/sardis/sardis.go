@@ -14,6 +14,7 @@ func main() {
 	defer cancel()
 
 	cmd := operations.Commander()
+
 	cmd.SetAppOptions(cmdr.AppOptions{
 		Name:    global.ApplicationName,
 		Usage:   "tychoish automation",

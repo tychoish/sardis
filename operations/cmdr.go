@@ -91,6 +91,8 @@ func StandardSardisOperationSpec() *cmdr.OperationSpec[*sardis.Configuration] {
 
 func Commander() *cmdr.Commander {
 	return cmdr.MakeRootCommander().
+		SetName(global.ApplicationName).
+		EnableCompletionCmd().
 		Flags(cmdr.FlagBuilder(false).SetName("jsonLog").SetUsage("format logs as json").Flag(),
 			cmdr.FlagBuilder(false).SetName("colorJsonLog").SetUsage("colorized json logs").Flag(),
 			cmdr.FlagBuilder(false).SetName("quietStdOut").SetUsage("don't log to standard out").Flag(),

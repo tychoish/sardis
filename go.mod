@@ -10,7 +10,9 @@ require (
 	github.com/go-git/go-git/v5 v5.2.0
 	github.com/google/go-github/v50 v50.2.0
 	github.com/google/uuid v1.6.0
+	github.com/jmoiron/sqlx v1.4.0
 	github.com/koki-develop/go-fzf v0.15.0
+	github.com/lib/pq v1.11.2
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nwidger/jsoncolor v0.3.2
@@ -18,7 +20,7 @@ require (
 	github.com/quasilyte/go-ruleguard/dsl v0.3.22
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/tychoish/birch v0.4.0
-	github.com/tychoish/cmdr v0.5.0
+	github.com/tychoish/cmdr v0.5.3
 	github.com/tychoish/fun v0.14.6
 	github.com/tychoish/godmenu v0.2.3
 	github.com/tychoish/grip v0.4.8

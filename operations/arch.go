@@ -125,12 +125,12 @@ func dumpArchPackages() *cmdr.Commander {
 			}
 
 			data := conf.Export()
+			data.DEP = nil
 
 			defer grip.Info(message.NewKV().
 				KV("ABS", len(data.ABS)).
 				KV("AUR", len(data.AUR)).
-				KV("USR", len(data.USR)).
-				KV("DEP", len(data.DEP)),
+				KV("USR", len(data.USR)),
 			)
 			return util.MarshalerForFile(path).Write(conf.Export()).Into(output)
 		})

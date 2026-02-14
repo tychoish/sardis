@@ -105,18 +105,20 @@ func dumpArchPackages() *cmdr.Commander {
 			switch {
 			case path == "":
 				output = os.Stdout
-			case util.FileExists(path):
-				return fmt.Errorf("file %s alredy exists")
+				path = "<stdout>"
+			// TODO: decide if we want to enforce safety to prevent .
+			//
+			// case util.FileExists(path):
+			// 	return fmt.Errorf("file %s alredy exists", path)
 			case !util.FileExists(filepath.Dir(path)):
 				return fmt.Errorf("cannot write file %q, create parent directory", path)
-			case HasSuffix(irt.Args("json", "yaml", "bson", "yml", "jsonl"), path):
+			case !HasSuffix(irt.Args("json", "yaml", "bson", "yml", "jsonl"), path):
 				return fmt.Errorf("unknown serialization format for %s", filepath.Ext(path))
 			default:
-				output, err := os.Create(path)
+				output, err = os.Create(path)
 				if err != nil {
 					return err
 				}
-
 				defer func() { err = erc.Join(err, output.Close()) }()
 			}
 
@@ -128,11 +130,15 @@ func dumpArchPackages() *cmdr.Commander {
 			data.DEP = nil
 
 			defer grip.Info(message.NewKV().
+				KV("msg", "installed arch package state dumped").
+				KV("path", path).
 				KV("ABS", len(data.ABS)).
 				KV("AUR", len(data.AUR)).
 				KV("USR", len(data.USR)),
 			)
-			return util.MarshalerForFile(path).Write(conf.Export()).Into(output)
+			data.DEP = nil
+
+			return util.MarshalerForFile(path).Write(data).Into(output)
 		})
 }
 

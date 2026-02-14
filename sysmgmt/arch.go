@@ -58,7 +58,9 @@ type ArchLinux struct {
 	PackageIndex ArchPackageIndex `bson:"package_index" json:"package_index" yaml:"package_index"`
 
 	cache struct {
-		collectedAt         time.Time
+		materializedAt      time.Time
+		materialization     ArchPackageIndex
+		indexedAt           time.Time
 		versions            adt.Map[string, string]
 		explicitlyInstalled adt.Set[string]
 		inSyncDB            adt.Set[string]
@@ -70,7 +72,7 @@ type ArchLinux struct {
 
 func (conf *ArchLinux) Discovery() fnx.Worker { return conf.doDiscovery }
 func (conf *ArchLinux) doDiscovery(ctx context.Context) error {
-	defer func() { conf.cache.collectedAt = time.Now() }()
+	defer func() { conf.cache.indexedAt = time.Now() }()
 	return erc.Join(
 		conf.collectVersions(ctx),
 		conf.collectExplicityInstalled(ctx),
@@ -85,7 +87,7 @@ func (conf *ArchLinux) ResolvePackages(ctx context.Context) iter.Seq[ArchPackage
 	hostname := util.GetHostname()
 
 	// Ensure discovery has run
-	if time.Since(conf.cache.collectedAt) > time.Hour {
+	if time.Since(conf.cache.indexedAt) > time.Hour {
 		ec.Push(conf.Discovery().Run(ctx))
 	}
 
@@ -112,10 +114,12 @@ func (conf *ArchLinux) ResolvePackages(ctx context.Context) iter.Seq[ArchPackage
 }
 
 func (conf *ArchLinux) Export() ArchPackageIndex {
-	if conf.cache.collectedAt.IsZero() {
-		grip.Error("no arch linux package data collected")
-	} else if conf.cache.collectedAt.Add(-time.Hour).Before(time.Now()) {
-		grip.Warning("arch linux package data may be stale")
+	if !conf.cache.materializedAt.IsZero() {
+		return conf.cache.materialization
+	} else if conf.cache.indexedAt.IsZero() {
+		grip.EmergencyPanic("no arch linux package data collected")
+	} else if conf.cache.indexedAt.Add(time.Hour).Before(time.Now()) {
+		grip.Warning("arch linux package cache is out of date")
 	}
 	hostname := util.GetHostname()
 
@@ -154,6 +158,8 @@ func (conf *ArchLinux) Export() ArchPackageIndex {
 		})
 	}
 
+	conf.cache.materialization = out
+	conf.cache.materializedAt = time.Now()
 	return out
 }
 

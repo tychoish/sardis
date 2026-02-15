@@ -127,7 +127,7 @@ func dumpArchPackages() *cmdr.Commander {
 			}
 
 			data := conf.Export()
-			data.DEP = nil
+			data.Sort()
 
 			defer grip.Info(message.NewKV().
 				KV("msg", "installed arch package state dumped").

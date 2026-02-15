@@ -1,6 +1,7 @@
 package sysmgmt
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"iter"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -50,6 +52,17 @@ type ArchPackageIndex struct {
 	AUR []ArchPackage `bson:"aur" json:"aur" yaml:"aur"`
 	DEP []ArchPackage `bson:"dependencies" json:"dependencies" yaml:"dependencies"`
 	USR []ArchPackage `bson:"installed" json:"installed" yaml:"installed"`
+}
+
+func (*ArchPackageIndex) compare(lh, rh ArchPackage) int {
+	return cmp.Or(cmp.Compare(lh.Name, rh.Name), cmp.Compare(lh.Version, rh.Version))
+}
+
+func (pi *ArchPackageIndex) Sort() {
+	slices.SortFunc(pi.ABS, pi.compare)
+	slices.SortFunc(pi.AUR, pi.compare)
+	slices.SortFunc(pi.DEP, pi.compare)
+	slices.SortFunc(pi.USR, pi.compare)
 }
 
 type ArchLinux struct {

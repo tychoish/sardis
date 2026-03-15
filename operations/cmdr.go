@@ -27,8 +27,8 @@ import (
 - [ ] TODO <cmdr> cut releases of commander
 - [ ] TODO <libfun> a log-based Map persistence (sets only, BSON encoding wrapping GOB)
 - [X] TODO <sardis> move more (all?) of the operations logic into units, and have a generators produce workers scheme.
-- [ ] TODO <fun/libfun> worker pool but be able to pause to let things coalese
-- [ ] TODO <cmdr> move to v3 of the cli lib
+- [X] TODO <fun/libfun> worker pool but be able to pause to let things coalese
+- [X] TODO <cmdr> move to v3 of the cli lib
 - [ ] TODO <cmdr> do something with argflags.
 - [ ] TODO <cmdr> cmdr.Action adapter for fun.Worker/fnx.Operation
 - [x] TODO <fun> finish fn.Converter[T, O] and fn.Filter[T]

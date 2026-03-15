@@ -13,13 +13,12 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cmd := operations.Commander()
-
-	cmd.SetAppOptions(cmdr.AppOptions{
-		Name:    global.ApplicationName,
-		Usage:   "tychoish automation",
-		Version: "v0.0.1-pre",
-	}).UrfaveCommands(cli.Jasper())
+	cmd := operations.Commander().
+		SetAppOptions(cmdr.AppOptions{
+			Name:    global.ApplicationName,
+			Usage:   "tychoish automation",
+			Version: "v0.0.1-pre",
+		}).UrfaveCommands(cli.Jasper())
 
 	cmdr.Main(ctx, cmd)
 }

@@ -74,7 +74,7 @@ type ArchLinux struct {
 		materializedAt      time.Time
 		materialization     ArchPackageIndex
 		indexedAt           time.Time
-		versions            adt.Map[string, string]
+		versions            adt.SyncMap[string, string]
 		explicitlyInstalled adt.Set[string]
 		inSyncDB            adt.Set[string]
 		absPackages         adt.Set[string]

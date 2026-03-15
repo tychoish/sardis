@@ -19,11 +19,11 @@ require (
 	github.com/quasilyte/go-ruleguard v0.4.5
 	github.com/quasilyte/go-ruleguard/dsl v0.3.22
 	github.com/shirou/gopsutil v3.21.11+incompatible
-	github.com/tychoish/birch v0.4.0
+	github.com/tychoish/birch v0.4.1
 	github.com/tychoish/cmdr v0.5.3
-	github.com/tychoish/fun v0.14.6
+	github.com/tychoish/fun v0.14.7
 	github.com/tychoish/godmenu v0.2.3
-	github.com/tychoish/grip v0.4.8
+	github.com/tychoish/grip v0.4.9
 	github.com/tychoish/grip/x/desktop v0.1.1
 	github.com/tychoish/grip/x/jira v0.1.0
 	github.com/tychoish/grip/x/system v0.1.2
@@ -115,7 +115,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
-	github.com/tychoish/birch/x/ftdc v0.1.0 // indirect
+	github.com/tychoish/birch/x/ftdc v0.1.1 // indirect
 	github.com/tychoish/gimlet v0.0.0-20260131191610-eac0aaade579 // indirect
 	github.com/tychoish/grip/x/metrics v0.1.0 // indirect
 	github.com/tychoish/grip/x/splunk v0.1.0 // indirect

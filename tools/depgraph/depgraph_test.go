@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tychoish/fun/depgraph"
+	"github.com/tychoish/sardis/tools/depgraph"
 )
 
 // moduleRoot returns the root of the fun module by walking up from

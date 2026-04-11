@@ -105,9 +105,9 @@ func (conf *SystemdService) Worker() fnx.Worker {
 			KV("dur", time.Since(startAt)).
 			KV("host", hn)
 
-		proclog.Infoln("----------------", nonce, "---", jobID, "--->")
+		proclog.Info(grip.MPrintln("----------------", nonce, "---", jobID, "--->"))
 		if err := cmd.Run(ctx); err != nil {
-			proclog.Infoln("<---------------", nonce, "---", jobID, "----")
+			proclog.Info(grip.MPrintln("<---------------", nonce, "---", jobID, "----"))
 			grip.Critical(err)
 
 			grip.Error(buf.String())

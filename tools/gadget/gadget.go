@@ -188,7 +188,7 @@ func RunTests(ctx context.Context, opts Options) error {
 			pkg := pkg // capture for closure
 			ec.Push(main.Push(func(ctx context.Context) error {
 				if reports.Check(pkg.PackageName) {
-					grip.Errorln("duplicate", pkg.PackageName)
+					grip.Error(grip.MPrintln("duplicate", pkg.PackageName))
 					return nil
 				}
 				grip.Build().Level(level.Debug).
@@ -205,7 +205,7 @@ func RunTests(ctx context.Context, opts Options) error {
 				testOut := send.MakeStdOut()
 				testOut.SetPriority(grip.Sender().Priority())
 				testOut.SetFormatter(testOutputFilter(opts, reports, pkg))
-				testOut.SetErrorHandler(func(err error) { grip.ErrorWhen(!errors.Is(err, io.EOF), err) })
+				testOut.SetErrorHandler(func(err error) { grip.Error(grip.When(!errors.Is(err, io.EOF), err)) })
 				args := []string{
 					"go", "test", "-race",
 					fmt.Sprintf("-parallel=%d", min(4, opts.Workers/2)),
@@ -378,7 +378,7 @@ func testOutputFilter(
 					report.FullyCovered = true
 				}
 			}
-			grip.WarningWhen(mp.Check(report.Package), message.MakeLines("DUPE", report.Package))
+			grip.Warning(grip.When(mp.Check(report.Package), message.MakeLines("DUPE", report.Package)))
 			mp.Store(report.Package, report)
 			grip.Debug(func() message.Composer {
 				m := report.Message()

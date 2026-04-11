@@ -106,7 +106,7 @@ func blogPublish() *cmdr.Commander {
 				return fmt.Errorf("problem deploying the blog %q: %w", name, err)
 			}
 
-			grip.Noticef("blog publication complete for %q", name)
+			grip.Notice(grip.MPrintf("blog publication complete for %q", name))
 
 			return nil
 		})

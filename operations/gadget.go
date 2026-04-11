@@ -34,8 +34,8 @@ func Gadget() *cmdr.Commander {
 				}
 
 				if strings.HasSuffix(path, "...") {
-					grip.Warningln("module-path (working directory) should not use '...';",
-						"set go test path with '--path'")
+					grip.Warning(grip.MPrintln("module-path (working directory) should not use '...';",
+					"set go test path with '--path'"))
 					return fmt.Errorf("module path %q should not have ... suffix", path)
 				}
 				if util.FileExists(util.TryExpandHomeDir(path)) {

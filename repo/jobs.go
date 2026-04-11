@@ -62,7 +62,7 @@ func (conf *GitRepository) FetchJob() fnx.Worker {
 
 		proclog, procbuf := subexec.NewOutputBuf(id)
 		defer util.DropErrorOnDefer(procbuf.Close)
-		proclog.Infoln(ruler, id, ruler)
+		proclog.Info(grip.MPrintln(ruler, id, ruler))
 
 		return jasper.Context(ctx).
 			CreateCommand(ctx).
@@ -85,7 +85,7 @@ func (conf *GitRepository) FetchJob() fnx.Worker {
 				)
 			}).
 			WithErrorFilter(func(err error) error {
-				proclog.Infoln(ruler, id, ruler)
+				proclog.Info(grip.MPrintln(ruler, id, ruler))
 				msg := message.NewKV().
 					KV("op", opName).
 					KV("state", "COMPLETED").
@@ -229,8 +229,8 @@ func (conf *GitRepository) UpdateJob() fnx.Worker {
 
 		for _, mirror := range conf.Mirrors {
 			if strings.Contains(mirror, host) {
-				grip.Infof("skipping mirror %s->%s because it's probably local (%s)",
-					conf.Path, mirror, host)
+				grip.Info(grip.MPrintf("skipping mirror %s->%s because it's probably local (%s)",
+					conf.Path, mirror, host))
 				continue
 			}
 
@@ -316,7 +316,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fnx.Worker {
 
 		proclog, procbuf := subexec.NewOutputBuf(buildID)
 		defer util.DropErrorOnDefer(procbuf.Close)
-		proclog.Noticeln(ruler, bullet, ruler)
+		proclog.Notice(grip.MPrintln(ruler, bullet, ruler))
 
 		grip.Info(message.NewKV().
 			KV("op", opName).
@@ -347,7 +347,7 @@ func (conf *GitRepository) SyncRemoteJob(host string) fnx.Worker {
 			Append(conf.Post...).
 			Worker().
 			WithErrorFilter(func(err error) error {
-				proclog.Noticeln(ruler, bullet, ruler)
+				proclog.Notice(grip.MPrintln(ruler, bullet, ruler))
 				if err != nil {
 					grip.Critical(message.NewKV().
 						KV("op", opName).
@@ -412,7 +412,7 @@ func (conf *GitRepository) CleanupJob() fnx.Worker {
 
 		proclog, procbuf := subexec.NewOutputBuf(id)
 		defer util.DropErrorOnDefer(procbuf.Close)
-		proclog.Infoln(ruler, id, ruler)
+		proclog.Info(grip.MPrintln(ruler, id, ruler))
 
 		return jasper.Context(ctx).CreateCommand(ctx).Priority(level.Info).
 			Directory(conf.Path).
@@ -422,7 +422,7 @@ func (conf *GitRepository) CleanupJob() fnx.Worker {
 			AppendArgs("git", "prune").
 			Worker().
 			WithErrorFilter(func(err error) error {
-				proclog.Infoln(ruler, id, ruler)
+				proclog.Info(grip.MPrintln(ruler, id, ruler))
 				if err != nil {
 					grip.Critical(message.NewKV().
 						KV("op", opName).

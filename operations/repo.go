@@ -271,7 +271,7 @@ func repoGithubClone() *cmdr.Commander {
 			jpm := jasper.Context(ctx)
 			args := append(cc.Args().Slice(), "", "")
 
-			grip.Infoln(args, len(args))
+			grip.Info(grip.MPrintln(args, len(args)))
 
 			account := fallbackTo(cc.String("account"), args...)
 			repo := fallbackTo(cc.String("repo"), args[1:]...)

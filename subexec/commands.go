@@ -104,7 +104,7 @@ func (conf *Command) Worker() fnx.Worker {
 				defer grip.Notice(msg)
 
 				desktop := grip.ContextLogger(ctx, global.ContextDesktopLogger)
-				proclog.Infoln("<---------------", nonce, "---", jobID, "----")
+				proclog.Info(grip.MPrintln("<---------------", nonce, "---", jobID, "----"))
 				if err != nil {
 					m := message.WrapError(err, conf.Name)
 					desktop.Error(m)
@@ -120,7 +120,7 @@ func (conf *Command) Worker() fnx.Worker {
 			}).
 			Worker().
 			PreHook(func(context.Context) {
-				proclog.Infoln("----------------", nonce, "---", jobID, "--->")
+				proclog.Info(grip.MPrintln("----------------", nonce, "---", jobID, "--->"))
 			}).Run(ctx)
 	}
 }

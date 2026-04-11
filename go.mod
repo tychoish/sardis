@@ -20,10 +20,10 @@ require (
 	github.com/quasilyte/go-ruleguard/dsl v0.3.22
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/tychoish/birch v0.4.1
-	github.com/tychoish/cmdr v0.5.3
-	github.com/tychoish/fun v0.14.8
+	github.com/tychoish/cmdr v0.5.6
+	github.com/tychoish/fun v0.14.9
 	github.com/tychoish/godmenu v0.2.3
-	github.com/tychoish/grip v0.4.9
+	github.com/tychoish/grip v0.5.0
 	github.com/tychoish/grip/x/desktop v0.1.1
 	github.com/tychoish/grip/x/jira v0.1.0
 	github.com/tychoish/grip/x/system v0.1.2
@@ -31,7 +31,6 @@ require (
 	github.com/tychoish/grip/x/twitter v0.1.1
 	github.com/tychoish/grip/x/xmpp v0.1.1
 	github.com/tychoish/jasper v0.1.5
-	github.com/tychoish/jasper/x/cli v0.1.1
 	github.com/tychoish/jasper/x/track v0.1.0
 	github.com/tychoish/libfun v0.1.0
 	github.com/urfave/cli/v3 v3.6.2
@@ -116,10 +115,9 @@ require (
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
 	github.com/tychoish/birch/x/ftdc v0.1.1 // indirect
-	github.com/tychoish/gimlet v0.0.0-20260131191610-eac0aaade579 // indirect
+	github.com/tychoish/gimlet v0.0.0-00010101000000-000000000000 // indirect
 	github.com/tychoish/grip/x/metrics v0.1.0 // indirect
 	github.com/tychoish/grip/x/splunk v0.1.0 // indirect
-	github.com/tychoish/jasper/x/remote v0.1.1 // indirect
 	github.com/tychoish/jasper/x/splunk v0.1.0 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
@@ -144,4 +142,9 @@ require (
 	google.golang.org/grpc v1.78.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
+)
+
+replace (
+	github.com/tychoish/jasper/x/cli => ../jasper/x/cli
+	github.com/tychoish/jasper/x/remote => ../jasper/x/remote
 )

@@ -76,14 +76,14 @@ func (cg *Group) Validate() error {
 
 	{ // this is in braces because it's sus as hell.
 		if cg.Category == "" && cg.Name != "" && cg.CmdNamePrefix != "" {
-			grip.Warningf("deprecated and unnecessary mangling for %s and %s", cg.Category, cg.Name)
+			grip.Warning(grip.MPrintf("deprecated and unnecessary mangling for %s and %s", cg.Category, cg.Name))
 			cg.Category = cg.Name
 			cg.Name = cg.CmdNamePrefix
 			cg.CmdNamePrefix = ""
 		}
 
 		if cg.Name == "" && cg.CmdNamePrefix != "" {
-			grip.Warningf("command group cat=%q prefix=%q is missing name, rotating name", cg.Category, cg.CmdNamePrefix)
+			grip.Warning(grip.MPrintf("command group cat=%q prefix=%q is missing name, rotating name", cg.Category, cg.CmdNamePrefix))
 			cg.Name = cg.CmdNamePrefix
 			cg.CmdNamePrefix = ""
 		}

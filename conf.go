@@ -97,7 +97,7 @@ func readConfiguration(fn string) (*Configuration, error) {
 
 func (conf *Configuration) Validate() error { return conf.caches.validation.Do(conf.doValidate) }
 func (conf *Configuration) doValidate() error {
-	grip.Debugf("validating %q", conf.originalPath)
+	grip.Debug(grip.MPrintf("validating %q", conf.originalPath))
 	if conf.Settings == nil {
 		conf.Settings = new(srv.Configuration)
 	}
@@ -142,7 +142,7 @@ func (conf *Configuration) expandLinkedFiles() error {
 	ec := &erc.Collector{}
 	for _, fn := range conf.Settings.ConfigPaths {
 		fn = util.TryExpandHomeDir(fn)
-		grip.Debugf("reading linked config file %q", fn)
+		grip.Debug(grip.MPrintf("reading linked config file %q", fn))
 		iconf, err := readConfiguration(fn)
 		switch {
 		case err != nil:
@@ -167,7 +167,7 @@ func (conf *Configuration) Migrate() *Configuration {
 		conf.BlogCOMPAT[idx].Type = "blog"
 	}
 
-	grip.Debugf("migrating config file %q", conf.originalPath)
+	grip.Debug(grip.MPrintf("migrating config file %q", conf.originalPath))
 
 	conf.Repos.Projects = append(conf.Repos.Projects, conf.BlogCOMPAT...)
 	conf.BlogCOMPAT = nil
@@ -204,7 +204,7 @@ func (conf *Configuration) Join(mcf *Configuration) *Configuration {
 	if mcf == nil {
 		return conf
 	}
-	grip.Debugf("merging config files: %q into %q", mcf.originalPath, conf.originalPath)
+	grip.Debug(grip.MPrintf("merging config files: %q into %q", mcf.originalPath, conf.originalPath))
 
 	conf.NetworkCOMPAT.Join(mcf.NetworkCOMPAT)
 	conf.Settings.Join(mcf.Settings)

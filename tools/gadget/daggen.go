@@ -158,8 +158,10 @@ func Collect(ctx context.Context, path string) (*Module, error) {
 
 	conf := &packages.Config{
 		Context: ctx,
-		Logf: grip.NewLogger(send.MakeAnnotating(grip.Sender(),
-			message.Fields{"pkg": path, "op": "dag-collect"})).Debugf,
+		Logf: func(f string, args ...interface{}) {
+			grip.NewLogger(send.MakeAnnotating(grip.Sender(),
+				message.Fields{"pkg": path, "op": "dag-collect"})).Debug(grip.MPrintf(f, args...))
+		},
 		Dir:  filepath.Dir(path),
 		Mode: packages.NeedModule | packages.NeedName | packages.NeedImports | packages.NeedDeps | packages.NeedTypes,
 	}

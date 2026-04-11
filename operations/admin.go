@@ -56,8 +56,8 @@ func hacking() *cmdr.Commander {
 			cmdr.MakeCommander().
 				SetName("env").
 				With(StandardSardisOperationSpec().SetAction(func(ctx context.Context, conf *sardis.Configuration) error {
-					grip.Noticeln("has conf", conf != nil)
-					grip.Noticeln("has default jasper", jasper.HasManager(ctx))
+					grip.Notice(grip.MPrintln("has conf", conf != nil))
+					grip.Notice(grip.MPrintln("has default jasper", jasper.HasManager(ctx)))
 
 					grip.Info(message.Fields{
 						"istty":                      isatty.IsTerminal(os.Stdin.Fd()),

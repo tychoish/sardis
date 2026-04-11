@@ -400,7 +400,7 @@ func (conf *ArchLinux) BuildPackageInABS(name string) fnx.Worker {
 		jobID := fmt.Sprintf("OP(%s).PKG(%s).HOST(%s).ID(%s)", opName, name, hn, nonce)
 
 		proclog, buf := subexec.NewOutputBuf(fmt.Sprint(jobID, ".", nonce))
-		proclog.Infoln("----------------", jobID, "--------------->")
+		proclog.Info(grip.MPrintln("----------------", jobID, "--------------->"))
 
 		args := []string{"makepkg", "--syncdeps", "--force", "--install", "--noconfirm"}
 
@@ -436,7 +436,7 @@ func (conf *ArchLinux) BuildPackageInABS(name string) fnx.Worker {
 					KV("host", hn)
 
 				if err != nil {
-					proclog.Infoln("<---------------", jobID, "----------------")
+					proclog.Info(grip.MPrintln("<---------------", jobID, "----------------"))
 					grip.Error(msg)
 					grip.Info(buf.String())
 					return

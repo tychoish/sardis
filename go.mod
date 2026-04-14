@@ -21,7 +21,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/tychoish/birch v0.4.1
 	github.com/tychoish/cmdr v0.5.6
-	github.com/tychoish/fun v0.14.9
+	github.com/tychoish/fun v0.14.10-0.20260411005334-0f84bb0bc3c5
 	github.com/tychoish/godmenu v0.2.3
 	github.com/tychoish/grip v0.5.0
 	github.com/tychoish/grip/x/desktop v0.1.1
@@ -31,6 +31,7 @@ require (
 	github.com/tychoish/grip/x/twitter v0.1.1
 	github.com/tychoish/grip/x/xmpp v0.1.1
 	github.com/tychoish/jasper v0.1.5
+	github.com/tychoish/jasper/x/cli v0.0.0-00010101000000-000000000000
 	github.com/tychoish/jasper/x/track v0.1.0
 	github.com/tychoish/libfun v0.1.0
 	github.com/urfave/cli/v3 v3.6.2
@@ -115,9 +116,10 @@ require (
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
 	github.com/tychoish/birch/x/ftdc v0.1.1 // indirect
-	github.com/tychoish/gimlet v0.0.0-00010101000000-000000000000 // indirect
+	github.com/tychoish/gimlet v0.0.0-20260411035301-757f192ba472 // indirect
 	github.com/tychoish/grip/x/metrics v0.1.0 // indirect
 	github.com/tychoish/grip/x/splunk v0.1.0 // indirect
+	github.com/tychoish/jasper/x/remote v0.1.1 // indirect
 	github.com/tychoish/jasper/x/splunk v0.1.0 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect

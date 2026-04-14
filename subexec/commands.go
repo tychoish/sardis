@@ -25,13 +25,13 @@ type Command struct {
 	Directory       string                  `bson:"directory" json:"directory" yaml:"directory"`
 	Environment     stw.Map[string, string] `bson:"env" json:"env" yaml:"env"`
 	Command         string                  `bson:"command" json:"command" yaml:"command"`
+	Arg             string                  `bson:"arg" json:"arg" yaml:"arg"`
 	Commands        []string                `bson:"commands" json:"commands" yaml:"commands"`
 	OverrideDefault bool                    `bson:"override_default" json:"override_default" yaml:"override_default"`
 	Notify          *bool                   `bson:"notify,omitempty" json:"notify,omitempty" yaml:"notify,omitempty"`
 	Background      *bool                   `bson:"background,omitempty" json:"background,omitempty" yaml:"background,omitempty"`
 	SortHint        int                     `bson:"sort_hint,omitempty" json:"sort_hint,omitempty" yaml:"sort_hint,omitempty"`
 	Logs            Logging                 `bson:"logs" json:"logs" yaml:"logs"`
-
 	// if possible call the operation rather
 	// than execing the commands
 	WorkerDefinition fnx.Worker `bson:"-" json:"-" yaml:"-"`

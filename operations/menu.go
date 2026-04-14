@@ -562,19 +562,19 @@ func listCommands() *cmdr.Commander {
 			groups := conf.Operations.ExportCommandGroups()
 
 			table := tabby.New()
-			table.AddHeader("Category", "Group", "Prefix", "Name")
+			table.AddHeader("Category", "Group", "Prefix", "Name", "Command")
 
 			for name, group := range groups {
 				_, inSet := set[name]
 				if len(set) == 0 || inSet {
 					for idx, cc := range group.Commands {
 						if idx == 0 {
-							table.AddLine(group.Category, group.Name, group.CmdNamePrefix, cc.Name)
+							table.AddLine(group.Category, group.Name, group.CmdNamePrefix, cc.Name, cc.Command)
 						} else {
-							table.AddLine("", "", "", cc.Name)
+							table.AddLine("", "", "", cc.Name, cc.Command)
 						}
 					}
-					table.AddLine("", "", "", "")
+					table.AddLine("", "", "", "", "")
 				}
 			}
 

@@ -8,6 +8,8 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/stw"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/message"
 	"github.com/tychoish/sardis/util"
 )
 
@@ -63,7 +65,7 @@ func (conf *Configuration) doValidate() error {
 		case stw.DerefZ(conf.Settings.AllowUndefinedSockets):
 			return ""
 		default:
-			erc.Invariant(err)
+			grip.Warning(message.WrapError(err, "could not find allacritty socket"))
 		}
 		// unreachable
 		return ""
@@ -80,7 +82,7 @@ func (conf *Configuration) doValidate() error {
 		case stw.DerefZ(conf.Settings.AllowUndefinedSockets):
 			return ""
 		default:
-			erc.Invariant(err)
+			grip.Warning(message.WrapError(err, "could not find ssh-agent socket"))
 		}
 		// unreachable
 		return ""

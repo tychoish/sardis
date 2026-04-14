@@ -128,6 +128,7 @@ func (cg *Group) Validate() error {
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{group.name}}", cg.Name)
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{host}}", stw.DerefZ(cg.Host))
 			cmd.Command = strings.ReplaceAll(cmd.Command, "{{prefix}}", cg.CmdNamePrefix)
+			cmd.Command = strings.ReplaceAll(cmd.Command, "{{arg}}", cmd.Arg)
 		}
 
 		for idx := range cmd.Commands {
@@ -138,6 +139,7 @@ func (cg *Group) Validate() error {
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.name}}", cg.Name)
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{group.category}}", cg.Category)
 				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{prefix}}", cg.Name)
+				cmd.Commands[idx] = strings.ReplaceAll(cmd.Commands[idx], "{{arg}}", cmd.Arg)
 			}
 		}
 

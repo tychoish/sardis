@@ -32,6 +32,8 @@ type Command struct {
 	Background      *bool                   `bson:"background,omitempty" json:"background,omitempty" yaml:"background,omitempty"`
 	SortHint        int                     `bson:"sort_hint,omitempty" json:"sort_hint,omitempty" yaml:"sort_hint,omitempty"`
 	Logs            Logging                 `bson:"logs" json:"logs" yaml:"logs"`
+	Profile         string                  `bson:"profile" json:"profile" yaml:"profile"`
+
 	// if possible call the operation rather
 	// than execing the commands
 	WorkerDefinition fnx.Worker `bson:"-" json:"-" yaml:"-"`

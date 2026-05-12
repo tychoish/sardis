@@ -42,7 +42,7 @@ func StartService(ctx context.Context, conf *ServiceConfig) error {
 
 	grip.Infof("starting web service, pid=%d", os.Getpid())
 
-	return srv.GetOrchestrator(ctx).Add(srv.HTTP("hello-world", time.Minute, web))
+	return srv.GetOrchestrator(ctx).Add(srv.HTTP("hello-world", qtime.Minute, web))
 }
 
 func BuildCommand() *cmdr.Commander {

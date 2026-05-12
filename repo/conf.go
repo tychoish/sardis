@@ -36,10 +36,8 @@ func (conf *Configuration) doValidate() error {
 
 	for group, tags := range conf.TagGroups {
 		ec.Whenf(conf.caches.lookup.Check(group), "group name %q is an existing repo name", group)
-		ec.Whenf(conf.caches.tags.Check(group), "group name %q is an existing tag name", group)
 		for _, tg := range tags {
-			ec.Whenf(!conf.caches.lookup.Check(tg), "tag %q in group %q is NOT an existing repo name", tg, group)
-			ec.Whenf(!conf.caches.tags.Check(tg), "tag name %q is NOT an existing tag name", group)
+			ec.Whenf(!conf.caches.lookup.Check(tg) && !conf.caches.tags.Check(tg), "tag %q in group %q is NOT an existing repo name", tg, group)
 		}
 	}
 

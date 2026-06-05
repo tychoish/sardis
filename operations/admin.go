@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"iter"
 	"os"
 	"slices"
@@ -22,9 +21,11 @@ import (
 	"github.com/tychoish/jasper"
 	"github.com/tychoish/sardis"
 	"github.com/tychoish/sardis/global"
+	srsrv "github.com/tychoish/sardis/srv"
 	"github.com/tychoish/sardis/subexec"
 	"github.com/tychoish/sardis/sysmgmt"
 	"github.com/tychoish/sardis/util"
+	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v2"
 )
 
@@ -102,59 +103,118 @@ func linkOp() *cmdr.Commander {
 				return subexec.TOOLS.WorkerPool(workers).Run(ctx)
 			}).
 			Add).
-		Subcommanders(addOpCommand(cmdr.MakeCommander().
+		Subcommanders(cmdr.MakeCommander().
 			SetName("discover").
 			Aliases("disco", "disc").
-			SetUsage("discover"),
-			"format", func(ctx context.Context, args *withConf[[]string]) error {
+			SetUsage("discover symlinks on the filesystem").
+			Flags(
+				cmdr.FlagBuilder("table").
+					SetName("format", "f").
+					SetUsage("output format: table|json|yaml|yaml-list|line").
+					Flag(),
+				cmdr.FlagBuilder(false).
+					SetName("skip-defined").
+					SetUsage("show only problems: exists-but-undefined and defined-but-missing").
+					Flag(),
+			).
+			With(cmdr.SpecBuilder(func(ctx context.Context, cc *cli.Command) (*discoverArgs, error) {
+				conf, err := ResolveConfiguration(ctx, cc)
+				if err != nil {
+					return nil, err
+				}
+				format := cc.String("format")
+				if !cc.IsSet("format") {
+					if first := cc.Args().First(); first != "" {
+						format = first
+					}
+				}
+				return &discoverArgs{
+					conf:        conf,
+					format:      format,
+					skipDefined: cc.Bool("skip-defined"),
+				}, nil
+			}).SetMiddleware(func(ctx context.Context, args *discoverArgs) context.Context {
+				ctx = sardis.WithConfiguration(ctx, args.conf)
+				ctx = subexec.WithJasper(ctx, &args.conf.Operations)
+				ctx = srsrv.WithAppLogger(ctx, args.conf.Settings.Logging)
+				ctx = srsrv.WithRemoteNotify(ctx, args.conf.Settings)
+				return ctx
+			}).SetAction(func(ctx context.Context, args *discoverArgs) error {
 				if args.conf.System.Links.Discovery == nil {
 					return errors.New("discovery config not defined")
 				}
 				ec := &erc.Collector{}
-
 				lookup := args.conf.System.Links.Resolve()
 
-				format := "table"
-				if len(args.arg) > 0 {
-					format = args.arg[0]
+				links := func(yield func(sysmgmt.LinkDefinition) bool) {
+					seen := map[string]struct{}{}
+					for d := range args.conf.System.Links.Discovery.FindLinks() {
+						d.Defined = lookup.Check(d.Path)
+						seen[d.Path] = struct{}{}
+						if args.skipDefined && d.Defined && d.PathExists {
+							continue
+						}
+						if !yield(d) {
+							return
+						}
+					}
+					if args.skipDefined {
+						for _, link := range args.conf.System.Links.Links {
+							if _, ok := seen[link.Path]; ok {
+								continue
+							}
+							link.Defined = true
+							link.PathExists = util.FileExists(link.Path)
+							link.TargetExists = util.FileExists(link.Target)
+							if link.PathExists {
+								continue
+							}
+							if !yield(link) {
+								return
+							}
+						}
+					}
 				}
 
-				switch format {
+				switch args.format {
 				case "JSON", "json", "js", "j":
 					buf := bufio.NewWriter(os.Stdout)
-
-					for d := range args.conf.System.Links.Discovery.FindLinks() {
+					for d := range links {
 						erc.Must(buf.Write(erc.Must(jsonx.DC.Elements(
 							jsonx.EC.String("path", d.Path),
 							jsonx.EC.String("target", d.Target),
-							jsonx.EC.Boolean("defined", lookup.Check(d.Path)),
+							jsonx.EC.Boolean("defined", d.Defined),
 							jsonx.EC.Boolean("target_exists", d.TargetExists),
 							jsonx.EC.Boolean("path_exists", d.PathExists),
 						).MarshalJSON())))
 						ec.Push(buf.WriteByte('\n'))
 					}
-
 					ec.Push(buf.Flush())
-				case "line", "ln":
+				case "line", "ln", "print":
 					buf := bufio.NewWriter(os.Stdout)
-
-					for d := range args.conf.System.Links.Discovery.FindLinks() {
-						_, err := fmt.Fprintln(buf, d.Path, "->", d.Target)
-						if err != nil {
-							ec.Push(err)
-						}
+					enc := yaml.NewEncoder(buf)
+					type linksConf struct {
+						Links []sysmgmt.LinkDefinition `yaml:"links"`
 					}
-
+					out := linksConf{}
+					for d := range links {
+						out.Links = append(out.Links, d)
+					}
+					ec.Push(enc.Encode(out))
+					ec.Push(enc.Close())
+					ec.Push(buf.Flush())
+				case "yaml-list", "yl":
+					buf := bufio.NewWriter(os.Stdout)
+					enc := yaml.NewEncoder(buf)
+					ec.Push(enc.Encode(irt.Collect(links)))
+					ec.Push(enc.Close())
 					ec.Push(buf.Flush())
 				case "YAML", "yaml", "yml", "y", "export":
 					buf := bufio.NewWriter(os.Stdout)
 					enc := yaml.NewEncoder(buf)
-
-					for d := range args.conf.System.Links.Discovery.FindLinks() {
-						d.Defined = lookup.Check(d.Path)
+					for d := range links {
 						ec.Push(enc.Encode(d))
 					}
-
 					ec.Push(enc.Close())
 					ec.Push(buf.Flush())
 				case "table":
@@ -162,8 +222,7 @@ func linkOp() *cmdr.Commander {
 				default:
 					table := tabby.New()
 					table.AddHeader("Path", "Target", "Exists", "Defined")
-
-					items := irt.Collect(args.conf.System.Links.Discovery.FindLinks())
+					items := irt.Collect(links)
 					slices.SortFunc(items, func(a, b sysmgmt.LinkDefinition) int {
 						if a.LessThan(b) {
 							return -1
@@ -173,21 +232,24 @@ func linkOp() *cmdr.Commander {
 						}
 						return 0
 					})
-
 					for _, d := range items {
 						table.AddLine(
 							util.TryCollapseHomeDir(d.Path),
 							util.TryCollapseHomeDir(d.Target),
 							renderBool(d.TargetExists),
-							renderBool(lookup.Check(d.Path)),
+							renderBool(d.Defined),
 						)
 					}
-
 					table.Print()
 				}
-
 				return ec.Resolve()
-			}))
+			}).Add))
+}
+
+type discoverArgs struct {
+	conf        *sardis.Configuration
+	format      string
+	skipDefined bool
 }
 
 func renderBool(in bool) string {

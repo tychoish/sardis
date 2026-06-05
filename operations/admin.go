@@ -114,7 +114,10 @@ func linkOp() *cmdr.Commander {
 
 				lookup := args.conf.System.Links.Resolve()
 
-				format := args.arg[0]
+				format := "table"
+				if len(args.arg) > 0 {
+					format = args.arg[0]
+				}
 
 				switch format {
 				case "JSON", "json", "js", "j":

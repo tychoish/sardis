@@ -90,6 +90,9 @@ func (b *OutputBuf) Close() error {
 }
 
 func (b *OutputBuf) Send(m message.Composer) {
+	if b.buffer == nil {
+		return
+	}
 	if send.ShouldLog(b, m) {
 		erc.Must(b.buffer.WriteString(m.String()))
 		erc.Must(b.buffer.WriteString("\n"))

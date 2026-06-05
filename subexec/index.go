@@ -17,7 +17,7 @@ import (
 type Node struct {
 	word     string
 	command  *Command
-	children stw.Map[string, *Node]
+	children map[string]*Node
 }
 
 func NewCommandTree(commands []Command) *Node {
@@ -33,6 +33,7 @@ func NewTree(nodes []*Node) *Node {
 	}
 	return n
 }
+
 func (conf *Configuration) Tree() *Node { return NewCommandTree(conf.ExportAllCommands()) }
 
 func (n *Node) KeysAtLevel() []string {
@@ -59,7 +60,7 @@ func (n *Node) Len() int                  { return len(n.children) }
 func (n *Node) Children() iter.Seq[*Node] { return maps.Values(n.children) }
 func (n *Node) NarrowTo(key string) *Node { return n.children[key] }
 func (n *Node) HasCommand() bool          { return n.command != nil }
-func (n *Node) HasChidren() bool          { return n.children.Len() > 0 }
+func (n *Node) HasChidren() bool          { return n.Len() > 0 }
 func (n *Node) Command() *Command         { return n.command }
 func (n *Node) ID() string                { return n.word }
 

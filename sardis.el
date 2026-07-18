@@ -10,15 +10,10 @@
 ;;; Code:
 
 (require 'seq)
-(require 'alert)
-(require 'annotated-completing-read)
 
 (eval-when-compile
   ;; xlib macros: `pa', `with-force-write', `add-hygenic-one-shot-hook'
   (require 'xtdlib))
-
-;; tychoish-common functions: `compile-buffer-name'
-(declare-function compile-buffer-name "tychoish-common")
 
 (bind-keys
  :map tychoish/core-map
@@ -26,15 +21,17 @@
 
 ;;; Alert style
 
-(alert-define-style 'sardis
-  :title "Notify via sardis"
-  :notifier
-  (lambda (info)
-    (start-process
-     "sardis-alert" nil
-     "sardis" "notify" "send"
-     (or (plist-get info :title) "emacs")
-     (or (plist-get info :message) ""))))
+(with-eval-after-load 'alert 
+  (alert-define-style
+   'sardis
+   :title "Notify via sardis"
+   :notifier
+   (lambda (info)
+     (start-process
+      "sardis-alert" nil
+      "sardis" "notify" "send"
+      (or (plist-get info :title) "emacs")
+      (or (plist-get info :message) "")))))
 
 ;;; Commands
 

@@ -9,8 +9,6 @@
 
 ;;; Code:
 
-(require 'seq)
-
 (eval-when-compile
   ;; xlib macros: `pa', `with-force-write', `add-hygenic-one-shot-hook'
   (require 'xtdlib))
@@ -21,7 +19,7 @@
 
 ;;; Alert style
 
-(with-eval-after-load 'alert 
+(with-eval-after-load 'alert
   (alert-define-style
    'sardis
    :title "Notify via sardis"
@@ -38,8 +36,8 @@
 (defun sardis--select-cmd ()
   (annotated-completing-read
    (thread-last (process-lines "sardis" "cmd" "--annotate")
-		(seq-map (lambda (it) (split-string it "\t" t "[ \s\t\n]")))
-		(seq-map (lambda (cc) (cons (car cc) (cadr cc)))))
+		(mapcar (lambda (it) (split-string it "\t" t "[ \s\t\n]")))
+		(mapcar (lambda (cc) (cons (car cc) (cadr cc)))))
    :prompt "sards.cmds =>"
    :require-match nil
    :category 'tychoish/sardis-cmds))

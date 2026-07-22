@@ -9,13 +9,7 @@
 
 ;;; Code:
 
-(eval-when-compile
-  ;; xlib macros: `pa', `with-force-write', `add-hygenic-one-shot-hook'
-  (require 'xtdlib))
-
-(bind-keys
- :map tychoish/core-map
- ("r" . sardis-run))
+(keymap-set hud-core-map "r" #'sardis-run)
 
 ;;; Alert style
 
@@ -32,7 +26,6 @@
       (or (plist-get info :message) "")))))
 
 ;;; Commands
-
 (defun sardis--select-cmd ()
   (annotated-completing-read
    (thread-last (process-lines "sardis" "cmd" "--annotate")

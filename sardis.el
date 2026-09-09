@@ -73,5 +73,49 @@
        (pa "highlight-regexp" :is nil)
        (pa "continue" :is nil)))))
 
+;;; Daemons Dashboard Integration
+
+(defcustom sardis-daemons-config-file "~/garen/configs/sardis.system-config.yaml"
+  "Path to the Sardis declarative system configuration file."
+  :type 'file
+  :group 'sardis)
+
+;;;###autoload
+(defun sardis-load-daemons-config (&optional file)
+  "Load expected system service declarations from Sardis YAML config FILE.
+Defaults to `sardis-daemons-config-file'. Registers parsed service
+units into `daemons-dash-config-registry' when `daemons-dash-config' is available."
+  (interactive)
+  (let ((path (expand-file-name (or file sardis-daemons-config-file))))
+    (when (and (file-exists-p path) (featurep 'daemons-dash-config))
+      (let* ((content (with-temp-buffer
+                        (insert-file-contents path)
+                        (buffer-string)))
+             (parsed (when (fboundp 'yaml-parse-string)
+                       (ignore-errors
+                         (yaml-parse-string content
+                                            :object-type 'plist
+                                            :sequence-type 'list
+                                            :object-key-type 'keyword))))
+             (system (plist-get parsed :system))
+             (systemd (plist-get system :systemd))
+             (services (plist-get systemd :services)))
+        (dolist (s services)
+          (let* ((unit (or (plist-get s :unit) (plist-get s :name)))
+                 (is-user (plist-get s :user))
+                 (disabled (plist-get s :disabled))
+                 (provider (if is-user 'systemd-user 'systemd-system))
+                 (expected (if disabled 'inactive 'active)))
+            (when unit
+              (daemons-dash-register-service
+               unit
+               :name unit
+               :provider provider
+               :expected-status expected
+               :doc (plist-get s :name)))))))))
+
+(with-eval-after-load 'daemons-dash-config
+  (sardis-load-daemons-config))
+
 (provide 'sardis)
 ;;; sardis.el ends here
